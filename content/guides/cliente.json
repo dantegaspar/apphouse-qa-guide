@@ -1,0 +1,391 @@
+{
+  "id": "cliente",
+  "version": "1.0.0",
+  "role": "Cliente final",
+  "title": "Manual del Cliente final",
+  "subtitle": "Guía de prueba de la app AppHouse",
+  "summary": "Vas a hacer compras de práctica desde tu celular. Ningún cobro es real: no uses tu dinero ni tus tarjetas, y no se entrega comida de verdad. Sigue las actividades en orden.",
+  "source": "Manual_Cliente_final-1.pdf",
+  "notice": "Al abrir la app puede salir el logotipo de ejemplo «Mi negocio Pizzería»: es normal, es la marca de prueba.",
+  "glossary": "**Toca** = presiona con el dedo · **Escribe** = usa el teclado · **Toma una captura** = foto de la pantalla · **El grupo** = el grupo de WhatsApp de la prueba.",
+  "tester": {
+    "fields": [
+      { "id": "device", "label": "Marca y modelo de tu celular", "placeholder": "Ej. Samsung A14, iPhone 13", "required": true },
+      { "id": "appEmail", "label": "Correo con el que entras a la app", "type": "email", "required": false }
+    ]
+  },
+  "prep": {
+    "title": "Antes de empezar",
+    "sections": [
+      {
+        "title": "Instala la app",
+        "items": [
+          "**Android:** toca la liga que Coordinación manda al grupo y toca **Instalar** (o **Actualizar**). Si sale un aviso de seguridad por ser una app de prueba, toca **Permitir** o **Instalar de todas formas**.",
+          "**iPhone:** descarga gratis **TestFlight** (la app de pruebas de Apple) desde la App Store. Regresa al grupo, toca otra vez la liga y toca **Aceptar** y luego **Instalar**."
+        ]
+      }
+    ],
+    "checklist": [
+      { "id": "installed", "label": "Ya tengo instalada la app AppHouse." },
+      { "id": "permissions", "label": "Le di permiso de avisos (notificaciones) y de ubicación cuando me lo pidió." },
+      { "id": "screenshots", "label": "Sé tomar capturas de pantalla en mi celular." }
+    ],
+    "rules": [
+      "Ningún cobro es real. Usa solo las **tarjetas de práctica** de la hoja de datos.",
+      "Si la sucursal rechaza o cancela tu pedido, es parte de la prueba: anótalo y sigue.",
+      "Si algo no sale como dice la guía, repórtalo con el botón **No pude** o **Reportar falla** del paso.",
+      "**C12** (cómo se ven las pantallas) se revisa durante toda la prueba, no al final.",
+      "Graba la pantalla solo para mostrar una falla, de 1 a 2 minutos. **Android:** desliza desde arriba y toca **Grabar pantalla**. **iPhone:** desliza desde la esquina de arriba a la derecha y toca el círculo con punto."
+    ],
+    "tour": {
+      "title": "Conoce la app",
+      "image": "/guides/cliente/conoce-la-app.jpg",
+      "caption": "1 = Entregar en · 2 = Pedir en · 3 = menú de abajo",
+      "items": [
+        "Arriba a la izquierda, **Entregar en (1)**: toca el nombre de tu dirección (ej. «Casa») para elegir adónde llega tu pedido.",
+        "Arriba a la derecha, **Pedir en (2)**: la sucursal que te atiende. Debajo dice **Abierta** en verde o **Cerrada** en rojo. Toca el nombre para cambiarla.",
+        "**Menú de abajo (3)**: **Inicio** (la comida), **Promociones** (descuentos), **Pedidos** (tus compras) y **Cuenta** (direcciones y tarjetas)."
+      ]
+    }
+  },
+  "reference": {
+    "title": "Datos para tus pedidos",
+    "intro": "Hoja de consulta: no necesitas memorizarla. Usa solo las tarjetas de práctica; nunca escribas una tarjeta real.",
+    "tables": [
+      {
+        "title": "Productos",
+        "columns": ["Producto", "Precio", "Qué debe pasar"],
+        "rows": [
+          ["Pizza Hawaiana", "Chica $120 · Mediana $150 · Grande $180. Extras: Queso extra +$20, Orilla rellena +$30", "20 % de descuento solo en el precio base ($120 → $96). Tamaños y extras se suman sin descuento: Mediana $126; Mediana con Orilla rellena $156."],
+          ["Pizza Pepperoni", "Chica $110 · Mediana $140 · Grande $170. Queso extra +$20", "Disponible"],
+          ["Hamburguesa doble carne", "$130", "Agotada: no se puede comprar"],
+          ["Alitas 10 piezas", "$140 · sabor obligatorio", "Disponible"],
+          ["Papas a la francesa", "$50 · Queso cheddar +$15", "Disponible"],
+          ["Agua de limón 1 L", "$35 · sin opciones", "Disponible"],
+          ["Refresco 600 ml", "$25 · sabor obligatorio", "Disponible"],
+          ["Paquete fiesta", "$650", "Disponible"]
+        ],
+        "note": "Los productos de prueba no tienen foto: es normal, no lo reportes como falla. Si ves otros productos (por ejemplo Volcánica o Ensalada César), guíate solo por esta tabla."
+      },
+      {
+        "title": "Datos de prueba",
+        "columns": ["Dato", "Valor"],
+        "rows": [
+          ["Promoción", "Pizza Hawaiana 20 %: la crea la sucursal y aparece en Promociones. No hay cupones."],
+          ["Envío", "Hasta 1 km $25 · hasta 2 km $35 · hasta 3 km $45 · más de 3 km sin entrega («Aún no llegamos»)."],
+          ["Tarjeta que SÍ pasa", "4242 4242 4242 4242 · vence 12/30 · CVC 123 · titular: tu nombre."],
+          ["Tarjeta que se RECHAZA a propósito", "4000 0000 0000 0002 · vence 12/30 · CVC 123 · titular: tu nombre."],
+          ["Límites", "Pedido máximo $1,000 · pago en efectivo máximo $700."],
+          ["Ejemplo de cuenta", "Pepperoni Mediana con Queso extra ($160) + Refresco Cola ($25) = Productos $185. Con envío de $25 (hasta 1 km): Total $210, sin contar propina."]
+        ]
+      }
+    ]
+  },
+  "troubleshooting": [
+    ["El botón dice **Sin repartidores por ahora** o el envío dice **Sin calcular**.", "Toma una captura y avisa en el grupo qué sucursal tienes elegida. No es falla de tu celular."],
+    ["La sucursal dice **Cerrada**.", "Toca su nombre en **Pedir en** y elige una que diga **Abierta**, o avisa en el grupo."],
+    ["Tu dirección dice **Aún no llegamos**.", "Está a más de 3 km de la sucursal. Agrega otra dirección más cercana."],
+    ["Tu pedido cambió solo a **Rechazado** o **Cancelado**.", "Es parte de la prueba de la sucursal. Anótalo y revisa que diga **Reembolsado** si pagaste con tarjeta."],
+    ["Al abrir la app dice **No pudimos cargar los productos**.", "En Inicio, desliza el dedo hacia abajo para recargar."],
+    ["Promociones dice «**No tenemos promociones por ahora**».", "Toma una captura y avisa en el grupo: la sucursal debe crear la promoción."],
+    ["Un producto no tiene foto.", "Es normal: los productos de prueba no tienen foto. No lo reportes."],
+    ["Android no deja instalar la app.", "Toca **Permitir** o **Instalar de todas formas**. Si no aparece, avisa en el grupo."]
+  ],
+  "activities": [
+    {
+      "id": "C01",
+      "title": "Crea tu cuenta o entra a la app",
+      "when": "Al empezar, antes de INICIAN PEDIDOS.",
+      "where": "Pantalla de entrada de la app.",
+      "warnings": ["No toques **Continuar como invitado**."],
+      "steps": [
+        { "id": "1", "text": "Si todavía no tienes cuenta: toca **Regístrate (4)** y sigue los 3 pasos. La contraseña lleva al menos 10 caracteres, con una mayúscula, una minúscula, un número y un signo como ! o #. Escribe el código de 6 números que llega a tu correo (búscalo también en **Correo no deseado**). Si ya tienes cuenta, marca **Lo logré** y sigue.", "image": "/guides/cliente/c01-1.jpg", "caption": "1 = correo · 2 = contraseña · 3 = Iniciar sesión · 4 = Regístrate" },
+        { "id": "2", "text": "Ya con tu cuenta: escribe tu **correo (1)** y una **contraseña equivocada a propósito (2)** y toca **Iniciar sesión (3)**. Toma una captura del aviso.", "image": "/guides/cliente/c01-1.jpg", "caption": "1 = correo · 2 = contraseña · 3 = Iniciar sesión · 4 = Regístrate", "evidence": true },
+        { "id": "3", "text": "Escribe la **contraseña correcta** y toca **Iniciar sesión**." }
+      ],
+      "expected": [
+        "Con la contraseña equivocada, la app muestra un mensaje de error y no entra.",
+        "Con la contraseña correcta, entras a la pantalla de inicio.",
+        "Al registrarte, el código llega a tu correo y la app no te deja pedir hasta que lo escribes."
+      ],
+      "fields": [{ "id": "codeMinutes", "label": "Minutos que tardó el código (si te registraste)", "type": "number" }]
+    },
+    {
+      "id": "C02",
+      "title": "Guarda, edita y borra direcciones",
+      "when": "Antes de INICIAN PEDIDOS.",
+      "where": "Menú de abajo › **Cuenta** › **Direcciones**.",
+      "steps": [
+        { "id": "1", "text": "Toca **Agregar dirección**. Escribe solo las primeras **3 letras** de tu calle (1).", "image": "/guides/cliente/c02-1.jpg", "caption": "1 = 3 letras · 2 = sugerencias" },
+        { "id": "2", "text": "Antes de tocar una sugerencia (2), revisa que la colonia y la ciudad sean de **Puebla**. En Android, si el primer toque solo esconde el teclado, toca otra vez.", "image": "/guides/cliente/c02-1.jpg", "caption": "1 = 3 letras · 2 = sugerencias" },
+        { "id": "3", "text": "En el mapa, revisa el punto, ponle un nombre (Casa, Trabajo, Escuela), revisa el código postal, escribe una referencia y toca **Confirmar y guardar**.", "image": "/guides/cliente/c02-2.jpg", "caption": "1 = buscar · 2 = datos · 3 = guardar" },
+        { "id": "4", "text": "Guarda **3 direcciones con servicio** en al menos dos zonas distintas, y una **cuarta** solo para borrarla. Si una dice en rojo **Aún no llegamos** (está a más de 3 km), agrega otra.", "image": "/guides/cliente/c02-3.jpg", "caption": "1 = lista · 2 = Editar · 3 = bote rojo" },
+        { "id": "5", "text": "En una dirección toca **Editar (2)**, cambia la referencia y toca **Guardar cambios**.", "image": "/guides/cliente/c02-3.jpg", "caption": "1 = lista · 2 = Editar · 3 = bote rojo" },
+        { "id": "6", "text": "En la cuarta toca el **bote rojo (3)** y confirma con **Eliminar**.", "image": "/guides/cliente/c02-3.jpg", "caption": "1 = lista · 2 = Editar · 3 = bote rojo" }
+      ],
+      "expected": [
+        "Con 3 letras aparecen sugerencias, y la dirección elegida coincide con el punto del mapa.",
+        "Las tres direcciones se guardan y aparecen en tu lista.",
+        "El cambio de la dirección editada se conserva.",
+        "La dirección borrada desaparece de la lista.",
+        "La pantalla nunca se queda en blanco o en negro.",
+        "Siempre puedes escribir el código postal y siempre puedes salir o cancelar."
+      ]
+    },
+    {
+      "id": "C03",
+      "title": "Revisa el menú",
+      "when": "Antes de INICIAN PEDIDOS.",
+      "where": "Menú de abajo › **Inicio**.",
+      "warnings": ["Los productos de prueba no tienen foto. Es normal: no lo reportes como falla."],
+      "steps": [
+        { "id": "1", "text": "En **Inicio**, desliza hacia abajo y compara cada producto con la tabla de la hoja de **Datos**.", "image": "/guides/cliente/c03-1.jpg", "caption": "1 = agotada · 2 = −20 %" },
+        { "id": "2", "text": "La **Hamburguesa doble carne** debe decir **Agotado (1)**.", "image": "/guides/cliente/c03-1.jpg", "caption": "1 = agotada · 2 = −20 %" },
+        { "id": "3", "text": "Toca la **Pizza Hawaiana**: prueba cada tamaño y extra y revisa que el precio del botón **Agregar** cambie (4). Con **Mediana** y **Orilla rellena** debe decir **$156**.", "image": "/guides/cliente/c03-2.jpg", "caption": "1 = precio · 2 = tamaños · 3 = extras · 4 = Agregar" },
+        { "id": "4", "text": "Toca las **Alitas** (deben pedir sabor) y el **Agua de limón** (sin opciones). Cierra cada ficha con la **X** sin agregar nada." }
+      ],
+      "expected": [
+        "La Hamburguesa aparece como agotada y no se puede agregar.",
+        "Cada tamaño tiene precio, y la Hawaiana muestra el precio con descuento.",
+        "El precio cambia según el tamaño y los extras que eliges.",
+        "Las Alitas no se agregan sin sabor.",
+        "Cada producto muestra solo sus propias opciones; el Agua no muestra ninguna.",
+        "Ningún producto aparece dos veces."
+      ],
+      "fields": [{ "id": "hawaianaPrice", "label": "Precio de la Hawaiana Mediana con Orilla rellena (debe ser $156)" }]
+    },
+    {
+      "id": "C04",
+      "title": "Revisa las promociones",
+      "when": "Antes de INICIAN PEDIDOS.",
+      "where": "Menú de abajo › **Promociones**.",
+      "warnings": ["En la app no hay cupones. Las promociones las crea la sucursal y aparecen solas en Promociones y en el menú."],
+      "steps": [
+        { "id": "1", "text": "Toca **Promociones (1)**. Debe aparecer **Pizza Hawaiana 20 %** con el precio **$96** y el precio anterior tachado **$120 (2)**. Toma una captura.", "image": "/guides/cliente/c04-1.jpg", "caption": "1 = Promociones · 2 = precio con descuento · 3 = abrir", "evidence": true },
+        { "id": "2", "text": "Toca el **+ (3)** para abrir la pizza. Deja **Chica**, sin extras: el botón **Agregar** debe decir **$96**.", "image": "/guides/cliente/c04-1.jpg", "caption": "1 = Promociones · 2 = precio con descuento · 3 = abrir" },
+        { "id": "3", "text": "Elige **Mediana** y **Orilla rellena**: debe decir **$156** (el descuento es solo del precio base). Cierra con la **X** sin agregar." }
+      ],
+      "notes": "Si Promociones dice «No tenemos promociones por ahora», toma una captura, repórtalo con **No pude** y marca la actividad como **No pude hacerla por otro problema**.",
+      "expected": [
+        "La Pizza Hawaiana 20 % aparece en Promociones a $96, con $120 tachado.",
+        "El descuento se aplica solo al precio base: Chica $96 y Mediana con Orilla rellena $156."
+      ],
+      "fields": [{ "id": "promoPrice", "label": "Precio que muestra Promociones para la Hawaiana" }]
+    },
+    {
+      "id": "C05",
+      "title": "Revisa el carrito antes de pagar",
+      "when": "Antes de INICIAN PEDIDOS. **No se paga.**",
+      "where": "Botón **Ver pedido** (abajo, en Inicio).",
+      "warnings": ["En la pantalla **Propina** no toques **Pedir · $… al recibir**: ese botón crea el pedido. Regresa con la flecha ←."],
+      "steps": [
+        { "id": "1", "text": "Agrega una **Pizza Pepperoni Mediana con Queso extra** y un **Refresco Cola**, y toca **Ver pedido**. Se abre **Tu pedido**.", "image": "/guides/cliente/c05-1.jpg", "caption": "1 = Entregar en · 2 = resumen" },
+        { "id": "2", "text": "Cambia la cantidad de un producto con **−** y **+** y regrésala como estaba.", "image": "/guides/cliente/c05-1.jpg", "caption": "1 = Entregar en · 2 = resumen" },
+        { "id": "3", "text": "Revisa **Entregar en (1)** y el **Resumen (2)**: Productos, Envío y Total.", "image": "/guides/cliente/c05-1.jpg", "caption": "1 = Entregar en · 2 = resumen" },
+        { "id": "4", "text": "Toca **Continuar**. En **¿Algo más para tu pedido? (1)** no agregues nada y toca **Así está bien (2)**.", "image": "/guides/cliente/c05-2.jpg", "caption": "1 = sugerencias · 2 = Así está bien" },
+        { "id": "5", "text": "En **Finalizar compra** revisa la dirección, la sucursal y el total, y toca **Continuar**." },
+        { "id": "6", "text": "En **Propina** elige **10 % (1)** y revisa que el **Total** cambie (2). **No toques Pedir (3)**: regresa con la flecha ←.", "image": "/guides/cliente/c05-3.jpg", "caption": "1 = propina · 2 = total · 3 = no tocar" }
+      ],
+      "expected": [
+        "Se ven por separado: productos, descuento, envío, propina (si hay) y total.",
+        "El envío corresponde a tu distancia según la tabla de envío, sin mensajes de error.",
+        "Total = productos − descuento + envío + propina.",
+        "Al cambiar la cantidad, los productos y el total se actualizan."
+      ],
+      "fields": [{ "id": "totals", "label": "Productos / envío / propina / total", "placeholder": "Ej. $185 / $25 / $18.50 / $228.50" }]
+    },
+    {
+      "id": "C06",
+      "title": "Paga con tarjeta y en efectivo",
+      "when": "Después del mensaje **INICIAN PEDIDOS**.",
+      "where": "**Ver pedido** › **Continuar** › **Finalizar compra**.",
+      "steps": [
+        { "id": "1", "text": "Arma un pedido de **menos de $500** y llega a **Finalizar compra** como en C05." },
+        { "id": "2", "text": "**Tarjeta que se rechaza:** en **Método de pago** toca **Cambiar › Agregar método de pago (1)**. Escribe **4000 0000 0000 0002**, **12/30**, **123** y tu nombre, y toca **Guardar tarjeta**. Debe salir «Tu banco rechazó la tarjeta…» (2). Toma una captura.", "image": "/guides/cliente/c06-2.jpg", "caption": "1 = datos de la tarjeta · 2 = aviso de rechazo", "evidence": true },
+        { "id": "3", "text": "**Tarjeta que sí pasa:** borra el número, escribe **4242 4242 4242 4242**, **12/30** y **123**, y toca **Guardar tarjeta**. Revisa que quede elegida en **Método de pago**, toca **Continuar**, elige propina y toca **Pedir**. Anota el número de pedido.", "image": "/guides/cliente/c06-1.jpg", "caption": "1 = Agregar método de pago" },
+        { "id": "4", "text": "**Efectivo:** haz otro pedido de menos de $500. En **Método de pago** elige **Efectivo (1)**, en **¿Con cuánto vas a pagar?** toca **$500 (2)** y revisa «Te llevan $… de cambio». Toca **Continuar** y **Pedir**.", "image": "/guides/cliente/c06-3.jpg", "caption": "1 = Efectivo · 2 = billete y cambio" },
+        { "id": "5", "text": "**Tope en efectivo:** arma un carrito de **más de $700** (por ejemplo 1 Paquete fiesta y 1 Pizza Pepperoni Chica = $760) y toca **Ver pedido**. Debe salir «Los pedidos de más de $700.00 se pagan con tarjeta». No lo pagues y vacía el carrito." }
+      ],
+      "expected": [
+        "Con la tarjeta rechazada, la app muestra un mensaje claro y no crea el pedido.",
+        "Con la tarjeta aprobada, aparece la confirmación con número de pedido.",
+        "En efectivo, la app muestra el cambio correcto ($500 − total) y la confirmación con número de pedido.",
+        "En ningún pago aparece una pantalla en blanco o en negro, ni un mensaje de error cuando el pago sí pasó.",
+        "Con más de $700, la app avisa que ese pedido se paga con tarjeta y no deja pagarlo en efectivo."
+      ],
+      "fields": [
+        { "id": "orderCard", "label": "Número de pedido con tarjeta" },
+        { "id": "orderCash", "label": "Número de pedido en efectivo" }
+      ]
+    },
+    {
+      "id": "C07",
+      "title": "Pide en dos sucursales distintas",
+      "when": "Después de C06.",
+      "where": "Arriba en Inicio: **Entregar en** y **Pedir en**.",
+      "steps": [
+        { "id": "1", "text": "En **Entregar en** elige una de tus direcciones. Revisa en **Pedir en** qué sucursal te atiende. Si dice **Cerrada**, toca el nombre y elige una **Abierta**." },
+        { "id": "2", "text": "Arma un pedido y págalo como en C06. En **Finalizar compra** revisa «**Tu pedido sale de…**» (1).", "image": "/guides/cliente/c07-1.jpg", "caption": "1 = sucursal que surte · 2 = totales" },
+        { "id": "3", "text": "Cuando se entregue, abre el pedido, toca **Ver el recibo** y revisa que diga la misma sucursal (1).", "image": "/guides/cliente/c07-2.jpg", "caption": "1 = sucursal · 2 = Entregado" },
+        { "id": "4", "text": "Repite con **otra dirección** para que te atienda **otra sucursal**." }
+      ],
+      "expected": [
+        "La app muestra las sucursales que te dan servicio en esa dirección.",
+        "El seguimiento, el recibo y los datos de contacto dicen la sucursal que elegiste.",
+        "Las sugerencias del carrito son productos de esa sucursal."
+      ],
+      "fields": [
+        { "id": "orderBranch1", "label": "Número de pedido y sucursal 1" },
+        { "id": "orderBranch2", "label": "Número de pedido y sucursal 2" }
+      ]
+    },
+    {
+      "id": "C08",
+      "title": "Sigue un pedido hasta que se entregue",
+      "when": "Con el pedido que pagaste en C06.",
+      "where": "Menú de abajo › **Pedidos**.",
+      "steps": [
+        { "id": "1", "text": "Abre el pedido y sal de la app **sin cerrarla** (toca el botón de inicio de tu celular).", "image": "/guides/cliente/c08-1.jpg", "caption": "1 = etapa · 2 = barra de 5 etapas · 3 = Ayuda" },
+        { "id": "2", "text": "Con cada aviso, anota la hora abajo (**Preparando** y **En camino**).", "image": "/guides/cliente/c08-2.jpg", "caption": "1 = entrega estimada · 2 = barra · 3 = repartidor" },
+        { "id": "3", "text": "Cuando diga **En camino**, haz **C09** (escribe al repartidor) y regresa aquí." },
+        { "id": "4", "text": "Al final debe decir **Entregado** (¡Tu pedido llegó!).", "image": "/guides/cliente/c08-3.jpg", "caption": "1 = aviso · 2 = ¡Tu pedido llegó! · 3 = Ver el recibo" }
+      ],
+      "expected": [
+        "Te llega un aviso en cada cambio de etapa.",
+        "Las etapas aparecen en orden: Recibido → Preparando → En camino → Llegando → Entregado.",
+        "El pedido termina como Entregado."
+      ],
+      "fields": [
+        { "id": "timePreparing", "label": "Hora del aviso Preparando", "type": "time" },
+        { "id": "timeOnTheWay", "label": "Hora del aviso En camino", "type": "time" }
+      ]
+    },
+    {
+      "id": "C09",
+      "title": "Escribe al repartidor",
+      "when": "Durante C08, cuando tu pedido diga **En camino**.",
+      "where": "Dentro del pedido, junto al nombre del repartidor.",
+      "warnings": ["No toques el botón de **llamar**."],
+      "steps": [
+        { "id": "1", "text": "Toca el botón de **mensaje** junto al repartidor." },
+        { "id": "2", "text": "Escribe **Prueba: ¿ya vienes?** y toma una captura con el teclado abierto (1).", "image": "/guides/cliente/c09-1.jpg", "caption": "1 = caja de texto y Enviar", "evidence": true },
+        { "id": "3", "text": "Toca la **flecha** para enviarlo.", "image": "/guides/cliente/c09-2.jpg", "caption": "1 = mensaje enviado" }
+      ],
+      "expected": [
+        "El teclado no tapa la caja de texto ni el botón Enviar.",
+        "El mensaje se envía y aparece en la conversación."
+      ]
+    },
+    {
+      "id": "C10",
+      "title": "Arma un pedido que pase el máximo",
+      "when": "Después de C08.",
+      "where": "Inicio y **Ver pedido**.",
+      "steps": [
+        { "id": "1", "text": "Con el carrito vacío, agrega **2 Paquetes fiesta** ($1,300)." },
+        { "id": "2", "text": "Toca **Ver pedido**: debe salir el **aviso del máximo (1)** y no debe dejarte continuar. Toma una captura.", "image": "/guides/cliente/c10-1.jpg", "caption": "1 = aviso del máximo", "evidence": true },
+        { "id": "3", "text": "Quita un paquete con **−**: el botón **Continuar** debe activarse (2).", "image": "/guides/cliente/c10-2.jpg", "caption": "1 = cantidad · 2 = Continuar" },
+        { "id": "4", "text": "Al terminar, quita el otro paquete para dejar el carrito vacío. **No pagues.**" }
+      ],
+      "expected": [
+        "Aparece un mensaje claro de que el pedido pasa el máximo.",
+        "El pedido no se crea.",
+        "Puedes abrir el carrito y quitar productos.",
+        "Al quedar en $1,000 o menos, ya puedes pagar."
+      ]
+    },
+    {
+      "id": "C11",
+      "title": "Cancela dos pedidos",
+      "when": "Después de INICIAN PEDIDOS. Paga en **efectivo**.",
+      "where": "Dentro del pedido › **Ayuda** (arriba a la derecha).",
+      "warnings": ["No toques **Llamar a la sucursal**: es un teléfono real."],
+      "steps": [
+        { "id": "1", "text": "Haz un pedido. Mientras diga **Recibido**, toca **Ayuda › Quiero cancelar mi pedido**. Elige un **motivo (1)** y toca **Cancelar pedido (2)** › **Sí, cancelar**.", "image": "/guides/cliente/c11-1.jpg", "caption": "1 = motivo · 2 = Cancelar pedido" },
+        { "id": "2", "text": "Haz otro pedido, espera a que diga **Preparando** e intenta cancelarlo igual. Toma una captura del mensaje (1).", "image": "/guides/cliente/c11-2.jpg", "caption": "1 = ya no se puede · 2 = no tocar", "evidence": true },
+        { "id": "3", "text": "Haz un pedido nuevo para confirmar que puedes seguir pidiendo." }
+      ],
+      "expected": [
+        "El pedido recién hecho se cancela y queda como Cancelado.",
+        "El pedido que ya dice Preparando no se cancela, y la app explica por qué y muestra cómo contactar a la sucursal.",
+        "Después puedes hacer otro pedido.",
+        "La pantalla de inicio no dice \"En curso\" por el pedido cancelado."
+      ]
+    },
+    {
+      "id": "C12",
+      "title": "Revisa cómo se ven las pantallas",
+      "when": "Durante toda la prueba, desde C01.",
+      "where": "Menú, carrito y detalle del pedido.",
+      "steps": [
+        { "id": "1", "text": "Mientras haces las demás actividades, fíjate en el **menú**, el **carrito** y el **detalle del pedido**." },
+        { "id": "2", "text": "En el detalle de un pedido, desliza el **panel blanco** de abajo del mapa hacia arriba y hacia abajo." },
+        { "id": "3", "text": "Si algo se ve **encimado o cortado**, repórtalo con una captura e indica la pantalla." }
+      ],
+      "expected": [
+        "Nada se ve encimado ni cortado.",
+        "El panel blanco de abajo del mapa se desliza sin trabarse."
+      ],
+      "fields": [{ "id": "badScreen", "label": "Pantalla con problema (si hubo)" }]
+    },
+    {
+      "id": "C13",
+      "title": "Cierra y vuelve a abrir la app",
+      "when": "Con un pedido que todavía no se entrega.",
+      "where": "Menú de abajo › **Pedidos**.",
+      "steps": [
+        { "id": "1", "text": "Anota abajo la **etapa** del pedido." },
+        { "id": "2", "text": "Cierra solo la app AppHouse. **Android:** toca el botón de apps abiertas y desliza AppHouse hacia arriba. **iPhone:** desliza desde abajo hasta la mitad de la pantalla y sube la tarjeta de AppHouse." },
+        { "id": "3", "text": "Vuelve a abrir la app y revisa el pedido. Si sale «No pudimos cargar los productos», desliza hacia abajo en Inicio para recargar." }
+      ],
+      "expected": [
+        "Sigues con la sesión iniciada.",
+        "El pedido sigue activo y con el estado correcto."
+      ],
+      "fields": [
+        { "id": "stageBefore", "label": "Etapa antes de cerrar" },
+        { "id": "stageAfter", "label": "Etapa al reabrir" }
+      ]
+    },
+    {
+      "id": "C14",
+      "title": "Producto que se agota con el carrito abierto",
+      "when": "Cuando Coordinación escriba **PREPAREN PAPAS - Sucursal (nombre)**.",
+      "where": "Inicio y **Ver pedido**.",
+      "steps": [
+        { "id": "1", "text": "Con el carrito vacío y esa sucursal en **Pedir en**, agrega solo **Papas a la francesa**. No pagues." },
+        { "id": "2", "text": "Cuando la sucursal escriba **PAPAS AGOTADAS**, toca **Ver pedido** e intenta pagar. Toma una captura.", "image": "/guides/cliente/c14-1.jpg", "caption": "1 = aviso · 2 = Papas agotadas · 3 = no deja pagar", "evidence": true },
+        { "id": "3", "text": "Cuando escriba **PAPAS DISPONIBLES**, abre el carrito y paga." }
+      ],
+      "expected": [
+        "El carrito marca las Papas como agotadas.",
+        "La app no te deja pagar mientras estén en el carrito.",
+        "Al reactivarlas, las puedes agregar y pagar."
+      ],
+      "fields": [
+        { "id": "timeSoldOutMsg", "label": "Hora del mensaje PAPAS AGOTADAS", "type": "time" },
+        { "id": "timeSoldOutApp", "label": "Hora en que la app las marcó agotadas", "type": "time" }
+      ]
+    }
+  ],
+  "finish": {
+    "checklist": [
+      { "id": "screenRecOff", "label": "Apagué la grabación de pantalla." },
+      { "id": "doneMsg", "label": "Mandé al grupo: TERMINADA - Cliente (tu nombre)." }
+    ]
+  },
+  "survey": {
+    "title": "Encuesta del Cliente final",
+    "intro": "Tus respuestas nos ayudan a mejorar la app. Toma 2 minutos.",
+    "questions": [
+      { "id": "ease", "type": "scale", "label": "¿Qué tan fácil fue usar la app AppHouse?", "min": 1, "max": 5, "minLabel": "Muy difícil", "maxLabel": "Muy fácil", "required": true },
+      { "id": "speed", "type": "scale", "label": "¿Qué tan rápida sentiste la app?", "min": 1, "max": 5, "minLabel": "Muy lenta", "maxLabel": "Muy rápida", "required": true },
+      { "id": "tracking", "type": "scale", "label": "¿Qué tan claro fue seguir tu pedido (etapas y avisos)?", "min": 1, "max": 5, "minLabel": "Nada claro", "maxLabel": "Muy claro", "required": true },
+      { "id": "payment", "type": "choice", "label": "¿Pagar fue sencillo?", "options": ["Sí, sin problemas", "Con algunas dudas", "No, me costó trabajo"], "required": true },
+      { "id": "nps", "type": "nps", "label": "Del 0 al 10, ¿qué tan probable es que recomiendes la app a un amigo?", "required": true },
+      { "id": "liked", "type": "text", "label": "¿Qué fue lo que más te gustó?" },
+      { "id": "improve", "type": "text", "label": "¿Qué mejorarías primero?" },
+      { "id": "guide", "type": "scale", "label": "¿Qué tan clara fue esta guía de pruebas?", "min": 1, "max": 5, "minLabel": "Nada clara", "maxLabel": "Muy clara" }
+    ]
+  }
+}

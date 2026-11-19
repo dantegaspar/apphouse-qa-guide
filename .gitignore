@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# datos locales de la app (SQLite y subidas) y variables de entorno
+data/
+uploads/
+.env
+!.env.example

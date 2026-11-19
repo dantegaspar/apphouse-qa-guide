@@ -1,0 +1,36 @@
+# Despliegue de AppHouse QA Guide con Docker Compose.
+# Uso: cp .env.example .env  (y define ADMIN_PASSWORD)  ->  docker compose up -d --build
+#
+# IMPORTANTE: la base de datos es SQLite (archivo local con modo WAL).
+# Solo puede haber UNA instancia (réplica) del servicio: no escales a varias
+# réplicas ni las pongas en varias máquinas, porque se corromperían los datos.
+
+services:
+  app:
+    build: .
+    image: apphouse-qa-guide
+    # Puerto del host: toma PORT de .env (por defecto 3000). El contenedor siempre escucha en 3000.
+    ports:
+      - "${PORT:-3000}:3000"
+    # .env es opcional: si no existe, Compose sigue funcionando con las variables del entorno.
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Estas variables se toman del .env o del entorno del shell.
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD}"
+      SESSION_SECRET: "${SESSION_SECRET:-}"
+      MAX_UPLOAD_MB: "${MAX_UPLOAD_MB:-15}"
+      # Fijadas dentro del contenedor: no las cambies aquí, porque deben coincidir con los volúmenes
+      # y con el puerto interno. Anulan cualquier valor distinto que venga de .env.
+      PORT: "3000"
+      DATA_DIR: /app/data
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - qa_data:/app/data
+      - qa_uploads:/app/uploads
+    restart: unless-stopped
+
+volumes:
+  qa_data:
+  qa_uploads:

@@ -1,0 +1,34 @@
+# Dependencias y artefactos de build locales (se reinstalan dentro de la imagen)
+node_modules
+.next
+out
+build
+coverage
+*.tsbuildinfo
+
+# Datos locales y subidas (van en volúmenes, nunca en la imagen)
+data
+uploads
+
+# Control de versiones y editores
+.git
+.gitignore
+.DS_Store
+.vscode
+.idea
+
+# Secretos y variables de entorno locales
+.env
+.env.*
+*.pem
+
+# Logs y depuración
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Archivos de despliegue (no hacen falta dentro de la imagen)
+Dockerfile
+docker-compose.yml
+.dockerignore

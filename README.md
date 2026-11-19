@@ -1,36 +1,154 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AppHouse QA Guide
 
-## Getting Started
+Guía interactiva de pruebas QA de AppHouse. El tester:
 
-First, run the development server:
+- Se identifica (nombre, correo, rol y datos de su celular).
+- Sigue cada actividad paso a paso, con instrucción e imagen, y marca cada paso como **"Lo logré"** o **"No pude"**.
+- Reporta fallas con descripción y captura de pantalla (o video corto).
+- Ve un resumen de sus resultados y contesta una encuesta al final.
+
+Todo se guarda en SQLite. El panel **/admin**, protegido con contraseña, muestra los resultados y permite exportarlos a CSV.
+
+## Requisitos
+
+- Node.js 22 o superior
+- npm (incluido con Node.js)
+- Para producción: Docker y Docker Compose (opcional)
+
+## Correr en desarrollo
+
+```bash
+git clone https://github.com/dantegaspar/apphouse-qa-guide
+cd apphouse-qa-guide
+npm install
+cp .env.example .env.local
+```
+
+Edita `.env.local` y define `ADMIN_PASSWORD`. Luego:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- App del tester: http://localhost:3000
+- Panel de administración: http://localhost:3000/admin
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Para probar desde un celular conectado al mismo Wi‑Fi:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run dev -- -H 0.0.0.0
+```
 
-## Learn More
+Después abre en el celular `http://<IP-de-tu-computadora>:3000`, usando la IP local de tu computadora en la red (por ejemplo `192.168.1.20`). Las IP locales `192.168.x.x`, `10.x.x.x` y `172.x.x.x` ya están permitidas; si usas un túnel u otro dominio, agrégalo en `DEV_ORIGINS` (separado por comas).
 
-To learn more about Next.js, take a look at the following resources:
+La base de datos se guarda en `./data/qa.sqlite` y las subidas en `./uploads/`. Para reiniciar la prueba desde cero, detén el servidor y borra la carpeta `./data` (borra también `./uploads` si quieres eliminar las capturas).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Producción con Docker
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Crea el archivo de variables:
 
-## Deploy on Vercel
+   ```bash
+   cp .env.example .env
+   ```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+   Edita `.env` y define al menos `ADMIN_PASSWORD`. Se recomienda también un `SESSION_SECRET` largo (`openssl rand -hex 32`).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+2. Construye y levanta el servicio:
+
+   ```bash
+   docker compose up -d --build
+   ```
+
+3. Verifica que esté sano:
+
+   ```bash
+   curl http://localhost:3000/api/health
+   ```
+
+Detalles del despliegue:
+
+- **Volúmenes:** `qa_data` guarda la base de datos (`/app/data`) y `qa_uploads` guarda las capturas y videos (`/app/uploads`). Los datos sobreviven a reinicios y a `docker compose up -d --build`. No borres los volúmenes salvo que quieras perder todo.
+- **Una sola instancia:** SQLite no admite varias réplicas del servicio. Mantén `app` con una sola instancia.
+- **Reinicio:** el contenedor usa `restart: unless-stopped`.
+
+### Respaldos
+
+SQLite usa modo WAL: además de `qa.sqlite` existen `qa.sqlite-wal` y `qa.sqlite-shm`. Los cambios recientes pueden estar todavía en el archivo `-wal`, así que **copiar solo `qa.sqlite` puede dejar un respaldo incompleto**.
+
+Forma segura de respaldar los volúmenes (detiene la app un momento):
+
+```bash
+docker compose stop app
+docker run --rm -v apphouse-qa-guide_qa_data:/data -v "$PWD":/backup alpine \
+  tar czf /backup/qa_data-$(date +%F).tar.gz -C /data .
+docker run --rm -v apphouse-qa-guide_qa_uploads:/data -v "$PWD":/backup alpine \
+  tar czf /backup/qa_uploads-$(date +%F).tar.gz -C /data .
+docker compose start app
+```
+
+El nombre de los volúmenes depende del nombre de la carpeta del proyecto; revísalo con `docker volume ls`.
+
+Si la base de datos está accesible en disco (desarrollo o una carpeta montada), puedes respaldarla con la app encendida usando el comando `.backup` de `sqlite3`, que incluye también lo que está en el WAL:
+
+```bash
+sqlite3 ./data/qa.sqlite ".backup './respaldo-qa.sqlite'"
+```
+
+## Estructura del proyecto
+
+```
+content/guides/*.json   Contenido versionado de cada guía (texto, actividades, encuesta)
+public/guides/<id>/     Imágenes de cada guía (las rutas en el JSON empiezan con /guides/<id>/)
+src/lib/db.ts           Conexión a SQLite y migraciones
+src/lib/guides.ts       Registro de guías disponibles
+src/app/                Páginas y rutas de API (Next.js App Router)
+```
+
+### Migraciones de base de datos
+
+Las migraciones se aplican solas la primera vez que la app accede a la base de datos. Están en el arreglo `MIGRATIONS` de `src/lib/db.ts`, y la versión aplicada se guarda en `PRAGMA user_version`.
+
+Para cambiar el esquema, **agrega una nueva migración al final del arreglo**. Nunca edites una migración existente, porque ya pudo aplicarse en bases de datos reales.
+
+## Cómo editar o agregar una guía
+
+Cada guía es un archivo JSON en `content/guides/`, por ejemplo `cliente.json`. Para agregar una guía nueva, crea su JSON y regístrala en `src/lib/guides.ts`.
+
+Resumen del esquema:
+
+- `id`, `version`, `role`, `title`, `subtitle`, `summary`, `notice`, `glossary`.
+- `tester.fields`: datos que se piden al tester al inicio.
+- `prep`: antes de empezar (`sections`, `checklist`, `rules` y, opcional, `tour` con imagen).
+- `reference`: tablas de referencia (`tables` con `title`, `columns`, `rows`).
+- `troubleshooting`: pares `[problema, solución]`.
+- `activities[]`: cada una tiene `id`, `title`, `when`, `where`, `warnings`, `steps`, `expected` y `fields` (opcional).
+  - `steps[]`: `id`, `text`, y opcionales `image`, `caption` y `evidence`. Con `evidence: true` el manual pide captura en ese paso.
+- `finish.checklist`: lista de cierre.
+- `survey`: `title`, `intro` y `questions[]`. Cada pregunta tiene `id`, `type` (`scale`, `nps`, `choice` o `text`) y `label`. Las de tipo `scale` usan `min`, `max`, `minLabel` y `maxLabel`; las `choice` usan `options`.
+
+Reglas prácticas:
+
+- Usa `**negritas**` para resaltar texto.
+- Cada vez que cambies el contenido, **sube el campo `version`** (por ejemplo de `1.0.0` a `1.1.0`), para que los resultados queden asociados a la versión que se probó.
+- Las imágenes van en `public/guides/<id>/` y se referencian como `/guides/<id>/archivo.jpg`.
+
+## Variables de entorno
+
+| Variable | Obligatoria | Por defecto | Descripción |
+| --- | --- | --- | --- |
+| `ADMIN_PASSWORD` | Sí (para `/admin`) | — | Contraseña del panel de administración. |
+| `SESSION_SECRET` | No | Se deriva de `ADMIN_PASSWORD` | Secreto para firmar la sesión de `/admin`. |
+| `MAX_UPLOAD_MB` | No | `15` | Tamaño máximo por archivo subido, en MB. |
+| `DATA_DIR` | No | `./data` | Carpeta de `qa.sqlite`. En Docker es `/app/data`. |
+| `UPLOAD_DIR` | No | `./uploads` | Carpeta de capturas y videos. En Docker es `/app/uploads`. |
+| `PORT` | No | `3000` | Puerto HTTP. En Docker Compose define el puerto publicado en el host. |
+
+Consulta `.env.example` para un ejemplo comentado.
+
+## Límites de subida
+
+- Tamaño máximo por archivo: `MAX_UPLOAD_MB` (15 MB por defecto).
+- Máximo 5 archivos por reporte.
+- Formatos aceptados:
+  - Imágenes: JPG, PNG, WebP, GIF, HEIC y HEIF.
+  - Videos: MP4, MOV y WebM.
