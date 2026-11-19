@@ -1,6 +1,6 @@
 {
   "id": "establecimiento",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "role": "Establecimiento",
   "title": "Manual del Establecimiento",
   "subtitle": "Guía de prueba del panel web de tu sucursal",
@@ -272,7 +272,7 @@
       "id": "E02",
       "title": "Prepara tu sucursal",
       "when": "30 minutos antes de abrir. Tiene 5 partes (A a E).",
-      "where": "Menú izquierdo del panel: **Menú**, **Promociones**, **Costo de envío**, **Cómo opera** y **Horario**.",
+      "where": "Menú izquierdo del panel: **Mi app › Menú**, **Mi app › Promociones y banners**, **Configuración de sucursal › Envío y zona de entrega**, **Reglas de pedidos y pagos** y **Horario**.",
       "warnings": [
         "Envía **LISTA - Sucursal (tu sucursal)** al grupo hasta terminar la Parte E.",
         "En la Parte C no toques **Ocultar aquí** (quita el producto del menú) ni **Deshacer**."
@@ -281,7 +281,7 @@
       "steps": [
         {
           "id": "A1",
-          "text": "**Parte A · Crea los productos.** En el menú izquierdo toca **Menú** (debajo del letrero MI APP). Página: **https://logistica-establecimientos.tupide.mx/mi-app/menu**. Crea los 8 productos de la tabla de **Datos** (Productos que debes crear). Abajo se explica cómo crear la Pizza Hawaiana; los demás se crean igual, solo cambian los datos."
+          "text": "**Parte A · Crea los productos.** En el menú izquierdo toca **Menú** (en el grupo **MI APP**). Página: **https://logistica-establecimientos.tupide.mx/mi-app/menu**. Crea los 8 productos de la tabla de **Datos** (Productos que debes crear). Abajo se explica cómo crear la Pizza Hawaiana; los demás se crean igual, solo cambian los datos."
         },
         {
           "id": "A2",
@@ -319,27 +319,27 @@
         },
         {
           "id": "B1",
-          "text": "**Parte B · Crea la promoción** (después de crear los productos de la Parte A). En el menú izquierdo toca **Promociones**. Página: **https://logistica-establecimientos.tupide.mx/mi-app/promociones**. Toca **Nueva promoción (1)**.",
+          "text": "**Parte B · Crea la promoción** (después de crear los productos de la Parte A). En el menú izquierdo toca **Promociones y banners** (grupo **MI APP**). Página: **https://logistica-establecimientos.tupide.mx/mi-app/promociones**. Toca **Nueva promoción (1)**.",
           "image": "/guides/establecimiento/e02-6.jpg",
           "caption": "1 = Nueva promoción · 2 = así se ve la promoción guardada y Vigente"
         },
         {
           "id": "B2",
-          "text": "Escribe el **Nombre** «Pizza Hawaiana 20 %» **(3)**. En **Tipo** deja «Porcentaje» **(4)** y en **Cuánto** escribe 20 **(5)**. En **¿Sobre qué se aplica?** elige **Solo el producto base (6)**: así baja el precio de la pizza y los tamaños y extras cuestan igual.",
+          "text": "En **¿Qué tipo de promoción?** deja **Precio rebajado en el menú (3)**. Escribe el **Nombre** «Pizza Hawaiana 20 %» **(4)**. En **Cómo se descuenta** deja «Porcentaje» **(5)** y en **Cuánto (%)** escribe 20 **(6)**. En **¿Sobre qué se aplica?** elige **Solo el producto base (7)**: así baja el precio de la pizza y los tamaños y extras cuestan igual.",
           "image": "/guides/establecimiento/e02-7.jpg",
-          "caption": "3 = Nombre · 4 = Tipo · 5 = Cuánto · 6 = Solo el producto base"
+          "caption": "3 = tipo de promoción · 4 = Nombre · 5 = Cómo se descuenta · 6 = Cuánto · 7 = Solo el producto base"
         },
         {
           "id": "B3",
-          "text": "En **A qué se aplica** elige «Unos productos» **(7)**. En **Buscar producto** escribe Hawaiana **(8)** y marca la Pizza Hawaiana que está en PIZZAS **(9)**. Si aparece otra «Hawaiana» en otra categoría, no la marques.",
+          "text": "En **A qué se aplica** elige «Unos productos» **(8)**. En **Buscar producto** escribe Hawaiana **(9)** y marca la Pizza Hawaiana que está en PIZZAS **(10)**. Si aparece otra «Hawaiana» en otra categoría, no la marques.",
           "image": "/guides/establecimiento/e02-8.jpg",
-          "caption": "7 = A qué se aplica · 8 = Buscar producto · 9 = Pizza Hawaiana de PIZZAS"
+          "caption": "8 = A qué se aplica · 9 = Buscar producto · 10 = Pizza Hawaiana de PIZZAS"
         },
         {
           "id": "B4",
-          "text": "Deja vacíos el importe mínimo **(10)** y las fechas **Empieza** y **Termina**. Deja encendidos **Activa (11)** y **Generar banner (12)**. Toca **Guardar (13)**.",
+          "text": "Deja vacías las fechas **Empieza** y **Termina (11)**. Deja encendidos **Activa (12)** y **Generar banner para esta promoción (13)**. Toca **Guardar en esta sucursal (14)**.",
           "image": "/guides/establecimiento/e02-9.jpg",
-          "caption": "10 = importe mínimo vacío · 11 = Activa · 12 = Generar banner · 13 = Guardar"
+          "caption": "11 = fechas vacías · 12 = Activa · 13 = Generar banner · 14 = Guardar en esta sucursal"
         },
         {
           "id": "B5",
@@ -365,7 +365,7 @@
         },
         {
           "id": "D1",
-          "text": "**Parte D · Revisa el costo de envío.** En el menú izquierdo toca **Costo de envío**. Página: **https://logistica-establecimientos.tupide.mx/envio**. Revisa o escribe: **Tarifa base** 25 **(1)**, **Kilómetros incluidos** 1 **(2)**, **Cada kilómetro adicional** 10 **(3)**, **Radio de entrega** 3 **(4)**. Deja vacío **Envío gratis** («No aplica», **5**).",
+          "text": "**Parte D · Revisa el costo de envío.** En el menú izquierdo toca **Envío y zona de entrega** (grupo **CONFIGURACIÓN DE SUCURSAL**). Página: **https://logistica-establecimientos.tupide.mx/envio**. Revisa o escribe: **Tarifa base** 25 **(1)**, **Kilómetros incluidos** 1 **(2)**, **Cada kilómetro adicional** 10 **(3)**, **Radio de entrega** 3 **(4)**. Deja vacío **Envío gratis** («No aplica», **5**).",
           "image": "/guides/establecimiento/e02-11.jpg",
           "caption": "1 a 5 = datos del envío · 6 = Guardar tarifas · 7 = no tocar · 8 = cómo se cobra"
         },
@@ -381,7 +381,7 @@
         },
         {
           "id": "E1",
-          "text": "**Parte E · Revisa tiempo para confirmar, pagos, topes y horario.** En el menú izquierdo toca **Cómo opera**. Página: **https://logistica-establecimientos.tupide.mx/mi-app**. En **Plazo para confirmar** debe decir **5 min (1)**. Si dice otro número, escribe 5 y toca **Guardar cambios**.",
+          "text": "**Parte E · Revisa tiempo para confirmar, pagos, topes y horario.** En el menú izquierdo toca **Reglas de pedidos y pagos** (grupo **CONFIGURACIÓN DE SUCURSAL**). Página: **https://logistica-establecimientos.tupide.mx/ajustes**. Baja a **En tu app**. En **Plazo para confirmar** debe decir **5 min (1)**. Si dice otro número, escribe 5 y toca **Guardar cambios**.",
           "image": "/guides/establecimiento/e02-12.jpg",
           "caption": "1 = 5 minutos para confirmar · 2 = pago con tarjeta"
         },
@@ -393,7 +393,7 @@
         },
         {
           "id": "E3",
-          "text": "En el menú izquierdo toca **Horario** y revisa que tu sucursal esté abierta hoy durante toda la prueba. Si cierra pronto, avisa en el grupo."
+          "text": "En el menú izquierdo toca **Horario** (grupo **CONFIGURACIÓN DE SUCURSAL**) y revisa que tu sucursal esté abierta hoy durante toda la prueba. Si cierra pronto, avisa en el grupo."
         },
         {
           "id": "E4",
@@ -435,9 +435,9 @@
       "steps": [
         {
           "id": "1",
-          "text": "Mira el botón de arriba **(1)**: si está en verde y dice **Abierta**, no lo toques. Fíjate a qué hora cierra; si falta poco o dice **Cerrada**, avisa en el grupo.",
+          "text": "Mira el botón de arriba **(1)**: si está en verde y dice **Abierta**, no lo toques; si lo abres, no toques **Cerrar ahora (3)**. Fíjate a qué hora cierra; si falta poco o dice **Cerrada**, avisa en el grupo.",
           "image": "/guides/establecimiento/e03-1.jpg",
-          "caption": "1 = sucursal Abierta y hora de cierre · 2 = Ver horario"
+          "caption": "1 = sucursal Abierta y hora de cierre · 2 = Ver horario · 3 = Cerrar ahora (no tocar)"
         },
         {
           "id": "2",
@@ -447,7 +447,7 @@
           "id": "3",
           "text": "Toma una captura y envía al grupo: **ABIERTA - Sucursal (tu sucursal)**.",
           "image": "/guides/establecimiento/e03-1.jpg",
-          "caption": "1 = sucursal Abierta y hora de cierre · 2 = Ver horario",
+          "caption": "1 = sucursal Abierta y hora de cierre · 2 = Ver horario · 3 = Cerrar ahora (no tocar)",
           "evidence": true
         },
         {
