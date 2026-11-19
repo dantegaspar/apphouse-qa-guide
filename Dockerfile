@@ -3,10 +3,8 @@
 # ---- deps: instala dependencias (incluye devDependencies para el build) ----
 FROM node:22-bookworm-slim AS deps
 WORKDIR /app
-# Herramientas de compilación por si better-sqlite3 necesita compilarse (no hay binario precompilado).
-RUN apt-get update \
- && apt-get install -y --no-install-recommends python3 make g++ \
- && rm -rf /var/lib/apt/lists/*
+# better-sqlite3 trae binarios precompilados (prebuilds) para linux x64/arm64,
+# así que no se necesitan herramientas de compilación.
 COPY package.json package-lock.json ./
 RUN npm ci
 
@@ -32,10 +30,8 @@ COPY --from=build --chown=node:node /app/.next/standalone ./
 COPY --from=build --chown=node:node /app/.next/static ./.next/static
 COPY --from=build --chown=node:node /app/public ./public
 
-# Por seguridad, asegura el módulo nativo better-sqlite3 y sus dependencias en node_modules.
+# Asegura el módulo nativo de better-sqlite3 (binario compilado para esta imagen).
 COPY --from=deps /app/node_modules/better-sqlite3 ./node_modules/better-sqlite3
-COPY --from=deps /app/node_modules/bindings ./node_modules/bindings
-COPY --from=deps /app/node_modules/file-uri-to-path ./node_modules/file-uri-to-path
 
 # Directorios de datos y subidas, propiedad del usuario node
 RUN mkdir -p /app/data /app/uploads \
