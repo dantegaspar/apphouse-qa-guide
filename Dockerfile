@@ -3,10 +3,11 @@
 # ---- deps: instala dependencias (incluye devDependencies para el build) ----
 FROM node:22-bookworm-slim AS deps
 WORKDIR /app
-# better-sqlite3 trae binarios precompilados (prebuilds) para linux x64/arm64,
-# así que no se necesitan herramientas de compilación.
+# better-sqlite3 trae binarios precompilados (prebuilds) para linux x64/arm64.
+# --ignore-scripts evita que npm intente compilarlo con node-gyp (la imagen slim no
+# tiene python ni compilador); ninguna otra dependencia necesita scripts de instalación.
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --ignore-scripts
 
 # ---- build: compila la app de Next.js ----
 FROM deps AS build
