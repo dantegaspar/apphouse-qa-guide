@@ -39,7 +39,8 @@ RUN mkdir -p /app/data /app/uploads \
 
 USER node
 
-VOLUME ["/app/data", "/app/uploads"]
+# Sin instrucción VOLUME: Railway no la admite. Los volúmenes se declaran en docker-compose.yml
+# (local) o en el panel de Railway (un solo volumen en /app/data).
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \

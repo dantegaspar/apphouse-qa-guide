@@ -138,6 +138,11 @@ export default function ReportSheet({
                   </button>
                 ))}
               </div>
+              {blocking && (
+                <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-800">
+                  La actividad quedará en pausa y tendrás que pedir ayuda al guía de la prueba para continuar.
+                </p>
+              )}
             </div>
             <label className="block">
               <span className="mb-1 block text-sm font-medium">Número de pedido (si aplica)</span>

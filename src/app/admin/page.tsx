@@ -3,8 +3,11 @@ import { redirect } from "next/navigation";
 import { isAdmin } from "@/lib/auth";
 import { getGuide, GUIDES } from "@/lib/guides";
 import { ACTIVITY_RESULTS } from "@/lib/types";
-import { deviceSummary, fmtDate, guideTitle, isImage, loadAll, parseRec } from "@/lib/admin-data";
+import {
+  deviceSummary, fmtDate, guideTitle, isImage, loadAll, loadOpenHelp, parseRec, runStatusClass, runStatusLabel, timeAgo,
+} from "@/lib/admin-data";
 import { LogoutButton } from "@/components/admin/LogoutButton";
+import { AutoRefresh } from "@/components/admin/AutoRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +17,7 @@ const EXPORTS: [string, string][] = [
   ["activities", "Actividades"],
   ["issues", "Reportes"],
   ["survey", "Encuesta"],
+  ["help", "Solicitudes de ayuda"],
 ];
 const RESULT_KEYS = ["ok", "issue", "blocked", "skipped"] as const;
 
@@ -33,12 +37,14 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const d = loadAll(guideId);
   const qs = guideId ? `?guide=${encodeURIComponent(guideId)}` : "";
 
-  const finished = d.runs.filter((r) => r.status === "finished").length;
+  const finished = d.runs.filter((r) => r.status === "finished" || r.status === "ended_blocked").length;
   const blocking = d.issues.filter((i) => i.blocking).length;
   const guideIds = [...new Set(d.runs.map((r) => r.guide_id))].filter((id) => getGuide(id));
   const attachmentsByIssue = new Map<string, typeof d.attachments>();
   for (const a of d.attachments) attachmentsByIssue.set(a.issue_id, [...(attachmentsByIssue.get(a.issue_id) ?? []), a]);
   const runById = new Map(d.runs.map((r) => [r.id, r]));
+  // Las solicitudes abiertas se muestran siempre, sin importar el filtro de guía
+  const { rows: openHelp, at: nowMs } = loadOpenHelp();
 
   return (
     <main className="mx-auto max-w-6xl space-y-8 px-4 py-6">
@@ -48,8 +54,58 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <h1 className="text-2xl font-bold text-slate-900">Panel de administración</h1>
           <p className="text-sm text-slate-600">Resultados de las pruebas de AppHouse</p>
         </div>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-slate-400">Se actualiza solo cada 20 s · {fmtDate(new Date(nowMs).toISOString())}</span>
+          <Link href={`/admin/graficas${qs}`} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-[#2F5DA8] hover:bg-slate-50">Gráficas</Link>
         <LogoutButton />
+        </div>
       </header>
+      <AutoRefresh seconds={20} />
+
+      <section
+        id="ayuda"
+        data-testid="help-requests"
+        className={`rounded-xl p-4 ring-2 ${openHelp.length ? "bg-red-50 ring-red-300" : "bg-white ring-slate-200"}`}
+      >
+        <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+          Solicitudes de ayuda
+          <span
+            className={`inline-flex min-w-7 items-center justify-center rounded-full px-2 py-0.5 text-sm font-bold ${
+              openHelp.length ? "animate-pulse bg-red-600 text-white" : "bg-slate-100 text-slate-500"
+            }`}
+            data-testid="help-count"
+          >
+            {openHelp.length}
+          </span>
+        </h2>
+        {openHelp.length === 0 ? (
+          <p className="mt-1 text-sm text-slate-500">Nadie está esperando ayuda.</p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {openHelp.map((h) => {
+              const g = getGuide(h.guide_id);
+              const act = g?.activities.find((a) => a.id === h.activity_id);
+              const stepIdx = act && h.step_id ? act.steps.findIndex((s) => s.id === h.step_id) : -1;
+              return (
+                <li key={h.id} className="rounded-lg bg-white p-3 shadow-sm ring-1 ring-red-200">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                    <Link href={`/admin/runs/${h.run_id}`} className="font-semibold text-[#2F5DA8] hover:underline">
+                      {h.tester}
+                    </Link>
+                    <span className="text-slate-600">{g?.title ?? h.guide_id}</span>
+                    <span className="font-medium text-slate-800">
+                      {h.activity_id} {act?.title}
+                      {stepIdx >= 0 ? ` · paso ${stepIdx + 1}` : ""}
+                    </span>
+                    <span className="ml-auto font-semibold text-red-700">{timeAgo(h.created_at, nowMs)}</span>
+                  </div>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">{h.reason}</p>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
 
       <nav className="flex flex-wrap gap-2 text-sm" aria-label="Filtrar por guía">
         {[{ id: "", title: "Todas las guías" }, ...GUIDES].map((g) => (
@@ -73,8 +129,14 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       </section>
 
       <section>
-        <h2 className="mb-2 text-lg font-semibold text-slate-900">Exportar CSV</h2>
+        <h2 className="mb-2 text-lg font-semibold text-slate-900">Descargar datos</h2>
         <div className="flex flex-wrap gap-2">
+          <a
+            href={`/api/admin/export/xlsx${qs}`}
+            className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white"
+          >
+            Excel (todo, una hoja por tabla)
+          </a>
           {EXPORTS.map(([k, label]) => (
             <a
               key={k}
@@ -171,9 +233,12 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                     </td>
                     <td className="px-3 py-2">{n}</td>
                     <td className="px-3 py-2">
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${r.status === "finished" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
-                        {r.status === "finished" ? "Terminada" : "En curso"}
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${runStatusClass(r.status)}`} title={r.ended_reason || undefined}>
+                        {runStatusLabel(r.status)}
                       </span>
+                      {d.help.some((h) => h.run_id === r.id && h.status === "open") && (
+                        <span className="ml-1 rounded-full bg-red-600 px-2 py-0.5 text-xs font-medium text-white">Pide ayuda</span>
+                      )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-slate-600">{fmtDate(r.updated_at)}</td>
                   </tr>

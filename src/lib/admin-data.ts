@@ -17,6 +17,8 @@ export type RunRow = {
   created_at: string;
   updated_at: string;
   finished_at: string | null;
+  ended_reason: string;
+  ended_at: string | null;
 };
 export type StepRow = { run_id: string; activity_id: string; step_id: string; outcome: "ok" | "fail" };
 export type ActivityRow = { run_id: string; activity_id: string; result: string | null; checks: string; fields: string; notes: string };
@@ -32,6 +34,50 @@ export type IssueRow = {
   order_number: string;
   created_at: string;
 };
+export type HelpRow = {
+  id: string;
+  run_id: string;
+  activity_id: string;
+  step_id: string | null;
+  issue_id: string | null;
+  reason: string;
+  status: "open" | "resolved" | "ended";
+  created_at: string;
+  resolved_at: string | null;
+  resolution: string;
+};
+export const HELP_STATUS: Record<HelpRow["status"], string> = { open: "Abierta", resolved: "Resuelta", ended: "Prueba terminada" };
+
+export const RUN_STATUS: Record<string, string> = {
+  in_progress: "En curso",
+  finished: "Terminada",
+  ended_blocked: "Terminada por bloqueo",
+};
+export const runStatusLabel = (s: string) => RUN_STATUS[s] ?? s;
+export const runStatusClass = (s: string) =>
+  s === "finished" ? "bg-emerald-100 text-emerald-800" : s === "ended_blocked" ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-800";
+
+/** "hace 5 min" */
+export function timeAgo(iso: string, nowMs = Date.now()) {
+  const m = Math.max(0, Math.round((nowMs - new Date(iso).getTime()) / 60000));
+  if (m < 1) return "hace menos de 1 min";
+  if (m < 60) return `hace ${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `hace ${h} h ${m % 60} min`;
+  return `hace ${Math.floor(h / 24)} día(s)`;
+}
+
+/** Solicitudes de ayuda abiertas de todas las guías (las más antiguas primero). */
+export function loadOpenHelp() {
+  const rows = getDb()
+    .prepare(
+      `SELECT h.*, r.name AS tester, r.guide_id AS guide_id FROM help_requests h JOIN runs r ON r.id = h.run_id
+       WHERE h.status = 'open' ORDER BY h.created_at`
+    )
+    .all() as (HelpRow & { tester: string; guide_id: string })[];
+  return { rows, at: Date.now() };
+}
+
 export type AttachmentRow = { id: string; run_id: string; issue_id: string; original_name: string; mime: string; size: number };
 
 export type Rec = Record<string, string | number | boolean>;
@@ -88,6 +134,7 @@ export function loadAll(guideId?: string | null) {
     activities: keep(db.prepare("SELECT * FROM activity_results").all() as ActivityRow[]),
     issues: keep(db.prepare("SELECT * FROM issues ORDER BY created_at DESC").all() as IssueRow[]),
     attachments: keep(db.prepare("SELECT id, run_id, issue_id, original_name, mime, size FROM attachments ORDER BY created_at").all() as AttachmentRow[]),
+    help: keep(db.prepare("SELECT * FROM help_requests ORDER BY created_at DESC").all() as HelpRow[]),
     surveys: keep(db.prepare("SELECT run_id, answers FROM survey_responses").all() as { run_id: string; answers: string }[]),
   };
 }

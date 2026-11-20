@@ -19,6 +19,7 @@ services:
     environment:
       # Estas variables se toman del .env o del entorno del shell.
       ADMIN_PASSWORD: "${ADMIN_PASSWORD}"
+      GUIDE_PASSWORD: "${GUIDE_PASSWORD:-}"
       SESSION_SECRET: "${SESSION_SECRET:-}"
       MAX_UPLOAD_MB: "${MAX_UPLOAD_MB:-15}"
       # Fijadas dentro del contenedor: no las cambies aquí, porque deben coincidir con los volúmenes

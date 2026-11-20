@@ -1,19 +1,39 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import type { Guide } from "@/lib/types";
-import { ACTIVITY_RESULTS, TESTER_ROLES } from "@/lib/types";
+import { ACTIVITY_RESULTS, TESTER_ROLES, type GuideVariant } from "@/lib/types";
 import ActivityView from "./ActivityView";
+import BlockedPanel from "./BlockedPanel";
 import ReportSheet, { type ReportDraft } from "./ReportSheet";
 import Survey from "./Survey";
 import { Button, Callout, inputCls, Rich, Sheet, StepImage } from "./ui";
-import { detectDevice, emptyActivity, stepKey, uid, useRun, type Issue, type RunState } from "./store";
+import { callRun, detectDevice, emptyActivity, stepKey, uid, useRun, type Blocked, type Issue, type RunState } from "./store";
 
 type View = { name: "home" } | { name: "prep" } | { name: "activity"; id: string; step: number } | { name: "summary" } | { name: "survey" };
 
-export default function GuideApp({ guide, maxUploadMb }: { guide: Guide; maxUploadMb: number }) {
+type HelpStatus = {
+  status: string;
+  endedReason: string;
+  endedAt: string | null;
+  open: { id: string; activityId: string; stepId?: string; issueId?: string; reason: string; createdAt: string } | null;
+};
+
+export default function GuideApp({
+  guide,
+  maxUploadMb,
+  variant,
+  onSwitchVariant,
+}: {
+  guide: Guide;
+  maxUploadMb: number;
+  /** Solo en guías con variante de escritorio y de celular. */
+  variant?: GuideVariant;
+  /** Cambia a la otra variante (solo antes de identificarse). */
+  onSwitchVariant?: () => void;
+}) {
   const { state, loaded, syncing, syncError, commit, update, flush, stateRef } = useRun(guide.id);
   const [view, setView] = useState<View>({ name: "home" });
   const [showRef, setShowRef] = useState(false);
@@ -37,7 +57,14 @@ export default function GuideApp({ guide, maxUploadMb }: { guide: Guide; maxUplo
         attachments: [],
         createdAt: new Date().toISOString(),
       };
-      update((s) => ({ ...s, issues: [...s.issues, issue] }), [{ type: "issue", payload: { ...issue } }]);
+      // Una falla que impide seguir detiene la actividad hasta que el guía ayude
+      const block: Blocked | undefined =
+        issue.kind === "issue" && issue.blocking
+          ? { activityId: issue.activityId, stepId: issue.stepId, issueId: issue.id, reason: issue.description }
+          : undefined;
+      update((s) => ({ ...s, issues: [...s.issues, issue], blocked: s.blocked ?? block }), [{ type: "issue", payload: { ...issue } }]);
+      // Lleva al tester al panel de pausa (arriba de la actividad)
+      if (block) setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 50);
       if (files.length === 0) return null;
       // Los archivos necesitan que el reporte ya exista en el servidor
       const ok = await flush();
@@ -63,8 +90,58 @@ export default function GuideApp({ guide, maxUploadMb }: { guide: Guide; maxUplo
     [report, update, flush, stateRef]
   );
 
+  // Al cargar, se concilia el bloqueo con el servidor (por si una respuesta se perdió)
+  const runId = state?.runId;
+  useEffect(() => {
+    if (!runId) return;
+    let cancelled = false;
+    void (async () => {
+      const cur = stateRef.current;
+      if (!cur) return;
+      const r = await callRun<HelpStatus>(cur, "help");
+      if (cancelled || !r.ok) return;
+      const { status, endedReason, endedAt, open } = r.data;
+      update((s) => {
+        if (status === "ended_blocked") {
+          return s.ended ? s : { ...s, blocked: undefined, ended: { reason: endedReason, at: endedAt || new Date().toISOString() } };
+        }
+        if (open && s.blocked?.helpId !== open.id) {
+          return {
+            ...s,
+            blocked: {
+              activityId: open.activityId,
+              stepId: open.stepId,
+              issueId: open.issueId ?? s.blocked?.issueId ?? "",
+              reason: open.reason,
+              helpId: open.id,
+              requestedAt: open.createdAt,
+            },
+          };
+        }
+        // La solicitud ya no está abierta (se resolvió con el guía): se quita el bloqueo
+        if (!open && s.blocked?.helpId) return { ...s, blocked: undefined };
+        return s;
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [runId, update, stateRef]);
+
+  const mobileBanner = variant === "mobile" && (
+    <div className="border-b border-teal-200 bg-teal-50 px-4 py-1.5 text-center text-xs font-semibold text-teal-800" data-testid="mobile-banner">
+      📱 Guía para la app de establecimientos en celular
+    </div>
+  );
+
   if (!loaded) return <div className="flex flex-1 items-center justify-center text-slate-500">Cargando…</div>;
-  if (!state || state.guideVersion === undefined) return <Identify guide={guide} onDone={(s) => commit(s)} />;
+  if (!state || state.guideVersion === undefined)
+    return (
+      <>
+        {mobileBanner}
+        <Identify guide={guide} variant={variant} onSwitchVariant={onSwitchVariant} onDone={(s) => commit(s)} />
+      </>
+    );
 
   const answered = guide.activities.reduce(
     (n, a) => n + a.steps.filter((s) => state.steps[stepKey(a.id, s.id)]).length,
@@ -93,13 +170,24 @@ export default function GuideApp({ guide, maxUploadMb }: { guide: Guide; maxUplo
           Datos
         </Button>
       </div>
+      {mobileBanner}
     </header>
   );
 
+  // Flujo estricto: solo se abre la actividad actual (la primera sin guardar), en orden
+  const ended = !!state.ended;
+  const currentAct = ended ? undefined : guide.activities.find((a) => !state.activities[a.id]?.done);
+  const canFinish = ended || !guide.activities.some((a) => !state.activities[a.id]?.done);
+  let cur: View = view;
+  if (cur.name === "activity" && (!state.prepDone || cur.id !== currentAct?.id)) cur = { name: "home" };
+  if ((cur.name === "summary" || cur.name === "survey") && !canFinish) cur = { name: "home" };
+
   let body: React.ReactNode;
-  if (view.name === "activity") {
-    const idx = guide.activities.findIndex((a) => a.id === view.id);
+  if (cur.name === "activity") {
+    const idx = guide.activities.findIndex((a) => a.id === cur.id);
     const act = guide.activities[idx];
+    const blockedHere = state.blocked?.activityId === act.id ? state.blocked : undefined;
+    const blockedStep = blockedHere?.stepId ? act.steps.findIndex((x) => x.id === blockedHere.stepId) : -1;
     body = (
       <ActivityView
         key={act.id}
@@ -107,7 +195,27 @@ export default function GuideApp({ guide, maxUploadMb }: { guide: Guide; maxUplo
         index={idx}
         total={guide.activities.length}
         state={state}
-        initialStep={view.step}
+        initialStep={cur.step}
+        blocked={!!blockedHere}
+        blockedPanel={
+          blockedHere && (
+            <BlockedPanel
+              key={`${blockedHere.issueId}:${blockedHere.helpId ?? ""}`}
+              blocked={blockedHere}
+              run={state}
+              stepLabel={blockedStep >= 0 ? `${act.id} · Paso ${blockedStep + 1}` : act.id}
+              beforeRequest={flush}
+              onRequested={(helpId, reason, at) =>
+                update((s) => ({ ...s, blocked: s.blocked && { ...s.blocked, helpId, reason, requestedAt: at } }))
+              }
+              onResolved={() => update((s) => ({ ...s, blocked: undefined }))}
+              onEnded={(reason, at) => {
+                update((s) => ({ ...s, blocked: undefined, ended: { reason, at } }));
+                nav({ name: "summary" });
+              }}
+            />
+          )
+        }
         onExit={() => nav({ name: "home" })}
         onStep={(stepId, outcome) =>
           update(
@@ -125,16 +233,16 @@ export default function GuideApp({ guide, maxUploadMb }: { guide: Guide; maxUplo
           update((s) => ({ ...s, activities: { ...s.activities, [act.id]: a } }), [
             { type: "activity", payload: { activityId: act.id, result: a.result, checks: a.checks, fields: a.fields, notes: a.notes } },
           ]);
-          const next = guide.activities.slice(idx + 1).find((x) => !stateRef.current?.activities[x.id]?.done);
+          const next = guide.activities.find((x) => !stateRef.current?.activities[x.id]?.done);
           nav(next ? { name: "activity", id: next.id, step: firstPending(stateRef.current!, next.id, next.steps.map((s) => s.id)) } : { name: "summary" });
         }}
       />
     );
-  } else if (view.name === "prep") {
+  } else if (cur.name === "prep") {
     body = <Prep guide={guide} state={state} update={update} onDone={() => nav({ name: "home" })} />;
-  } else if (view.name === "summary") {
-    body = <Summary guide={guide} state={state} update={update} onOpen={(id) => nav({ name: "activity", id, step: 0 })} onSurvey={() => nav({ name: "survey" })} />;
-  } else if (view.name === "survey") {
+  } else if (cur.name === "summary") {
+    body = <Summary guide={guide} state={state} update={update} onSurvey={() => nav({ name: "survey" })} />;
+  } else if (cur.name === "survey") {
     body = (
       <Survey
         survey={guide.survey}
@@ -148,7 +256,7 @@ export default function GuideApp({ guide, maxUploadMb }: { guide: Guide; maxUplo
     );
   } else {
     // Inicio: lista de actividades
-    const nextAct = guide.activities.find((a) => !state.activities[a.id]?.done);
+    const nextAct = currentAct;
     body = (
       <div className="animate-pop space-y-5">
         <section className="bg-brand-gradient rounded-3xl p-5 text-white shadow-md">
@@ -173,6 +281,31 @@ export default function GuideApp({ guide, maxUploadMb }: { guide: Guide; maxUplo
           </button>
         )}
 
+        {ended && (
+          <div className="space-y-3 rounded-2xl bg-rose-50 p-4 ring-1 ring-rose-200">
+            <div>
+              <div className="font-semibold text-rose-900">El guía terminó la prueba por un bloqueo</div>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-rose-800">{state.ended!.reason}</p>
+            </div>
+            <Button size="lg" className="w-full" onClick={() => nav({ name: "summary" })}>
+              Ver resumen y contestar la encuesta →
+            </Button>
+          </div>
+        )}
+
+        {!ended && canFinish && (
+          <Button size="lg" className="w-full" onClick={() => nav({ name: "summary" })}>
+            {state.finished ? "Ver resumen y encuesta" : "¡Terminaste! Ver resumen y contestar la encuesta"} →
+          </Button>
+        )}
+
+        {nextAct && state.prepDone && state.blocked?.activityId === nextAct.id && (
+          <Callout>
+            <strong>{nextAct.id} está en pausa</strong> por una falla que te impide seguir.{" "}
+            {state.blocked.helpId ? "Ya pediste ayuda: espera al guía." : "Ábrela y pide ayuda al guía."}
+          </Callout>
+        )}
+
         {nextAct && state.prepDone && (
           <Button
             size="lg"
@@ -184,7 +317,8 @@ export default function GuideApp({ guide, maxUploadMb }: { guide: Guide; maxUplo
         )}
 
         <section>
-          <h2 className="mb-2 px-1 text-sm font-semibold uppercase tracking-wide text-slate-500">Actividades</h2>
+          <h2 className="px-1 text-sm font-semibold uppercase tracking-wide text-slate-500">Actividades</h2>
+          <p className="mb-2 px-1 text-xs text-slate-500">Se hacen en orden. Las que ya guardaste quedan cerradas y no se pueden cambiar.</p>
           <ul className="space-y-2">
             {guide.activities.map((a) => {
               const st = state.activities[a.id];
@@ -195,14 +329,21 @@ export default function GuideApp({ guide, maxUploadMb }: { guide: Guide; maxUplo
                 : n > 0
                   ? "bg-brand-100 text-brand-700"
                   : "bg-slate-100 text-slate-500";
-              const label = st?.done && st.result ? ACTIVITY_RESULTS[st.result] : n > 0 ? `${n}/${a.steps.length} pasos` : "Pendiente";
-              return (
-                <li key={a.id}>
-                  <button
-                    onClick={() => nav({ name: "activity", id: a.id, step: st?.done ? 0 : firstPending(state, a.id, a.steps.map((s) => s.id)) })}
-                    className="flex w-full items-start gap-3 rounded-2xl bg-white p-4 text-left shadow-sm ring-1 ring-slate-200 active:scale-[0.99]"
-                  >
-                    <span className="mt-0.5 w-10 shrink-0 text-sm font-bold text-teal-brand">{a.id}</span>
+              const isCurrent = a.id === currentAct?.id;
+              const open = isCurrent && state.prepDone;
+              const isBlocked = isCurrent && state.blocked?.activityId === a.id;
+              const label = st?.done && st.result
+                ? ACTIVITY_RESULTS[st.result]
+                : isBlocked
+                  ? "En pausa"
+                  : n > 0
+                    ? `${n}/${a.steps.length} pasos`
+                    : ended
+                      ? "No realizada"
+                      : "Pendiente";
+              const inner = (
+                <>
+                  <span className="mt-0.5 w-10 shrink-0 text-sm font-bold text-teal-brand">{a.id}</span>
                     <span className="min-w-0 flex-1">
                       <span className="block font-medium leading-snug">{a.title}</span>
                       <span className="mt-0.5 block truncate text-xs text-slate-500">
@@ -210,23 +351,50 @@ export default function GuideApp({ guide, maxUploadMb }: { guide: Guide; maxUplo
                       </span>
                     </span>
                     <span className="flex shrink-0 flex-col items-end gap-1">
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${badge}`}>{label}</span>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${isBlocked ? "bg-rose-100 text-rose-800" : badge}`}>{label}</span>
                       {fails > 0 && <span className="text-xs text-rose-600">{fails} ✗</span>}
+                      {!open && (
+                        <span className="text-xs text-slate-400" aria-label={st?.done ? "Completada, cerrada" : "Bloqueada"}>
+                          🔒 {st?.done ? "Completada" : ""}
+                        </span>
+                      )}
                     </span>
-                  </button>
+                </>
+              );
+              return (
+                <li key={a.id} data-activity={a.id} data-locked={open ? "false" : "true"}>
+                  {open ? (
+                    <button
+                      onClick={() => nav({ name: "activity", id: a.id, step: firstPending(state, a.id, a.steps.map((s) => s.id)) })}
+                      className="flex w-full items-start gap-3 rounded-2xl bg-white p-4 text-left shadow-sm ring-2 ring-brand-500 active:scale-[0.99]"
+                    >
+                      {inner}
+                    </button>
+                  ) : (
+                    <div
+                      aria-disabled="true"
+                      className={`flex w-full cursor-not-allowed items-start gap-3 rounded-2xl p-4 text-left ring-1 ring-slate-200 ${
+                        st?.done ? "bg-white/70" : "bg-slate-50 opacity-60"
+                      }`}
+                    >
+                      {inner}
+                    </div>
+                  )}
                 </li>
               );
             })}
           </ul>
         </section>
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className={`grid gap-2 ${canFinish ? "grid-cols-2" : "grid-cols-1"}`}>
           <Button variant="outline" onClick={() => nav({ name: "prep" })}>
             {guide.prep.title}
           </Button>
-          <Button variant="outline" onClick={() => nav({ name: "summary" })}>
-            Resumen y encuesta
-          </Button>
+          {canFinish && (
+            <Button variant="outline" onClick={() => nav({ name: "summary" })}>
+              Resumen y encuesta
+            </Button>
+          )}
         </div>
         <p className="pb-6 text-center text-xs text-slate-400">
           Tu avance se guarda en este navegador. Versión de la guía {guide.version}.
@@ -254,12 +422,25 @@ export default function GuideApp({ guide, maxUploadMb }: { guide: Guide; maxUplo
 }
 
 function firstPending(state: RunState, activityId: string, stepIds: string[]) {
+  // Si la actividad está en pausa por una falla, se vuelve al paso donde se detuvo
+  const blockedAt = state.blocked?.activityId === activityId && state.blocked.stepId ? stepIds.indexOf(state.blocked.stepId) : -1;
+  if (blockedAt >= 0) return blockedAt;
   const i = stepIds.findIndex((id) => !state.steps[stepKey(activityId, id)]);
   return i === -1 ? stepIds.length : i;
 }
 
 /* ---------- Identificación del tester ---------- */
-function Identify({ guide, onDone }: { guide: Guide; onDone: (s: RunState) => void }) {
+function Identify({
+  guide,
+  variant,
+  onSwitchVariant,
+  onDone,
+}: {
+  guide: Guide;
+  variant?: GuideVariant;
+  onSwitchVariant?: () => void;
+  onDone: (s: RunState) => void;
+}) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState(guide.role);
@@ -277,7 +458,7 @@ function Identify({ guide, onDone }: { guide: Guide; onDone: (s: RunState) => vo
     setBusy(true);
     setError(null);
     try {
-      const device = await detectDevice();
+      const device = { ...(await detectDevice()), ...(variant ? { guideVariant: variant } : {}) };
       const res = await fetch("/api/runs", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -320,6 +501,11 @@ function Identify({ guide, onDone }: { guide: Guide; onDone: (s: RunState) => vo
           <h1 className="text-xl font-bold leading-tight">{guide.title}</h1>
         </div>
       </div>
+      {onSwitchVariant && (
+        <button type="button" onClick={onSwitchVariant} className="mt-3 text-sm font-medium text-brand-600 underline" data-testid="switch-variant">
+          {variant === "mobile" ? "¿Estás en computadora? Ver guía de escritorio" : "¿Estás en celular? Ver guía para celular"}
+        </button>
+      )}
       <p className="mt-4 text-slate-600">{guide.summary}</p>
       {guide.notice && (
         <div className="mt-3">
@@ -467,13 +653,11 @@ function Summary({
   guide,
   state,
   update,
-  onOpen,
   onSurvey,
 }: {
   guide: Guide;
   state: RunState;
   update: ReturnType<typeof useRun>["update"];
-  onOpen: (id: string) => void;
   onSurvey: () => void;
 }) {
   const pending = guide.activities.filter((a) => !state.activities[a.id]?.done);
@@ -486,10 +670,12 @@ function Summary({
         <Stat n={Object.values(state.steps).filter((o) => o === "ok").length} label="Pasos logrados" />
         <Stat n={issues.length} label="Fallas reportadas" tone={issues.length ? "warn" : undefined} />
       </div>
-      {pending.length > 0 && (
-        <Callout>
-          Te faltan {pending.length} actividad(es): {pending.map((a) => a.id).join(", ")}. Si no te tocaron, ábrelas y marca «No me tocó».
-        </Callout>
+      {state.ended && (
+        <div className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-900 ring-1 ring-rose-200">
+          <strong>El guía terminó la prueba por un bloqueo.</strong>
+          <p className="mt-1 whitespace-pre-wrap">{state.ended.reason}</p>
+          {pending.length > 0 && <p className="mt-1 text-xs">No se realizaron: {pending.map((a) => a.id).join(", ")}.</p>}
+        </div>
       )}
       <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
         {guide.activities.map((a) => {
@@ -499,16 +685,16 @@ function Summary({
           const nIssues = state.issues.filter((i) => i.activityId === a.id && i.kind === "issue").length;
           return (
             <li key={a.id}>
-              <button onClick={() => onOpen(a.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm">
+              <div className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm">
                 <span className="w-9 font-bold text-teal-brand">{a.id}</span>
                 <span className="flex-1">
-                  <span className="block font-medium">{st.done && st.result ? ACTIVITY_RESULTS[st.result] : "Pendiente"}</span>
+                  <span className="block font-medium">{st.done && st.result ? ACTIVITY_RESULTS[st.result] : state.ended ? "No realizada" : "Pendiente"}</span>
                   <span className="text-xs text-slate-500">
                     ✓ {ok} · ✗ {fail} de {a.steps.length} pasos{nIssues ? ` · ${nIssues} reporte(s)` : ""}
                   </span>
                 </span>
-                <span className="text-slate-400">›</span>
-              </button>
+                <span className="text-slate-400" aria-label="Cerrada">🔒</span>
+              </div>
             </li>
           );
         })}

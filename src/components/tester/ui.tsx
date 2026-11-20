@@ -81,19 +81,33 @@ export function Sheet({
   );
 }
 
-/** Captura del manual; al tocarla se abre en grande. */
+/**
+ * Captura del manual; al tocarla se abre en grande. Las capturas de celular (verticales) se
+ * muestran angostas; las de computadora (horizontales) usan todo el ancho.
+ */
 export function StepImage({ src, caption }: { src: string; caption?: string }) {
   const [zoom, setZoom] = useState(false);
+  const [wide, setWide] = useState(false);
+  const measure = (img: HTMLImageElement | null) => {
+    if (img && img.complete && img.naturalWidth) setWide(img.naturalWidth > img.naturalHeight * 1.1);
+  };
   return (
-    <figure className="mx-auto w-full max-w-[280px]">
+    <figure className={wide ? "w-full" : "mx-auto w-full max-w-[280px]"} data-wide={wide ? "true" : "false"}>
       <button
         type="button"
         onClick={() => setZoom(true)}
-        className="block w-full overflow-hidden rounded-2xl bg-white shadow-md ring-1 ring-slate-200"
+        className={`block w-full overflow-hidden bg-white shadow-md ring-1 ring-slate-200 ${wide ? "rounded-xl" : "rounded-2xl"}`}
         aria-label="Ver imagen en grande"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt={caption || "Captura de la app"} className="block h-auto w-full" loading="lazy" />
+        <img
+          ref={measure}
+          onLoad={(e) => measure(e.currentTarget)}
+          src={src}
+          alt={caption || "Captura de la app"}
+          className="block h-auto w-full"
+          loading="lazy"
+        />
       </button>
       {caption && <figcaption className="mt-2 text-center text-xs text-slate-500">{caption} · toca para ampliar</figcaption>}
       {zoom && (
@@ -104,8 +118,13 @@ export function StepImage({ src, caption }: { src: string; caption?: string }) {
             </button>
           </div>
           <div className="flex-1 overflow-auto p-2">
+            {/* En pantallas angostas la captura ancha se muestra más grande y se desplaza con el dedo */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={src} alt={caption || ""} className="mx-auto h-auto max-w-full" />
+            <img
+              src={src}
+              alt={caption || ""}
+              className={wide ? "mx-auto h-auto w-[200vw] max-w-none sm:w-auto sm:max-w-full" : "mx-auto h-auto max-w-full"}
+            />
           </div>
           {caption && <p className="pb-safe px-4 pt-2 text-center text-sm text-white/80">{caption}</p>}
         </div>

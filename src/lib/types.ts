@@ -49,6 +49,13 @@ export type Guide = {
   source?: string;
   notice?: string;
   glossary?: string;
+  /**
+   * Id de otra guía para celular (p. ej. la app nativa). En teléfonos se abre esa guía en lugar
+   * de esta; el tester puede cambiar de guía antes de identificarse.
+   */
+  mobileGuideId?: string;
+  /** No aparece en la lista de guías de la portada (p. ej. la variante para celular). */
+  hidden?: boolean;
   tester: { fields: FieldDef[] };
   prep: {
     title: string;
@@ -77,3 +84,5 @@ export const ACTIVITY_RESULTS = {
 export type ActivityResult = keyof typeof ACTIVITY_RESULTS;
 
 export const TESTER_ROLES = ["Cliente final", "Establecimiento", "Repartidor", "Coordinación / QA", "Otro"];
+
+export type GuideVariant = "desktop" | "mobile";

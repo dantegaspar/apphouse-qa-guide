@@ -4,8 +4,8 @@ import { isAdmin } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { getGuide } from "@/lib/guides";
 import {
-  checkValue, fmtDate, guideTitle, isImage, isVideo, parseRec, resultLabel,
-  type ActivityRow, type AttachmentRow, type IssueRow, type RunRow, type StepRow,
+  checkValue, fmtDate, guideTitle, HELP_STATUS, isImage, isVideo, parseRec, resultLabel, runStatusLabel,
+  type ActivityRow, type AttachmentRow, type HelpRow, type IssueRow, type RunRow, type StepRow,
 } from "@/lib/admin-data";
 
 export const dynamic = "force-dynamic";
@@ -47,6 +47,7 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
   const acts = db.prepare("SELECT * FROM activity_results WHERE run_id = ?").all(id) as ActivityRow[];
   const issues = db.prepare("SELECT * FROM issues WHERE run_id = ? ORDER BY created_at").all(id) as IssueRow[];
   const atts = db.prepare("SELECT id, run_id, issue_id, original_name, mime, size FROM attachments WHERE run_id = ? ORDER BY created_at").all(id) as AttachmentRow[];
+  const help = db.prepare("SELECT * FROM help_requests WHERE run_id = ? ORDER BY created_at").all(id) as HelpRow[];
   const survey = db.prepare("SELECT answers FROM survey_responses WHERE run_id = ?").get(id) as { answers: string } | undefined;
 
   const prep = parseRec(run.prep);
@@ -62,10 +63,50 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
         <h1 className="text-2xl font-bold">{run.name}</h1>
         <p className="text-sm opacity-90">{run.email} · {run.role}</p>
         <p className="mt-1 text-xs opacity-80">
-          {guideTitle(run.guide_id)} (v{run.guide_version}) · {run.status === "finished" ? "Terminada" : "En curso"} · creada {fmtDate(run.created_at)} · actualizada {fmtDate(run.updated_at)}
+          {guideTitle(run.guide_id)} (v{run.guide_version}) · {runStatusLabel(run.status)} · creada {fmtDate(run.created_at)} · actualizada {fmtDate(run.updated_at)}
           {run.finished_at ? ` · terminó ${fmtDate(run.finished_at)}` : ""}
         </p>
       </header>
+
+      {run.status === "ended_blocked" && (
+        <section className="rounded-xl bg-red-50 p-4 ring-2 ring-red-300">
+          <h2 className="font-semibold text-red-900">Prueba terminada por bloqueo</h2>
+          <p className="mt-1 whitespace-pre-wrap text-sm text-red-900">{run.ended_reason || "Sin motivo"}</p>
+          {run.ended_at && <p className="mt-1 text-xs text-red-700">{fmtDate(run.ended_at)}</p>}
+        </section>
+      )}
+
+      {help.length > 0 && (
+        <Card title={`Solicitudes de ayuda (${help.length})`}>
+          <ul className="space-y-2">
+            {help.map((h) => {
+              const act = guide?.activities.find((a) => a.id === h.activity_id);
+              const stepIdx = act && h.step_id ? act.steps.findIndex((s) => s.id === h.step_id) : -1;
+              return (
+                <li key={h.id} className="rounded-lg bg-slate-50 p-3 text-sm ring-1 ring-slate-200">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                    <span
+                      className={`rounded-full px-2 py-0.5 font-medium ${
+                        h.status === "open" ? "bg-red-600 text-white" : h.status === "resolved" ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"
+                      }`}
+                    >
+                      {HELP_STATUS[h.status] ?? h.status}
+                    </span>
+                    <span className="font-semibold text-slate-700">
+                      {h.activity_id} {act?.title}
+                      {stepIdx >= 0 ? ` · paso ${stepIdx + 1}` : ""}
+                    </span>
+                    <span>pedida {fmtDate(h.created_at)}</span>
+                    {h.resolved_at && <span>· cerrada {fmtDate(h.resolved_at)}</span>}
+                  </div>
+                  <p className="mt-1 whitespace-pre-wrap">{h.reason}</p>
+                  {h.resolution && <p className="mt-1 text-xs text-slate-500">{h.resolution}</p>}
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      )}
 
       <Card title="Tester y dispositivo">
         <KV data={{ ...parseRec(run.tester_fields) }} labels={testerLabels} />

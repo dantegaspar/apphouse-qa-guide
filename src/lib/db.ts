@@ -83,6 +83,26 @@ const MIGRATIONS: string[] = [
     updated_at TEXT NOT NULL
   );
   `,
+  // 2: solicitudes de ayuda al guía (falla bloqueante) y término de la prueba por bloqueo
+  `
+  CREATE TABLE help_requests (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+    activity_id TEXT NOT NULL,
+    step_id TEXT,
+    issue_id TEXT,
+    reason TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','resolved','ended')),
+    created_at TEXT NOT NULL,
+    resolved_at TEXT,
+    resolution TEXT NOT NULL DEFAULT ''
+  );
+  CREATE INDEX help_requests_status ON help_requests(status, created_at);
+  CREATE INDEX help_requests_run ON help_requests(run_id);
+
+  ALTER TABLE runs ADD COLUMN ended_reason TEXT NOT NULL DEFAULT '';
+  ALTER TABLE runs ADD COLUMN ended_at TEXT;
+  `,
 ];
 
 function migrate(db: Database.Database) {

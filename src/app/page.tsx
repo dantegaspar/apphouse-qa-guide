@@ -13,7 +13,7 @@ export default function Home() {
         </p>
       </div>
       <ul className="mt-8 space-y-3">
-        {GUIDES.map((g) => (
+        {GUIDES.filter((g) => !g.hidden).map((g) => (
           <li key={g.id}>
             <Link
               href={`/g/${g.id}`}

@@ -82,7 +82,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             `INSERT INTO survey_responses (run_id, answers, created_at, updated_at) VALUES (?,?,?,?)
              ON CONFLICT(run_id) DO UPDATE SET answers=excluded.answers, updated_at=excluded.updated_at`
           ).run(id, JSON.stringify(answers), ts, ts);
-          db.prepare("UPDATE runs SET status='finished', finished_at=COALESCE(finished_at, ?) WHERE id=?").run(ts, id);
+          // Una prueba terminada por bloqueo conserva ese estado aunque conteste la encuesta
+          db.prepare(
+            "UPDATE runs SET status=CASE WHEN status='ended_blocked' THEN status ELSE 'finished' END, finished_at=COALESCE(finished_at, ?) WHERE id=?"
+          ).run(ts, id);
           break;
         }
       }

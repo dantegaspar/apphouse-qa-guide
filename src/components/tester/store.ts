@@ -29,6 +29,18 @@ export type ActivityState = {
 
 export type QAEvent = { type: string; payload: Record<string, unknown> };
 
+/** Actividad detenida por una falla que impide seguir. */
+export type Blocked = {
+  activityId: string;
+  stepId?: string;
+  issueId: string;
+  /** Texto inicial (descripción del reporte) o el motivo enviado al guía. */
+  reason: string;
+  /** Id de la solicitud de ayuda en el servidor, una vez enviada. */
+  helpId?: string;
+  requestedAt?: string;
+};
+
 export type Tester = { name: string; email: string; role: string; fields: Record<string, string> };
 
 export type RunState = {
@@ -46,6 +58,9 @@ export type RunState = {
   survey: Record<string, string | number>;
   finished: boolean;
   outbox: QAEvent[];
+  blocked?: Blocked;
+  /** La prueba se terminó por un bloqueo (con la contraseña del guía). */
+  ended?: { reason: string; at: string };
 };
 
 export const stepKey = (activityId: string, stepId: string) => `${activityId}:${stepId}`;
@@ -57,6 +72,15 @@ export const uid = () =>
     : Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 const storageKey = (guideId: string) => `apphouse-qa:${guideId}`;
+
+/** ¿Hay una corrida guardada en este navegador para la guía? */
+export function hasStoredRun(guideId: string) {
+  try {
+    return Boolean(localStorage.getItem(storageKey(guideId)));
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Estado de la corrida: vive en localStorage (el progreso sobrevive a recargas) y cada cambio
@@ -160,6 +184,36 @@ export function useRun(guideId: string) {
   }, [flush, loaded]);
 
   return { state, loaded, syncing, syncError, commit, update, flush, stateRef };
+}
+
+const PHONE_QUERY = "(max-width: 767px)";
+
+/** Teléfono: pantalla angosta o navegador de celular. Tabletas y computadoras cuentan como escritorio. */
+export function isPhone() {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia(PHONE_QUERY).matches || /Android.+Mobile|iPhone|iPod/.test(navigator.userAgent);
+}
+
+/** Llamada directa al servidor (sin cola): necesita conexión. Devuelve los datos o un mensaje de error. */
+export async function callRun<T = Record<string, unknown>>(
+  run: { runId: string; token: string },
+  path: string,
+  body?: unknown
+): Promise<{ ok: true; data: T } | { ok: false; error: string; status?: number }> {
+  if (typeof navigator !== "undefined" && navigator.onLine === false)
+    return { ok: false, error: "No hay conexión a internet. Conéctate y vuelve a intentarlo." };
+  try {
+    const res = await fetch(`/api/runs/${run.runId}/${path}`, {
+      method: body === undefined ? "GET" : "POST",
+      headers: { "content-type": "application/json", "x-run-token": run.token },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return { ok: false, status: res.status, error: (data as { error?: string }).error || "No se pudo completar. Inténtalo de nuevo." };
+    return { ok: true, data: data as T };
+  } catch {
+    return { ok: false, error: "No hay conexión con el servidor. Revisa tu internet y vuelve a intentarlo." };
+  }
 }
 
 /** Datos del dispositivo y navegador, detectados automáticamente. */

@@ -5,7 +5,9 @@ Guía interactiva de pruebas QA de AppHouse. El tester:
 - Se identifica (nombre, correo, rol y datos de su celular).
 - Sigue cada actividad paso a paso, con instrucción e imagen, y marca cada paso como **"Lo logré"** o **"No pude"**.
 - Reporta fallas con descripción y captura de pantalla (o video corto).
-- Ve un resumen de sus resultados y contesta una encuesta al final.
+- Hace las actividades **en orden**: solo puede abrir la actividad actual y las ya guardadas quedan cerradas.
+- Si una falla le impide seguir, la actividad queda en pausa y pide ayuda al guía de la prueba. El guía la desbloquea o termina la prueba con su contraseña (`GUIDE_PASSWORD`). Las solicitudes abiertas aparecen arriba en **/admin**.
+- Ve un resumen de sus resultados y contesta una encuesta al final (al terminar la última actividad o si el guía terminó la prueba).
 
 Todo se guarda en SQLite. El panel **/admin**, protegido con contraseña, muestra los resultados y permite exportarlos a CSV.
 
@@ -94,6 +96,10 @@ Si la base de datos está accesible en disco (desarrollo o una carpeta montada),
 sqlite3 ./data/qa.sqlite ".backup './respaldo-qa.sqlite'"
 ```
 
+## Despliegue en Railway (alternativa)
+
+Guía paso a paso para el dueño: [docs/DEPLOY-RAILWAY.md](docs/DEPLOY-RAILWAY.md).
+
 ## Estructura del proyecto
 
 ```
@@ -117,6 +123,8 @@ Cada guía es un archivo JSON en `content/guides/`, por ejemplo `cliente.json`. 
 Resumen del esquema:
 
 - `id`, `version`, `role`, `title`, `subtitle`, `summary`, `notice`, `glossary`.
+- `mobileGuideId` (opcional): id de otra guía para celular. En teléfonos (pantalla de hasta 767 px o navegador de celular) se abre esa guía en su lugar; antes de identificarse, el tester puede cambiar entre escritorio y celular. Se registra en el dispositivo como `guideVariant`.
+- `hidden` (opcional): con `true` la guía no aparece en la portada (útil para la variante de celular).
 - `tester.fields`: datos que se piden al tester al inicio.
 - `prep`: antes de empezar (`sections`, `checklist`, `rules` y, opcional, `tour` con imagen).
 - `reference`: tablas de referencia (`tables` con `title`, `columns`, `rows`).
@@ -137,6 +145,7 @@ Reglas prácticas:
 | Variable | Obligatoria | Por defecto | Descripción |
 | --- | --- | --- | --- |
 | `ADMIN_PASSWORD` | Sí (para `/admin`) | — | Contraseña del panel de administración. |
+| `GUIDE_PASSWORD` | Recomendada | `ADMIN_PASSWORD` | Contraseña del guía de la prueba: desbloquea una actividad detenida por una falla o termina la prueba por bloqueo. Se verifica solo en el servidor. |
 | `SESSION_SECRET` | No | Se deriva de `ADMIN_PASSWORD` | Secreto para firmar la sesión de `/admin`. |
 | `MAX_UPLOAD_MB` | No | `15` | Tamaño máximo por archivo subido, en MB. |
 | `DATA_DIR` | No | `./data` | Carpeta de `qa.sqlite`. En Docker es `/app/data`. |

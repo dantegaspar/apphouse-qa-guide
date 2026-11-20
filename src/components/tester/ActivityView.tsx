@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { Activity } from "@/lib/types";
 import { ACTIVITY_RESULTS, type ActivityResult } from "@/lib/types";
 import { Button, Callout, inputCls, ProgressBar, Rich, StepImage } from "./ui";
@@ -23,6 +23,8 @@ export default function ActivityView({
   onReport,
   onSave,
   onExit,
+  blocked = false,
+  blockedPanel,
 }: {
   activity: Activity;
   index: number;
@@ -33,6 +35,9 @@ export default function ActivityView({
   onReport: (kind: "issue" | "evidence", stepId?: string) => void;
   onSave: (a: ActivityState) => void;
   onExit: () => void;
+  /** La actividad está detenida por una falla bloqueante: no se puede avanzar. */
+  blocked?: boolean;
+  blockedPanel?: ReactNode;
 }) {
   const steps = activity.steps;
   const [pos, setPos] = useState(Math.min(initialStep, steps.length)); // steps.length = cierre
@@ -77,6 +82,7 @@ export default function ActivityView({
       <div className="animate-pop">
         {header}
         <section className="mt-2 space-y-5">
+          {blocked && blockedPanel}
           <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
             <h2 className="font-semibold">Resultado esperado</h2>
             <p className="mb-3 text-sm text-slate-500">¿Pasó lo que dice cada punto?</p>
@@ -167,7 +173,7 @@ export default function ActivityView({
               <Button variant="outline" size="lg" onClick={() => go(steps.length - 1)}>
                 ←
               </Button>
-              <Button size="lg" disabled={!draft.result} onClick={() => onSave({ ...draft, done: true })}>
+              <Button size="lg" disabled={!draft.result || blocked} onClick={() => onSave({ ...draft, done: true })}>
                 Guardar y continuar
               </Button>
             </div>
@@ -185,6 +191,7 @@ export default function ActivityView({
     <div className="animate-pop" key={step.id}>
       {header}
       <section className="mt-1 space-y-4">
+        {blocked && blockedPanel}
         {pos === 0 && (
           <>
             <dl className="grid grid-cols-1 gap-2 rounded-2xl bg-white p-4 text-sm shadow-sm ring-1 ring-slate-200">
@@ -236,7 +243,9 @@ export default function ActivityView({
         <IssueList issues={stepIssues} />
 
         <div className="pb-safe sticky bottom-0 -mx-4 bg-[#f4f6fa]/95 px-4 pt-2 backdrop-blur">
-          {outcome && (
+          {blocked ? (
+            <p className="mb-2 text-center text-xs font-medium text-rose-700">Actividad en pausa: pide ayuda al guía para continuar.</p>
+          ) : outcome && (
             <p className="mb-2 text-center text-xs text-slate-500">
               Marcaste: <strong>{outcome === "ok" ? "Lo logré" : "No pude"}</strong> · puedes cambiarlo
             </p>
@@ -256,6 +265,7 @@ export default function ActivityView({
             <Button
               variant="success"
               size="lg"
+              disabled={blocked}
               className={outcome === "ok" ? "ring-4 ring-emerald-200" : ""}
               onClick={() => {
                 onStep(step.id, "ok");
@@ -273,7 +283,7 @@ export default function ActivityView({
               Reportar otra falla
             </button>
             {outcome ? (
-              <button onClick={() => go(pos + 1)} className="px-2 py-2 text-slate-500">
+              <button disabled={blocked} onClick={() => go(pos + 1)} className="px-2 py-2 text-slate-500 disabled:opacity-30">
                 Siguiente →
               </button>
             ) : (
