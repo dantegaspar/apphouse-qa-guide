@@ -9,6 +9,7 @@
   "notice": "Haz la prueba desde el programa de internet (Chrome, Safari o Edge) en tu computadora o iPad. No uses la app «AppHouse Establecimientos» al mismo tiempo, salvo que Mesa de control te lo pida.",
   "glossary": "**Toca** = tocar con el dedo o hacer clic · **Escribe** = escribir letras o números · **Toma una captura** = foto de la pantalla · **El grupo** = el grupo de WhatsApp de la prueba.",
   "mobileGuideId": "establecimiento-app",
+  "layout": "desktop",
   "tester": {
     "fields": [
       {

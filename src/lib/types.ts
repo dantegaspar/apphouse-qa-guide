@@ -56,6 +56,11 @@ export type Guide = {
   mobileGuideId?: string;
   /** No aparece en la lista de guías de la portada (p. ej. la variante para celular). */
   hidden?: boolean;
+  /**
+   * Diseño de la interfaz del tester. "desktop": en pantallas de computadora (≥1024 px) usa barra
+   * lateral, pasos en dos columnas y capturas grandes. Por omisión "mobile" (una columna angosta).
+   */
+  layout?: "desktop" | "mobile";
   tester: { fields: FieldDef[] };
   prep: {
     title: string;

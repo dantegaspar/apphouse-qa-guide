@@ -9,7 +9,7 @@ import ActivityView from "./ActivityView";
 import BlockedPanel from "./BlockedPanel";
 import ReportSheet, { type ReportDraft } from "./ReportSheet";
 import Survey from "./Survey";
-import { Button, Callout, inputCls, Rich, Sheet, StepImage } from "./ui";
+import { Button, Callout, inputCls, ProgressBar, Rich, Sheet, StepImage } from "./ui";
 import { callRun, detectDevice, emptyActivity, stepKey, uid, useRun, type Blocked, type Issue, type RunState } from "./store";
 
 type View = { name: "home" } | { name: "prep" } | { name: "activity"; id: string; step: number } | { name: "summary" } | { name: "survey" };
@@ -40,6 +40,9 @@ export default function GuideApp({
   const [report, setReport] = useState<{ kind: "issue" | "evidence"; activityId: string; stepId?: string } | null>(null);
 
   const totalSteps = useMemo(() => guide.activities.reduce((n, a) => n + a.steps.length, 0), [guide]);
+  // Guía de escritorio: en pantallas ≥1024 px (lg) usa barra lateral y vistas anchas
+  const desktop = guide.layout === "desktop";
+  const dk = (c: string) => (desktop ? " " + c : "");
 
   const nav = (v: View) => {
     setView(v);
@@ -139,7 +142,7 @@ export default function GuideApp({
     return (
       <>
         {mobileBanner}
-        <Identify guide={guide} variant={variant} onSwitchVariant={onSwitchVariant} onDone={(s) => commit(s)} />
+        <Identify guide={guide} variant={variant} desktop={desktop} onSwitchVariant={onSwitchVariant} onDone={(s) => commit(s)} />
       </>
     );
 
@@ -152,7 +155,7 @@ export default function GuideApp({
 
   const topbar = (
     <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
-      <div className="mx-auto flex max-w-xl items-center gap-3 px-4 py-2.5">
+      <div className={"mx-auto flex max-w-xl items-center gap-3 px-4 py-2.5" + dk("lg:max-w-[1440px] lg:px-8")}>
         <button onClick={() => nav({ name: "home" })} className="flex items-center gap-2" aria-label="Inicio de la guía">
           <Image src="/logo.png" alt="" width={36} height={26} />
           <span className="text-left text-sm font-semibold leading-tight">
@@ -160,6 +163,9 @@ export default function GuideApp({
             <span className="block text-xs font-normal text-slate-500">{state.tester.name}</span>
           </span>
         </button>
+        {desktop && (
+          <span className="ml-4 hidden min-w-0 truncate border-l border-slate-200 pl-4 text-sm text-slate-500 lg:inline">{guide.title}</span>
+        )}
         <span
           className={`ml-auto text-xs ${syncError ? "text-amber-600" : "text-slate-400"}`}
           title={syncError ? "Sin conexión: se enviará al volver el internet" : "Guardado"}
@@ -167,7 +173,10 @@ export default function GuideApp({
           {syncing ? "Guardando…" : syncError || state.outbox.length ? `● ${state.outbox.length} sin enviar` : "✓ Guardado"}
         </span>
         <Button variant="outline" onClick={() => setShowRef(true)} className="!px-3 !py-1.5">
-          Datos
+          <span>
+            Datos
+            {desktop && <span className="hidden lg:inline"> de la prueba</span>}
+          </span>
         </Button>
       </div>
       {mobileBanner}
@@ -191,6 +200,7 @@ export default function GuideApp({
     body = (
       <ActivityView
         key={act.id}
+        desktop={desktop}
         activity={act}
         index={idx}
         total={guide.activities.length}
@@ -239,11 +249,12 @@ export default function GuideApp({
       />
     );
   } else if (cur.name === "prep") {
-    body = <Prep guide={guide} state={state} update={update} onDone={() => nav({ name: "home" })} />;
+    body = <Prep guide={guide} state={state} update={update} desktop={desktop} onDone={() => nav({ name: "home" })} />;
   } else if (cur.name === "summary") {
-    body = <Summary guide={guide} state={state} update={update} onSurvey={() => nav({ name: "survey" })} />;
+    body = <Summary guide={guide} state={state} update={update} desktop={desktop} onSurvey={() => nav({ name: "survey" })} />;
   } else if (cur.name === "survey") {
     body = (
+      <div className={dk("lg:max-w-3xl")}>
       <Survey
         survey={guide.survey}
         initial={state.survey}
@@ -253,15 +264,17 @@ export default function GuideApp({
         }}
         onBack={() => nav({ name: "summary" })}
       />
+      </div>
     );
   } else {
     // Inicio: lista de actividades
     const nextAct = currentAct;
     body = (
-      <div className="animate-pop space-y-5">
-        <section className="bg-brand-gradient rounded-3xl p-5 text-white shadow-md">
+      <div className={"animate-pop space-y-5" + dk("lg:max-w-5xl lg:space-y-6")}>
+        <section className={"bg-brand-gradient rounded-3xl p-5 text-white shadow-md" + dk("lg:p-8")}>
           <p className="text-sm/5 opacity-90">Hola, {state.tester.name.split(" ")[0]} 👋</p>
-          <h1 className="mt-1 text-xl font-bold">{guide.title}</h1>
+          <h1 className={"mt-1 text-xl font-bold" + dk("lg:text-3xl")}>{guide.title}</h1>
+          {desktop && <p className="mt-1 hidden max-w-2xl text-sm opacity-90 lg:block">{guide.subtitle}</p>}
           <div className="mt-4 flex items-center justify-between text-sm">
             <span>
               {doneActs} de {guide.activities.length} actividades
@@ -275,7 +288,7 @@ export default function GuideApp({
         </section>
 
         {!state.prepDone && (
-          <button onClick={() => nav({ name: "prep" })} className="w-full rounded-2xl bg-amber-50 p-4 text-left ring-1 ring-amber-200">
+          <button onClick={() => nav({ name: "prep" })} className={"w-full rounded-2xl bg-amber-50 p-4 text-left ring-1 ring-amber-200" + dk("lg:p-5 lg:hover:bg-amber-100/70")}>
             <div className="font-semibold text-amber-900">Empieza aquí: {guide.prep.title}</div>
             <div className="text-sm text-amber-800">Instala la app, revisa las reglas y conoce la pantalla principal.</div>
           </button>
@@ -309,7 +322,7 @@ export default function GuideApp({
         {nextAct && state.prepDone && (
           <Button
             size="lg"
-            className="w-full"
+            className={"w-full" + dk("lg:w-auto lg:min-w-80")}
             onClick={() => nav({ name: "activity", id: nextAct.id, step: firstPending(state, nextAct.id, nextAct.steps.map((s) => s.id)) })}
           >
             {Object.keys(state.steps).length ? "Continuar" : "Empezar"} con {nextAct.id} →
@@ -319,7 +332,7 @@ export default function GuideApp({
         <section>
           <h2 className="px-1 text-sm font-semibold uppercase tracking-wide text-slate-500">Actividades</h2>
           <p className="mb-2 px-1 text-xs text-slate-500">Se hacen en orden. Las que ya guardaste quedan cerradas y no se pueden cambiar.</p>
-          <ul className="space-y-2">
+          <ul className={"space-y-2" + dk("lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0")}>
             {guide.activities.map((a) => {
               const st = state.activities[a.id];
               const n = a.steps.filter((s) => state.steps[stepKey(a.id, s.id)]).length;
@@ -362,7 +375,7 @@ export default function GuideApp({
                 </>
               );
               return (
-                <li key={a.id} data-activity={a.id} data-locked={open ? "false" : "true"}>
+                <li key={a.id} data-activity={a.id} data-locked={open ? "false" : "true"} className={dk("lg:flex")}>
                   {open ? (
                     <button
                       onClick={() => nav({ name: "activity", id: a.id, step: firstPending(state, a.id, a.steps.map((s) => s.id)) })}
@@ -386,7 +399,7 @@ export default function GuideApp({
           </ul>
         </section>
 
-        <div className={`grid gap-2 ${canFinish ? "grid-cols-2" : "grid-cols-1"}`}>
+        <div className={`grid gap-2 ${canFinish ? "grid-cols-2" : "grid-cols-1"}` + dk("lg:max-w-xl")}>
           <Button variant="outline" onClick={() => nav({ name: "prep" })}>
             {guide.prep.title}
           </Button>
@@ -407,8 +420,26 @@ export default function GuideApp({
   return (
     <>
       {topbar}
-      <main className="mx-auto w-full max-w-xl flex-1 px-4 pt-3">{body}</main>
-      <ReferenceSheet guide={guide} open={showRef} onClose={() => setShowRef(false)} />
+      {desktop ? (
+        <div className="mx-auto flex w-full max-w-xl flex-1 px-4 pt-3 lg:max-w-[1440px] lg:gap-8 lg:px-8 lg:pt-6">
+          <Sidebar
+            guide={guide}
+            state={state}
+            view={cur}
+            currentId={currentAct?.id}
+            canFinish={canFinish}
+            answered={answered}
+            totalSteps={totalSteps}
+            doneActs={doneActs}
+            nav={nav}
+            onOpenRef={() => setShowRef(true)}
+          />
+          <main className="min-w-0 flex-1 lg:pb-10">{body}</main>
+        </div>
+      ) : (
+        <main className="mx-auto w-full max-w-xl flex-1 px-4 pt-3">{body}</main>
+      )}
+      <ReferenceSheet guide={guide} desktop={desktop} open={showRef} onClose={() => setShowRef(false)} />
       <ReportSheet
         open={!!report}
         kind={report?.kind ?? "issue"}
@@ -429,15 +460,161 @@ function firstPending(state: RunState, activityId: string, stepIds: string[]) {
   return i === -1 ? stepIds.length : i;
 }
 
+/* ---------- Barra lateral (guía de escritorio, pantallas grandes) ---------- */
+const RESULT_DOT: Record<string, string> = {
+  ok: "bg-emerald-500",
+  issue: "bg-amber-500",
+  blocked: "bg-rose-500",
+  skipped: "bg-slate-400",
+};
+
+function Sidebar({
+  guide,
+  state,
+  view,
+  currentId,
+  canFinish,
+  answered,
+  totalSteps,
+  doneActs,
+  nav,
+  onOpenRef,
+}: {
+  guide: Guide;
+  state: RunState;
+  view: View;
+  currentId?: string;
+  canFinish: boolean;
+  answered: number;
+  totalSteps: number;
+  doneActs: number;
+  nav: (v: View) => void;
+  onOpenRef: () => void;
+}) {
+  const pct = Math.round((answered / totalSteps) * 100);
+  const item = (active: boolean) =>
+    `flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm transition ${
+      active ? "bg-brand-50 font-semibold text-brand-700" : "text-slate-700 hover:bg-slate-100"
+    }`;
+  return (
+    <aside className="hidden w-72 shrink-0 lg:block" aria-label="Navegación de la guía" data-testid="guide-sidebar">
+      <div className="sticky top-[78px] flex max-h-[calc(100dvh-102px)] flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+        <div className="border-b border-slate-100 p-4">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-teal-brand">{guide.role}</div>
+          <div className="mt-0.5 font-bold leading-snug">{guide.title}</div>
+          <div className="mt-3 flex items-baseline justify-between text-xs text-slate-500">
+            <span>
+              {doneActs} de {guide.activities.length} actividades
+            </span>
+            <span className="font-semibold text-slate-700">{pct}%</span>
+          </div>
+          <ProgressBar value={answered / totalSteps} className="mt-1.5" />
+        </div>
+
+        <nav className="min-h-0 flex-1 overflow-y-auto p-2">
+          <button onClick={() => nav({ name: "home" })} className={item(view.name === "home")}>
+            <span className="w-5 text-center" aria-hidden="true">
+              🏠
+            </span>
+            Inicio
+          </button>
+          <button onClick={() => nav({ name: "prep" })} className={item(view.name === "prep")}>
+            <span className="w-5 text-center" aria-hidden="true">
+              {state.prepDone ? "✅" : "📋"}
+            </span>
+            <span className="flex-1">{guide.prep.title}</span>
+          </button>
+
+          <div className="mt-3 px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Actividades</div>
+          <ul className="space-y-0.5">
+            {guide.activities.map((a) => {
+              const st = state.activities[a.id];
+              const done = !!st?.done;
+              const isCurrent = a.id === currentId;
+              const open = isCurrent && state.prepDone;
+              const active = view.name === "activity" && view.id === a.id;
+              const paused = isCurrent && state.blocked?.activityId === a.id;
+              const n = a.steps.filter((x) => state.steps[stepKey(a.id, x.id)]).length;
+              const inner = (
+                <>
+                  <span
+                    className={`flex h-6 w-9 shrink-0 items-center justify-center rounded-md text-[11px] font-bold ${
+                      active ? "bg-brand-500 text-white" : open ? "bg-brand-100 text-brand-700" : "bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    {a.id}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate leading-snug">{a.title}</span>
+                    <span className="block text-[11px] leading-tight text-slate-400">
+                      {done ? (
+                        <>
+                          <span className={`mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle ${RESULT_DOT[st.result ?? "ok"]}`} />
+                          🔒 Completada
+                        </>
+                      ) : paused ? (
+                        <span className="font-medium text-rose-600">En pausa</span>
+                      ) : open ? (
+                        n > 0 ? `En curso · ${n}/${a.steps.length} pasos` : `Siguiente · ${a.steps.length} pasos`
+                      ) : (
+                        `🔒 ${state.ended ? "No realizada" : "Bloqueada"}`
+                      )}
+                    </span>
+                  </span>
+                </>
+              );
+              return (
+                <li key={a.id} data-nav-activity={a.id}>
+                  {open ? (
+                    <button
+                      onClick={() => nav({ name: "activity", id: a.id, step: firstPending(state, a.id, a.steps.map((x) => x.id)) })}
+                      className={`${item(active)} ${active ? "" : "ring-1 ring-brand-200"}`}
+                    >
+                      {inner}
+                    </button>
+                  ) : (
+                    <div aria-disabled="true" className={`flex w-full cursor-not-allowed items-center gap-2.5 rounded-xl px-3 py-2 text-sm ${done ? "text-slate-600" : "text-slate-400"}`}>
+                      {inner}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+
+        <div className="space-y-0.5 border-t border-slate-100 p-2">
+          <button onClick={onOpenRef} className={item(false)}>
+            <span className="w-5 text-center" aria-hidden="true">
+              📊
+            </span>
+            {guide.reference.title}
+          </button>
+          {canFinish && (
+            <button onClick={() => nav({ name: "summary" })} className={item(view.name === "summary" || view.name === "survey")}>
+              <span className="w-5 text-center" aria-hidden="true">
+                🏁
+              </span>
+              Resumen y encuesta
+            </button>
+          )}
+        </div>
+      </div>
+    </aside>
+  );
+}
+
 /* ---------- Identificación del tester ---------- */
 function Identify({
   guide,
   variant,
+  desktop = false,
   onSwitchVariant,
   onDone,
 }: {
   guide: Guide;
   variant?: GuideVariant;
+  desktop?: boolean;
   onSwitchVariant?: () => void;
   onDone: (s: RunState) => void;
 }) {
@@ -490,7 +667,13 @@ function Identify({
   };
 
   return (
-    <main className="animate-pop mx-auto w-full max-w-xl flex-1 px-4 py-6">
+    <main
+      className={
+        "animate-pop mx-auto w-full max-w-xl flex-1 px-4 py-6" +
+        (desktop ? " lg:grid lg:max-w-6xl lg:grid-cols-[minmax(0,1fr)_480px] lg:items-start lg:gap-12 lg:px-8 lg:py-14" : "")
+      }
+    >
+      <div className={desktop ? "lg:pt-2" : undefined}>
       <Link href="/" className="text-sm text-brand-600">
         ← Guías
       </Link>
@@ -498,7 +681,8 @@ function Identify({
         <Image src="/logo.png" alt="AppHouse" width={64} height={46} />
         <div>
           <div className="text-xs font-semibold uppercase tracking-wide text-teal-brand">{guide.role}</div>
-          <h1 className="text-xl font-bold leading-tight">{guide.title}</h1>
+          <h1 className={"text-xl font-bold leading-tight" + (desktop ? " lg:text-3xl" : "")}>{guide.title}</h1>
+          {desktop && <p className="mt-1 hidden text-slate-500 lg:block">{guide.subtitle}</p>}
         </div>
       </div>
       {onSwitchVariant && (
@@ -506,13 +690,36 @@ function Identify({
           {variant === "mobile" ? "¿Estás en computadora? Ver guía de escritorio" : "¿Estás en celular? Ver guía para celular"}
         </button>
       )}
-      <p className="mt-4 text-slate-600">{guide.summary}</p>
+      <p className={"mt-4 text-slate-600" + (desktop ? " lg:mt-6 lg:text-lg lg:leading-relaxed" : "")}>{guide.summary}</p>
       {guide.notice && (
         <div className="mt-3">
           <Callout tone="info">{guide.notice}</Callout>
         </div>
       )}
-      <form onSubmit={submit} className="mt-6 space-y-4 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+      {desktop && (
+        <ul className="mt-8 hidden gap-3 text-sm text-slate-600 lg:grid lg:grid-cols-3">
+          <li className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+            <div className="text-xl">🧭</div>
+            <div className="mt-1 font-semibold text-slate-800">{guide.activities.length} actividades en orden</div>
+            Cada una con sus pasos y capturas del panel.
+          </li>
+          <li className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+            <div className="text-xl">🖥️</div>
+            <div className="mt-1 font-semibold text-slate-800">Capturas en grande</div>
+            Haz clic en cualquier captura para verla en pantalla completa.
+          </li>
+          <li className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+            <div className="text-xl">🐞</div>
+            <div className="mt-1 font-semibold text-slate-800">Reporta fallas</div>
+            Con «No pude» describes qué pasó y adjuntas capturas.
+          </li>
+        </ul>
+      )}
+      </div>
+      <form
+        onSubmit={submit}
+        className={"mt-6 space-y-4 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200" + (desktop ? " lg:mt-0 lg:p-7 lg:shadow-md" : "")}
+      >
         <h2 className="font-semibold">¿Quién hace la prueba?</h2>
         <label className="block">
           <span className="mb-1 block text-sm">Nombre y apellido *</span>
@@ -561,19 +768,24 @@ function Prep({
   state,
   update,
   onDone,
+  desktop = false,
 }: {
   guide: Guide;
   state: RunState;
   update: ReturnType<typeof useRun>["update"];
   onDone: () => void;
+  desktop?: boolean;
 }) {
   const p = guide.prep;
   const allChecked = p.checklist.every((c) => state.prep[c.id]);
+  const dk = (c: string) => (desktop ? " " + c : "");
+  const card = "rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200" + dk("lg:p-6");
   return (
-    <div className="animate-pop space-y-5 pb-8">
-      <h1 className="text-2xl font-bold">{p.title}</h1>
+    <div className={"animate-pop space-y-5 pb-8" + dk("lg:max-w-6xl lg:space-y-6")}>
+      <h1 className={"text-2xl font-bold" + dk("lg:text-3xl")}>{p.title}</h1>
+      <div className={"space-y-5" + dk("lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0")}>
       {p.sections.map((s) => (
-        <section key={s.title} className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+        <section key={s.title} className={card}>
           <h2 className="mb-2 font-semibold">{s.title}</h2>
           <ul className="space-y-2 text-sm text-slate-700">
             {s.items.map((it, i) => (
@@ -584,7 +796,9 @@ function Prep({
           </ul>
         </section>
       ))}
-      <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+      </div>
+      <div className={"space-y-5" + dk("lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0")}>
+      <section className={card}>
         <h2 className="mb-2 font-semibold">Confirma</h2>
         <ul className="space-y-2">
           {p.checklist.map((c) => (
@@ -605,7 +819,7 @@ function Prep({
           ))}
         </ul>
       </section>
-      <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+      <section className={card}>
         <h2 className="mb-2 font-semibold">Reglas</h2>
         <ol className="list-decimal space-y-2 pl-5 text-sm text-slate-700">
           {p.rules.map((r, i) => (
@@ -620,8 +834,10 @@ function Prep({
           </p>
         )}
       </section>
+      </div>
       {p.tour && (
-        <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+        <section className={card + dk("lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-start lg:gap-6")}>
+          <div>
           <h2 className="mb-2 font-semibold">{p.tour.title}</h2>
           <ol className="mb-4 list-decimal space-y-2 pl-5 text-sm text-slate-700">
             {p.tour.items.map((r, i) => (
@@ -630,12 +846,13 @@ function Prep({
               </li>
             ))}
           </ol>
-          {p.tour.image && <StepImage src={p.tour.image} caption={p.tour.caption} />}
+          </div>
+          {p.tour.image && <StepImage src={p.tour.image} caption={p.tour.caption} desktop={desktop} />}
         </section>
       )}
       <Button
         size="lg"
-        className="w-full"
+        className={"w-full" + dk("lg:ml-auto lg:flex lg:w-auto lg:min-w-96")}
         disabled={!allChecked}
         onClick={() => {
           update((s) => ({ ...s, prepDone: true }));
@@ -654,18 +871,21 @@ function Summary({
   state,
   update,
   onSurvey,
+  desktop = false,
 }: {
   guide: Guide;
   state: RunState;
   update: ReturnType<typeof useRun>["update"];
   onSurvey: () => void;
+  desktop?: boolean;
 }) {
   const pending = guide.activities.filter((a) => !state.activities[a.id]?.done);
   const issues = state.issues.filter((i) => i.kind === "issue");
+  const dk = (c: string) => (desktop ? " " + c : "");
   return (
-    <div className="animate-pop space-y-5 pb-8">
-      <h1 className="text-2xl font-bold">Resumen de tu prueba</h1>
-      <div className="grid grid-cols-3 gap-2 text-center">
+    <div className={"animate-pop space-y-5 pb-8" + dk("lg:max-w-5xl lg:space-y-6")}>
+      <h1 className={"text-2xl font-bold" + dk("lg:text-3xl")}>Resumen de tu prueba</h1>
+      <div className={"grid grid-cols-3 gap-2 text-center" + dk("lg:gap-4")}>
         <Stat n={guide.activities.length - pending.length} label="Actividades listas" />
         <Stat n={Object.values(state.steps).filter((o) => o === "ok").length} label="Pasos logrados" />
         <Stat n={issues.length} label="Fallas reportadas" tone={issues.length ? "warn" : undefined} />
@@ -677,6 +897,7 @@ function Summary({
           {pending.length > 0 && <p className="mt-1 text-xs">No se realizaron: {pending.map((a) => a.id).join(", ")}.</p>}
         </div>
       )}
+      <div className={dk("lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start lg:gap-6")}>
       <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
         {guide.activities.map((a) => {
           const st = state.activities[a.id] ?? emptyActivity();
@@ -687,6 +908,7 @@ function Summary({
             <li key={a.id}>
               <div className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm">
                 <span className="w-9 font-bold text-teal-brand">{a.id}</span>
+                {desktop && <span className="hidden w-56 shrink-0 truncate text-slate-600 lg:block">{a.title}</span>}
                 <span className="flex-1">
                   <span className="block font-medium">{st.done && st.result ? ACTIVITY_RESULTS[st.result] : state.ended ? "No realizada" : "Pendiente"}</span>
                   <span className="text-xs text-slate-500">
@@ -699,6 +921,7 @@ function Summary({
           );
         })}
       </ul>
+      <div className={"mt-5 space-y-5" + dk("lg:mt-0")}>
       {issues.length > 0 && (
         <section>
           <h2 className="mb-2 font-semibold">Tus reportes</h2>
@@ -735,7 +958,9 @@ function Summary({
           ))}
         </section>
       )}
-      <Button size="lg" className="w-full" onClick={onSurvey}>
+      </div>
+      </div>
+      <Button size="lg" className={"w-full" + dk("lg:ml-auto lg:flex lg:w-auto lg:min-w-96")} onClick={onSurvey}>
         {state.finished ? "Ver mi encuesta" : "Contestar la encuesta final"} →
       </Button>
     </div>
@@ -752,11 +977,11 @@ function Stat({ n, label, tone }: { n: number; label: string; tone?: "warn" }) {
 }
 
 /* ---------- Hoja de datos / ayuda ---------- */
-function ReferenceSheet({ guide, open, onClose }: { guide: Guide; open: boolean; onClose: () => void }) {
+function ReferenceSheet({ guide, open, onClose, desktop = false }: { guide: Guide; open: boolean; onClose: () => void; desktop?: boolean }) {
   const [tab, setTab] = useState<"data" | "help">("data");
   return (
-    <Sheet open={open} onClose={onClose} title={tab === "data" ? guide.reference.title : "Qué hacer si…"}>
-      <div className="mb-4 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 text-sm">
+    <Sheet open={open} onClose={onClose} title={tab === "data" ? guide.reference.title : "Qué hacer si…"} size={desktop ? "wide" : "default"}>
+      <div className={"mb-4 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 text-sm" + (desktop ? " lg:max-w-sm" : "")}>
         {[
           ["data", "Datos"],
           ["help", "Qué hacer si…"],
@@ -772,7 +997,7 @@ function ReferenceSheet({ guide, open, onClose }: { guide: Guide; open: boolean;
           {guide.reference.tables.map((t) => (
             <section key={t.title}>
               <h3 className="mb-2 font-semibold">{t.title}</h3>
-              <div className="space-y-2">
+              <div className={"space-y-2" + (desktop ? " lg:hidden" : "")}>
                 {t.rows.map((r, i) => (
                   <div key={i} className="rounded-xl bg-slate-50 p-3 text-sm">
                     <div className="font-semibold">
@@ -787,12 +1012,39 @@ function ReferenceSheet({ guide, open, onClose }: { guide: Guide; open: boolean;
                   </div>
                 ))}
               </div>
+              {desktop && (
+                // En escritorio, tabla de verdad
+                <div className="hidden overflow-hidden rounded-xl ring-1 ring-slate-200 lg:block">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                      <tr>
+                        {t.columns.map((c) => (
+                          <th key={c} className="px-3 py-2 font-semibold">
+                            {c}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {t.rows.map((r, i) => (
+                        <tr key={i} className="align-top even:bg-slate-50/50">
+                          {r.map((c, j) => (
+                            <td key={j} className={`px-3 py-2 ${j === 0 ? "font-semibold text-slate-900" : "text-slate-700"}`}>
+                              <Rich text={c} />
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
               {t.note && <p className="mt-2 text-xs text-slate-500">{t.note}</p>}
             </section>
           ))}
         </div>
       ) : (
-        <ul className="space-y-2">
+        <ul className={"space-y-2" + (desktop ? " lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0" : "")}>
           {guide.troubleshooting.map(([q, a], i) => (
             <li key={i} className="rounded-xl bg-slate-50 p-3 text-sm">
               <p>
