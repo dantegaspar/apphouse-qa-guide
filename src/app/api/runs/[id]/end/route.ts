@@ -1,21 +1,30 @@
 import { getDb, now } from "@/lib/db";
 import { checkRunToken } from "@/lib/auth";
 import { verifyGuidePassword } from "@/lib/guide-auth";
-import { err, json, str } from "@/lib/http";
+import { err, hasErrors, invalid, json, readJsonObject } from "@/lib/http";
+import { collect, text, textError } from "@/lib/validate";
 
 export const dynamic = "force-dynamic";
 
-/** El guía termina la prueba (con su contraseña) porque el bloqueo no se pudo resolver. */
+/**
+ * El guía termina la prueba (con su contraseña) porque el bloqueo no se pudo resolver.
+ * Reglas: password obligatoria (1–200); reason opcional ≤4000.
+ */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!checkRunToken(id, req.headers.get("x-run-token"))) return err("No autorizado", 401);
-  const body = await req.json().catch(() => null);
-  if (!body) return err("JSON inválido");
+  const { body, res } = await readJsonObject(req, 32 * 1024);
+  if (res) return res;
+  const errors = collect([
+    ["password", textError(body.password, { min: 1, max: 200, label: "la contraseña del guía" })],
+    ["reason", textError(body.reason, { max: 4000, label: "el motivo" })],
+  ]);
+  if (hasErrors(errors)) return invalid(errors);
   const denied = await verifyGuidePassword(req, body.password);
   if (denied) return denied;
 
   const db = getDb();
-  const reason = str(body.reason, 4000) || "Bloqueo sin resolver";
+  const reason = text(body.reason) || "Bloqueo sin resolver";
   const ts = now();
   db.transaction(() => {
     db.prepare(

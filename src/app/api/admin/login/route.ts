@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { ADMIN_COOKIE, adminConfigured, checkPassword, makeSessionValue } from "@/lib/auth";
-import { err, json } from "@/lib/http";
+import { err, invalid, json, readJsonObject } from "@/lib/http";
+import { textError } from "@/lib/validate";
 
 export const dynamic = "force-dynamic";
 
@@ -15,8 +16,12 @@ export async function POST(req: Request) {
   const recent = (fails.get(ip) ?? []).filter((x) => t - x < WINDOW_MS);
   if (recent.length >= MAX_FAILS) return err("Demasiados intentos. Espera un minuto.", 429);
 
-  const body = await req.json().catch(() => null);
-  const password = typeof body?.password === "string" ? body.password : "";
+  const { body, res } = await readJsonObject(req, 8 * 1024);
+  if (res) return res;
+  // Contraseña obligatoria, 1–200 caracteres (un formato inválido no cuenta como intento fallido)
+  const pwErr = textError(body.password, { min: 1, max: 200, label: "la contraseña" });
+  if (pwErr) return invalid({ password: pwErr });
+  const password = body.password as string;
   if (!checkPassword(password)) {
     recent.push(t);
     fails.set(ip, recent);

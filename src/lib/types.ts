@@ -1,7 +1,8 @@
 export type FieldDef = {
   id: string;
   label: string;
-  type?: "text" | "number" | "time" | "email";
+  /** "orders": tabla de pedidos (Hoja de pedidos, E07) con botón «Agregar pedido»; el valor se guarda como JSON (OrderRow[]). */
+  type?: "text" | "number" | "time" | "email" | "orders";
   placeholder?: string;
   required?: boolean;
   /** Regex (sin delimitadores) que debe cumplir el valor, p. ej. un folio "^\\d{6}-\\d{4}$". */
@@ -25,6 +26,24 @@ export type Step = {
    * (p. ej. al cerrar cada Parte A–E de E04).
    */
   checkpoint?: { title: string; items: string[] };
+  /** Paso que depende de algo («Si te pide…»): muestra un tercer botón «No me apareció» (terminado, sin falla). */
+  conditional?: boolean;
+  /** Aviso en amarillo dentro de este paso (p. ej. «No toques Cerrar ahora»). */
+  warning?: string;
+};
+
+/** Resultado esperado: texto simple, o con conditional=true para ofrecer Sí · No · No aplica. */
+export type ExpectedItem = string | { text: string; conditional?: boolean };
+
+/** Renglón de la Hoja de pedidos (FieldDef type "orders"). */
+export type OrderRow = {
+  folio: string;
+  arrived: string;
+  confirmed: string;
+  ready: string;
+  rider: string;
+  status: "Entregado" | "Rechazado" | "Cancelado" | "Otro" | "";
+  notes: string;
 };
 
 export type Activity = {
@@ -35,7 +54,7 @@ export type Activity = {
   warnings?: string[];
   notes?: string;
   steps: Step[];
-  expected: string[];
+  expected: ExpectedItem[];
   fields?: FieldDef[];
 };
 
@@ -73,6 +92,12 @@ export type Guide = {
    * lateral, pasos en dos columnas y capturas grandes. Por omisión "mobile" (una columna angosta).
    */
   layout?: "desktop" | "mobile";
+  /**
+   * Las actividades hasta esta (incluida) van en orden. Al guardarla se abren todas las demás a la vez,
+   * y cualquier actividad guardada se puede reabrir y editar hasta que el tester toque «Terminar».
+   * Sin este campo, todas van en orden estricto.
+   */
+  sequentialUntil?: string;
   tester: { fields: FieldDef[] };
   prep: {
     title: string;
@@ -88,7 +113,12 @@ export type Guide = {
   };
   troubleshooting: [string, string][];
   activities: Activity[];
-  finish: { checklist: { id: string; label: string }[] };
+  /** Texto que va arriba de la lista de cierre (p. ej. «Cuando Mesa de control dé por terminada la prueba…»). */
+  finish: { text?: string; checklist: { id: string; label: string }[] };
+  /** Ejemplo para el campo de descripción del formulario «Reportar una falla». */
+  reportExample?: string;
+  /** Ejemplo de número de pedido con la fecha de la prueba (p. ej. «Ej. 261120-0004»). */
+  orderExample?: string;
   survey: { title: string; intro?: string; questions: SurveyQuestion[] };
 };
 

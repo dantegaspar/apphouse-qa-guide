@@ -7,7 +7,54 @@
   --color-brand-600: #284f8f;
   --color-brand-700: #1f3e72;
   --color-teal-brand: #3ba3a8;
+  /* Verde azulado con contraste AA (≥4.5:1) sobre blanco y sobre el fondo, para texto pequeño */
+  --color-teal-ink: #1d7177;
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* Animaciones para guiar la atención: rápidas (≤600 ms) y sin mover el diseño */
+  --animate-pop: pop-in 0.22s ease-out both;
+  --animate-step-next: step-in-next 0.24s ease-out both;
+  --animate-step-prev: step-in-prev 0.24s ease-out both;
+  --animate-flash: flash-ring 0.6s ease-out both;
+  --animate-burst: burst 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
+  --animate-check: check-draw 0.35s 0.15s ease-out both;
+  --animate-toast: toast-in 0.25s ease-out both;
+  --animate-shake: shake 0.3s ease-in-out both;
+
+  @keyframes pop-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes step-in-next {
+    from { opacity: 0; transform: translateX(16px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes step-in-prev {
+    from { opacity: 0; transform: translateX(-16px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes flash-ring {
+    0% { background-color: #fef3c7; box-shadow: 0 0 0 3px #fcd34d; }
+    100% { box-shadow: 0 0 0 0 transparent; }
+  }
+  @keyframes burst {
+    0% { opacity: 0; transform: scale(0.4); }
+    60% { opacity: 1; transform: scale(1.1); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+  @keyframes check-draw {
+    from { stroke-dashoffset: 24; }
+    to { stroke-dashoffset: 0; }
+  }
+  @keyframes toast-in {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes shake {
+    0%, 100% { transform: none; }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
+  }
 }
 
 html {
@@ -27,8 +74,66 @@ body {
   padding-bottom: max(1rem, env(safe-area-inset-bottom));
 }
 
-@keyframes pop-in {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: none; }
+/*
+ * Pulso de atención en la acción principal: un anillo que sale del borde (pseudo-elemento con
+ * box-shadow: no mueve el diseño). Color en --attn. 600 ms de pulso y una pausa, para no cansar.
+ */
+.attn {
+  position: relative;
 }
-.animate-pop { animation: pop-in 0.22s ease-out both; }
+.attn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: attn-ring 2.4s ease-out infinite;
+}
+.attn-success {
+  --attn: rgb(5 150 105 / 0.6);
+}
+.attn-amber {
+  --attn: rgb(217 119 6 / 0.65);
+}
+@keyframes attn-ring {
+  0% { box-shadow: 0 0 0 0 var(--attn, rgb(47 93 168 / 0.6)); }
+  25% { box-shadow: 0 0 0 12px transparent; }
+  100% { box-shadow: 0 0 0 12px transparent; }
+}
+
+/* Destello que recorre una tarjeta recién desbloqueada (dos pasadas de 600 ms) */
+.shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.shimmer::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(110deg, transparent 35%, rgb(255 255 255 / 0.9) 50%, transparent 65%);
+  background-size: 250% 100%;
+  background-repeat: no-repeat;
+  animation: shimmer-sweep 0.6s ease-out 0.2s 2 both;
+}
+@keyframes shimmer-sweep {
+  from { background-position: 130% 0; }
+  to { background-position: -30% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .attn::after,
+  .shimmer::before {
+    animation: none !important;
+  }
+}

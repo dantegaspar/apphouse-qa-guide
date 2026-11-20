@@ -1,17 +1,24 @@
 import { getDb, now } from "@/lib/db";
 import { checkCourierToken } from "@/lib/courier-data";
-import { COURIER_ID_RE } from "@/lib/courier";
-import { err, json, str } from "@/lib/http";
+import { err, hasErrors, invalid, json, readJsonObject } from "@/lib/http";
+import { collect, courierIssueError, idError, text } from "@/lib/validate";
 
-/** Agrega un problema a una encuesta ya enviada (solo quien la envió, con su token). Idempotente por id. */
+/**
+ * Agrega un problema a una encuesta ya enviada (solo quien la envió, con su token). Idempotente por id.
+ * Reglas: id del navegador (8–64); descripción obligatoria 3–1000.
+ */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!checkCourierToken(id, req.headers.get("x-courier-token"))) return err("No autorizado", 401);
-  const body = await req.json().catch(() => null);
-  const issueId = str(body?.id, 64);
-  const description = str(body?.description, 2000);
-  if (!COURIER_ID_RE.test(issueId)) return err("Datos inválidos");
-  if (!description) return err("Escribe qué pasó");
+  const { body, res } = await readJsonObject(req, 16 * 1024);
+  if (res) return res;
+  const errors = collect([
+    ["id", idError(body.id, { label: "el problema" })],
+    ["description", courierIssueError(body.description)],
+  ]);
+  if (hasErrors(errors)) return invalid(errors);
+  const issueId = body.id as string;
+  const description = text(body.description);
 
   const db = getDb();
   const row = db.prepare("SELECT feedback_id FROM courier_issues WHERE id = ?").get(issueId) as { feedback_id: string } | undefined;

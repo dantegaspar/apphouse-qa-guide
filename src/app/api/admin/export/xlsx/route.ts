@@ -1,13 +1,16 @@
 import ExcelJS from "exceljs";
 import { isAdmin } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { err } from "@/lib/http";
+import { err, invalid } from "@/lib/http";
+import { GUIDES } from "@/lib/guides";
+import { idError } from "@/lib/validate";
 import { buildExport, DATE_HEADERS, requestOrigin, type ExportKind } from "@/lib/export-rows";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const SHEETS: { kind: ExportKind; name: string }[] = [
+  { kind: "insights", name: "Resumen" },
   { kind: "runs", name: "Pruebas" },
   { kind: "steps", name: "Pasos" },
   { kind: "activities", name: "Actividades" },
@@ -24,7 +27,10 @@ const EXCEL_MAX_CELL = 32767;
 export async function GET(req: Request) {
   if (!(await isAdmin())) return err("No autorizado", 401);
 
-  const guideId = new URL(req.url).searchParams.get("guide");
+  // ?guide= opcional y de una guía conocida
+  const guideId = new URL(req.url).searchParams.get("guide") || null;
+  const guideErr = idError(guideId, { known: GUIDES.map((g) => g.id), required: false, label: "la guía" });
+  if (guideErr) return invalid({ guide: guideErr });
   const origin = requestOrigin(req);
   const hasHelp = !!getDb().prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='help_requests'").get();
 

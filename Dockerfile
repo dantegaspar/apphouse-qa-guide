@@ -38,7 +38,10 @@ COPY --from=deps /app/node_modules/better-sqlite3 ./node_modules/better-sqlite3
 RUN mkdir -p /app/data /app/uploads \
  && chown -R node:node /app/data /app/uploads
 
-USER node
+# El entrypoint arranca como root solo para dar permisos a las carpetas montadas
+# (carpetas del servidor o volúmenes de Railway) y luego corre la app como "node".
+COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+ENTRYPOINT ["docker-entrypoint.sh"]
 
 # Sin instrucción VOLUME: Railway no la admite. Los volúmenes se declaran en docker-compose.yml
 # (local) o en el panel de Railway (un solo volumen en /app/data).

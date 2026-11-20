@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Button, inputCls } from "./ui";
+import { confirm } from "@/components/feedback";
+import { Button, FormField } from "./ui";
+import { focusFirstError, LIMITS } from "./validation";
 import { callRun, type Blocked } from "./store";
 
 type Mode = null | "resolve" | "end";
@@ -33,8 +35,23 @@ export default function BlockedPanel({
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tried, setTried] = useState(false);
+  const r = reason.trim();
+  const reasonErr = !r
+    ? "Escribe por qué no puedes seguir."
+    : r.length < 5
+      ? "Escribe un poco más (al menos 5 letras) para que el guía entienda."
+      : r.length > LIMITS.reason
+        ? `Máximo ${LIMITS.reason} caracteres (llevas ${r.length}).`
+        : null;
+  const pwErr = password.trim() ? null : "Escribe la contraseña del guía.";
 
   const request = async () => {
+    if (reasonErr) {
+      setTried(true);
+      focusFirstError(document.querySelector<HTMLElement>('[data-testid="blocked-panel"]'));
+      return;
+    }
     setBusy(true);
     setError(null);
     await beforeRequest();
@@ -49,7 +66,23 @@ export default function BlockedPanel({
     onRequested(r.data.id, reason.trim(), r.data.createdAt);
   };
 
-  const confirm = async () => {
+  const submitPassword = async () => {
+    if (pwErr) {
+      setTried(true);
+      focusFirstError(document.querySelector<HTMLElement>('[data-testid="blocked-panel"]'));
+      return;
+    }
+    if (
+      mode === "end" &&
+      !(await confirm({
+        title: "¿Terminar la prueba?",
+        message: "Se cerrarán todas las actividades que faltan y ya no podrás seguir. Después verás tu resumen y la encuesta.",
+        confirmLabel: "Sí, terminar la prueba",
+        cancelLabel: "Seguir en pausa",
+        tone: "danger",
+      }))
+    )
+      return;
     setBusy(true);
     setError(null);
     const r =
@@ -79,18 +112,25 @@ export default function BlockedPanel({
             No puedes avanzar hasta que el guía de la prueba te ayude. Explícale qué pasa y pide ayuda.
           </p>
         </div>
-        <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-rose-950">¿Por qué no puedes seguir con la prueba? *</span>
-          <textarea
-            className={inputCls + " min-h-24"}
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder="Ej. Al tocar Pagar sale un error y no se crea el pedido."
-          />
-          <span className="mt-1 block text-xs text-rose-800">Revisa o corrige el texto antes de enviarlo.</span>
-        </label>
+        <FormField
+          id="blocked-reason"
+          label="¿Por qué no puedes seguir con la prueba? *"
+          labelClassName="mb-1 block text-sm font-semibold text-rose-950"
+          error={tried ? reasonErr : null}
+          hint={<span className="text-rose-900">Revisa o corrige el texto antes de enviarlo.</span>}
+        >
+          {(p) => (
+            <textarea
+              {...p}
+              className={p.className + " min-h-24"}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Ej. Al tocar Pagar sale un error y no se crea el pedido."
+            />
+          )}
+        </FormField>
         {errorBox}
-        <Button size="lg" className="w-full !bg-rose-600 hover:!bg-rose-700" disabled={busy || reason.trim().length < 3} onClick={request}>
+        <Button size="lg" pulse={!reasonErr && !busy} className="w-full !bg-rose-600 hover:!bg-rose-700" disabled={busy} onClick={request}>
           {busy ? "Enviando…" : "🙋 Solicitar ayuda al guía de la prueba"}
         </Button>
       </section>
@@ -112,17 +152,17 @@ export default function BlockedPanel({
         </div>
       </div>
       <div className="rounded-xl bg-white/70 p-3 text-sm text-slate-700 ring-1 ring-amber-200">
-        <div className="text-xs font-semibold uppercase text-slate-500">Motivo · {stepLabel}</div>
+        <div className="text-xs font-semibold uppercase text-slate-600">Motivo · {stepLabel}</div>
         <p className="mt-0.5 whitespace-pre-wrap">{blocked.reason}</p>
       </div>
 
       {mode === null ? (
         <div className="space-y-2">
           <p className="text-xs font-medium text-amber-900">Cuando llegue el guía:</p>
-          <Button size="lg" variant="success" className="w-full" onClick={() => setMode("resolve")}>
+          <Button size="lg" variant="success" className="w-full" onClick={() => { setTried(false); setMode("resolve"); }}>
             ✓ Ya se resolvió, continuar
           </Button>
-          <Button size="lg" variant="danger" className="w-full" onClick={() => setMode("end")}>
+          <Button size="lg" variant="danger" className="w-full" onClick={() => { setTried(false); setMode("end"); }}>
             Terminar la prueba (contraseña del guía)
           </Button>
         </div>
@@ -131,7 +171,7 @@ export default function BlockedPanel({
           className="space-y-3 rounded-xl bg-white p-3 ring-1 ring-slate-200"
           onSubmit={(e) => {
             e.preventDefault();
-            void confirm();
+            void submitPassword();
           }}
         >
           <p className="text-sm font-semibold">
@@ -142,17 +182,11 @@ export default function BlockedPanel({
               Se cerrarán todas las actividades. Después podrás ver tu resumen y contestar la encuesta.
             </p>
           )}
-          <label className="block">
-            <span className="mb-1 block text-sm">Contraseña del guía</span>
-            <input
-              className={inputCls}
-              type="password"
-              autoComplete="off"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoFocus
-            />
-          </label>
+          <FormField id="guide-password" label="Contraseña del guía" error={tried ? pwErr : null}>
+            {(p) => (
+              <input {...p} type="password" autoComplete="off" value={password} onChange={(e) => setPassword(e.target.value)} autoFocus />
+            )}
+          </FormField>
           {errorBox}
           <div className="grid grid-cols-[auto_1fr] gap-2">
             <Button
@@ -162,11 +196,12 @@ export default function BlockedPanel({
                 setMode(null);
                 setPassword("");
                 setError(null);
+                setTried(false);
               }}
             >
               Cancelar
             </Button>
-            <Button type="submit" variant={mode === "resolve" ? "success" : "primary"} className={mode === "end" ? "!bg-rose-600" : ""} disabled={busy || !password}>
+            <Button type="submit" variant={mode === "resolve" ? "success" : "primary"} className={mode === "end" ? "!bg-rose-600" : ""} disabled={busy}>
               {busy ? "Verificando…" : mode === "resolve" ? "Confirmar y continuar" : "Terminar la prueba"}
             </Button>
           </div>

@@ -1,14 +1,32 @@
 /** Encuesta para repartidores: preguntas y caritas (compartido entre cliente y servidor). */
 
-export type CourierQuestion = { id: string; label: string; short: string };
+/** `faces`: etiqueta de cada carita (1 = peor … 5 = mejor) que responde a lo que se pregunta. */
+export type CourierQuestion = { id: string; label: string; short: string; faces: [string, string, string, string, string] };
+
+const EASY: CourierQuestion["faces"] = ["Muy difícil", "Difícil", "Regular", "Fácil", "Muy fácil"];
 
 export const COURIER_QUESTIONS: CourierQuestion[] = [
-  { id: "facil", label: "¿Qué tan fácil fue usar la app?", short: "Fácil de usar" },
-  { id: "avisos", label: "¿Te llegaron bien los avisos de pedidos nuevos?", short: "Avisos de pedidos" },
-  { id: "direccion", label: "¿Fue fácil encontrar la dirección y llegar?", short: "Encontrar la dirección" },
-  { id: "entregado", label: "¿Fue fácil marcar el pedido como entregado?", short: "Marcar entregado" },
-  { id: "rapida", label: "¿La app funcionó rápido y sin trabarse?", short: "Rápida, sin trabarse" },
-  { id: "general", label: "¿Qué tan contento estás con la app en general?", short: "Contento en general" },
+  { id: "facil", label: "¿Qué tan fácil fue usar la app?", short: "Fácil de usar", faces: EASY },
+  {
+    id: "avisos",
+    label: "¿Te llegaron bien los avisos de pedidos nuevos?",
+    short: "Avisos de pedidos",
+    faces: ["Nunca", "Pocas veces", "A veces", "Casi siempre", "Siempre"],
+  },
+  { id: "direccion", label: "¿Fue fácil encontrar la dirección y llegar?", short: "Encontrar la dirección", faces: EASY },
+  { id: "entregado", label: "¿Fue fácil marcar el pedido como entregado?", short: "Marcar entregado", faces: EASY },
+  {
+    id: "rapida",
+    label: "¿La app funcionó rápido y sin trabarse?",
+    short: "Rápida, sin trabarse",
+    faces: ["Muy lenta", "Lenta", "Regular", "Rápida", "Muy rápida"],
+  },
+  {
+    id: "general",
+    label: "¿Qué tan contento estás con la app en general?",
+    short: "Contento en general",
+    faces: ["Nada contento", "Poco", "Regular", "Contento", "Muy contento"],
+  },
 ];
 
 /** Valor 1 (peor) a 5 (mejor). */

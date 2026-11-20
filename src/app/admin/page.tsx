@@ -9,6 +9,11 @@ import {
 import { LogoutButton } from "@/components/admin/LogoutButton";
 import { AutoRefresh } from "@/components/admin/AutoRefresh";
 import { CourierAdminSection } from "@/components/admin/CourierSection";
+import { ExportButton } from "@/components/admin/ExportButton";
+import { HelpRequestWatcher } from "@/components/admin/HelpRequestWatcher";
+import { InsightsPanel } from "@/components/admin/InsightsPanel";
+import { Coachmark } from "@/components/feedback";
+import { computeInsights } from "@/lib/insights";
 
 export const dynamic = "force-dynamic";
 
@@ -48,21 +53,28 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const { rows: openHelp, at: nowMs } = loadOpenHelp();
 
   return (
-    <main className="mx-auto max-w-6xl space-y-8 px-4 py-6">
+    <main className="mx-auto w-full max-w-6xl space-y-8 px-4 py-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="mb-2 h-1.5 w-16 rounded-full bg-gradient-to-r from-[#2F5DA8] to-[#3BA3A8]" />
           <h1 className="text-2xl font-bold text-slate-900">Panel de administración</h1>
           <p className="text-sm text-slate-600">Resultados de las pruebas de AppHouse</p>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-slate-400">Se actualiza solo cada 20 s · {fmtDate(new Date(nowMs).toISOString())}</span>
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <span className="w-full text-xs text-slate-400 sm:w-auto">Se actualiza solo cada 20 s · {fmtDate(new Date(nowMs).toISOString())}</span>
+          <Link href={`/admin/mesa${qs}`} className="rounded-lg bg-[#2F5DA8] px-3 py-2 text-sm font-semibold text-white hover:bg-[#274f8f]">Mesa de control</Link>
           <a href="#repartidores" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-[#2F5DA8] hover:bg-slate-50">Repartidores</a>
           <Link href={`/admin/graficas${qs}`} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-[#2F5DA8] hover:bg-slate-50">Gráficas</Link>
-        <LogoutButton />
+          <LogoutButton />
         </div>
       </header>
       <AutoRefresh seconds={20} />
+      <HelpRequestWatcher
+        open={openHelp.map((h) => {
+          const act = getGuide(h.guide_id)?.activities.find((a) => a.id === h.activity_id);
+          return { id: h.id, tester: h.tester, where: act ? `${h.activity_id} ${act.title}` : h.activity_id || "la guía" };
+        })}
+      />
 
       <section
         id="ayuda"
@@ -123,6 +135,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         ))}
       </nav>
 
+      <InsightsPanel insights={computeInsights(guideId, nowMs)} exportQs={qs} />
+
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Kpi label="Testers / corridas" value={d.runs.length} />
         <Kpi label="Terminadas" value={finished} tone="text-emerald-600" />
@@ -133,20 +147,24 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       <section>
         <h2 className="mb-2 text-lg font-semibold text-slate-900">Descargar datos</h2>
         <div className="flex flex-wrap gap-2">
-          <a
-            href={`/api/admin/export/xlsx${qs}`}
-            className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white"
-          >
-            Excel (todo, una hoja por tabla)
-          </a>
+          <Coachmark id="admin-excel" inline message="Aquí bajas todos los resultados en un solo Excel, una hoja por tabla.">
+            <ExportButton
+              href={`/api/admin/export/xlsx${qs}`}
+              label="Excel"
+              className="inline-block rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white"
+            >
+              Excel (todo, una hoja por tabla)
+            </ExportButton>
+          </Coachmark>
           {EXPORTS.map(([k, label]) => (
-            <a
+            <ExportButton
               key={k}
               href={`/api/admin/export/${k}${qs}`}
+              label={`CSV de ${label}`}
               className="rounded-lg bg-gradient-to-r from-[#2F5DA8] to-[#3BA3A8] px-3 py-2 text-sm font-medium text-white"
             >
               {label}
-            </a>
+            </ExportButton>
           ))}
         </div>
       </section>

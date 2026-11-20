@@ -1,3 +1,4 @@
+import { expectedText } from "@/lib/guide-utils";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { isAdmin } from "@/lib/auth";
@@ -48,7 +49,7 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
   const issues = db.prepare("SELECT * FROM issues WHERE run_id = ? ORDER BY created_at").all(id) as IssueRow[];
   const atts = db.prepare("SELECT id, run_id, issue_id, original_name, mime, size FROM attachments WHERE run_id = ? ORDER BY created_at").all(id) as AttachmentRow[];
   const help = db.prepare("SELECT * FROM help_requests WHERE run_id = ? ORDER BY created_at").all(id) as HelpRow[];
-  const survey = db.prepare("SELECT answers FROM survey_responses WHERE run_id = ?").get(id) as { answers: string } | undefined;
+  const survey = db.prepare("SELECT answers, is_draft FROM survey_responses WHERE run_id = ?").get(id) as { answers: string; is_draft: number } | undefined;
 
   const prep = parseRec(run.prep);
   const finish = parseRec(run.finish);
@@ -56,7 +57,7 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
   const testerLabels = new Map((guide?.tester.fields ?? []).map((f) => [f.id, f.label]));
 
   return (
-    <main className="mx-auto max-w-4xl space-y-5 px-4 py-6">
+    <main className="mx-auto w-full max-w-4xl space-y-5 px-4 py-6">
       <Link href="/admin" className="text-sm text-[#2F5DA8] hover:underline">← Volver al panel</Link>
 
       <header className="rounded-xl bg-gradient-to-r from-[#2F5DA8] to-[#3BA3A8] p-5 text-white">
@@ -149,10 +150,16 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
                 const o = steps.find((x) => x.activity_id === a.id && x.step_id === s.id)?.outcome;
                 return (
                   <li key={s.id} className="flex gap-2">
-                    <span className={`w-4 shrink-0 text-center font-bold ${o === "ok" ? "text-emerald-600" : o === "fail" ? "text-red-600" : "text-slate-300"}`}>
-                      {o === "ok" ? "✓" : o === "fail" ? "✗" : "·"}
+                    <span
+                      className={`w-4 shrink-0 text-center font-bold ${o === "ok" ? "text-emerald-600" : o === "fail" ? "text-red-600" : o === "na" ? "text-slate-400" : "text-slate-300"}`}
+                      title={o === "na" ? "No me apareció" : undefined}
+                    >
+                      {o === "ok" ? "✓" : o === "fail" ? "✗" : o === "na" ? "–" : "·"}
                     </span>
-                    <span className="text-slate-800"><span className="text-slate-400">{idx + 1}.</span> {s.text.replace(/\*\*/g, "")}</span>
+                    <span className="text-slate-800">
+                      <span className="text-slate-400">{idx + 1}.</span> {s.text.replace(/\*\*/g, "")}
+                      {o === "na" && <span className="ml-1.5 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500">No me apareció</span>}
+                    </span>
                   </li>
                 );
               })}
@@ -161,11 +168,12 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
               <div className="mt-3">
                 <h3 className="mb-1 text-xs font-semibold uppercase text-slate-500">Qué debería pasar</h3>
                 <ul className="space-y-1 text-sm">
-                  {a.expected.map((t, i) => {
+                  {a.expected.map((item, i) => {
+                    const t = expectedText(item);
                     const v = checkValue(checks, i, t);
                     return (
                       <li key={i} className="flex gap-2">
-                        <span className={v === undefined ? "text-slate-300" : v ? "text-emerald-600" : "text-red-600"}>{v === undefined ? "·" : v ? "✓" : "✗"}</span>
+                        <span className={v === undefined || v === "na" ? "text-slate-400" : v ? "text-emerald-600" : "text-red-600"}>{v === undefined ? "·" : v === "na" ? "N/A" : v ? "✓" : "✗"}</span>
                         <span>{t.replace(/\*\*/g, "")}</span>
                       </li>
                     );
@@ -230,6 +238,9 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
           <p className="text-sm text-slate-500">Aún no respondió la encuesta.</p>
         ) : (
           <dl className="space-y-3 text-sm">
+            {survey.is_draft === 1 && (
+              <p className="rounded-lg bg-amber-50 px-3 py-2 text-amber-800">Borrador: el tester aún no envía la encuesta.</p>
+            )}
             {guide.survey.questions.map((q) => {
               const v = parseRec(survey.answers)[q.id];
               return (

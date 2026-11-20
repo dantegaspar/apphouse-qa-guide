@@ -5,6 +5,8 @@ import { getGuide, GUIDES } from "@/lib/guides";
 import { ACTIVITY_RESULTS } from "@/lib/types";
 import { loadStats, RESULT_ORDER, type NpsDist } from "@/lib/admin-stats";
 import { LogoutButton } from "@/components/admin/LogoutButton";
+import { InsightsPanel } from "@/components/admin/InsightsPanel";
+import { computeInsights } from "@/lib/insights";
 import { CourierChartsSection } from "@/components/admin/CourierSection";
 import { Bars, ChartCard, COLORS, Columns, Empty, fmt, Kpi, SegmentedBar, StackedBars, type Series } from "@/components/admin/charts/Charts";
 
@@ -90,6 +92,9 @@ export default async function ChartsPage({ searchParams }: { searchParams: Promi
           <Link href={adminHref} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
             ← Panel
           </Link>
+          <Link href={guideId ? `/admin/mesa?guide=${encodeURIComponent(guideId)}` : "/admin/mesa"} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-[#2F5DA8] hover:bg-slate-50">
+            Mesa de control
+          </Link>
           <LogoutButton />
         </div>
       </header>
@@ -107,6 +112,8 @@ export default async function ChartsPage({ searchParams }: { searchParams: Promi
           </Link>
         ))}
       </nav>
+
+      <InsightsPanel insights={computeInsights(guideId)} exportQs={guideId ? `?guide=${encodeURIComponent(guideId)}` : ""} />
 
       {/* 1. KPIs */}
       <section aria-label="Indicadores">

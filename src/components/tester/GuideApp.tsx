@@ -1,16 +1,41 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import type { Guide } from "@/lib/types";
 import { ACTIVITY_RESULTS, TESTER_ROLES, type GuideVariant } from "@/lib/types";
+import { confirm, Coachmark, toast } from "@/components/feedback";
 import ActivityView from "./ActivityView";
 import BlockedPanel from "./BlockedPanel";
 import ReportSheet, { type ReportDraft } from "./ReportSheet";
 import Survey from "./Survey";
-import { Button, Callout, inputCls, ProgressBar, Rich, Sheet, StepImage } from "./ui";
+import { Button, Callout, FormField, ProgressBar, Rich, Sheet, StepImage } from "./ui";
 import { callRun, detectDevice, emptyActivity, stepKey, uid, useRun, type Blocked, type Issue, type RunState } from "./store";
+import { focusFirstError, LIMITS, trimAll, validateEmail, validateFields, validateName, type Errors } from "./validation";
+
+/** Datos del formulario de identificación que se conservan al cambiar de variante. */
+export type IdentifyDraft = { name: string; email: string; role: string; fields: Record<string, string> };
+
+/** Control de la variante (computadora o celular) de una guía con `mobileGuideId`. */
+export type VariantCtl = {
+  variant: GuideVariant;
+  /** Lo que se detectó por el dispositivo. */
+  detected: GuideVariant;
+  /** ¿Ya hay una prueba empezada en este navegador con la otra variante? */
+  otherHasRun: boolean;
+  /** Cambia de variante; `carry` lleva los datos del tester a la otra (si todavía no empezó). */
+  choose: (next: GuideVariant, carry?: IdentifyDraft) => void;
+  draft: IdentifyDraft | null;
+  setDraft: (d: IdentifyDraft) => void;
+  /** Se llegó aquí desde una prueba ya empezada con la otra variante. */
+  carriedFrom: GuideVariant | null;
+};
+
+export const VARIANTS: Record<GuideVariant, { icon: string; short: string; long: string; sub: string; of: string; for: string }> = {
+  desktop: { icon: "💻", short: "Computadora", long: "En la computadora", sub: "panel web", of: "de la computadora", for: "para computadora" },
+  mobile: { icon: "📱", short: "Celular", long: "En el celular", sub: "app", of: "del celular", for: "para celular" },
+};
 
 type View = { name: "home" } | { name: "prep" } | { name: "activity"; id: string; step: number } | { name: "summary" } | { name: "survey" };
 
@@ -24,20 +49,46 @@ type HelpStatus = {
 export default function GuideApp({
   guide,
   maxUploadMb,
-  variant,
-  onSwitchVariant,
+  allowedMime = [],
+  variantCtl,
 }: {
   guide: Guide;
   maxUploadMb: number;
-  /** Solo en guías con variante de escritorio y de celular. */
-  variant?: GuideVariant;
-  /** Cambia a la otra variante (solo antes de identificarse). */
-  onSwitchVariant?: () => void;
+  /** Tipos de archivo que acepta el servidor (src/lib/http.ts). */
+  allowedMime?: string[];
+  /** Solo en guías con variante de computadora y de celular. */
+  variantCtl?: VariantCtl;
 }) {
+  const variant = variantCtl?.variant;
   const { state, loaded, syncing, syncError, commit, update, flush, stateRef } = useRun(guide.id);
   const [view, setView] = useState<View>({ name: "home" });
   const [showRef, setShowRef] = useState(false);
-  const [report, setReport] = useState<{ kind: "issue" | "evidence"; activityId: string; stepId?: string } | null>(null);
+  // Actividad recién guardada (festejo) y actividad recién desbloqueada (destello)
+  const [saved, setSaved] = useState<{ id: string; next?: string; n: number } | null>(null);
+  // Actividades recién abiertas (destello); se limpia cuando el destello termina
+  const [fresh, setFreshState] = useState<string[]>([]);
+  const setFresh = (v: string | string[] | null) => setFreshState(v === null ? [] : Array.isArray(v) ? v : [v]);
+  // Alto de la barra superior en una variable CSS (los encabezados fijos de cada vista van debajo)
+  const topbarRef = useRef<HTMLElement>(null);
+  const hasRun = !!state;
+  useEffect(() => {
+    const el = topbarRef.current;
+    if (!el) return;
+    const set = () => document.documentElement.style.setProperty("--topbar-h", `${el.offsetHeight}px`);
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      document.documentElement.style.removeProperty("--topbar-h");
+    };
+  }, [hasRun, loaded]);
+  useEffect(() => {
+    if (!saved) return;
+    const t = setTimeout(() => setSaved(null), 900);
+    return () => clearTimeout(t);
+  }, [saved]);
+  const [report, setReport] = useState<{ kind: "issue" | "evidence"; activityId: string; stepId?: string; markFail?: boolean } | null>(null);
 
   const totalSteps = useMemo(() => guide.activities.reduce((n, a) => n + a.steps.length, 0), [guide]);
   // Guía de escritorio: en pantallas ≥1024 px (lg) usa barra lateral y vistas anchas
@@ -65,10 +116,29 @@ export default function GuideApp({
         issue.kind === "issue" && issue.blocking
           ? { activityId: issue.activityId, stepId: issue.stepId, issueId: issue.id, reason: issue.description }
           : undefined;
-      update((s) => ({ ...s, issues: [...s.issues, issue], blocked: s.blocked ?? block }), [{ type: "issue", payload: { ...issue } }]);
+      // «No pude»: el paso queda como fallido solo al enviar el reporte (si se cierra sin enviar, no se marca)
+      const markFail = report.markFail && issue.kind === "issue" && report.stepId;
+      const stepEvents = markFail ? [{ type: "step", payload: stepPayload(stateRef.current, report.activityId, report.stepId!, "fail") }] : [];
+      update(
+        (s) => ({
+          ...s,
+          steps: markFail ? { ...s.steps, [stepKey(report.activityId, report.stepId!)]: "fail" } : s.steps,
+          issues: [...s.issues, issue],
+          blocked: s.blocked ?? block,
+        }),
+        [...stepEvents, { type: "issue", payload: { ...issue } }]
+      );
       // Lleva al tester al panel de pausa (arriba de la actividad)
       if (block) setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 50);
-      if (files.length === 0) return null;
+      const done = () =>
+        toast.success(
+          issue.kind === "evidence" ? "La captura quedó guardada en tu reporte." : block ? "La actividad quedó en pausa: pide ayuda al guía." : "Gracias, el equipo lo revisará.",
+          { title: issue.kind === "evidence" ? "Captura guardada ✓" : "Reporte enviado ✓" }
+        );
+      if (files.length === 0) {
+        done();
+        return null;
+      }
       // Los archivos necesitan que el reporte ya exista en el servidor
       const ok = await flush();
       if (!ok) return "Se guardó tu reporte, pero no hay conexión para subir los archivos. Revisa tu internet e inténtalo de nuevo.";
@@ -88,6 +158,7 @@ export default function GuideApp({
           issues: st.issues.map((i) => (i.id === issue.id ? { ...i, attachments: [...i.attachments, { id: att.id, name: f.name, size: att.size }] } : i)),
         }));
       }
+      done();
       return null;
     },
     [report, update, flush, stateRef]
@@ -131,20 +202,36 @@ export default function GuideApp({
     };
   }, [runId, update, stateRef]);
 
-  const mobileBanner = variant === "mobile" && (
-    <div className="border-b border-teal-200 bg-teal-50 px-4 py-1.5 text-center text-xs font-semibold text-teal-800" data-testid="mobile-banner">
-      📱 Guía para la app de establecimientos en celular
-    </div>
-  );
+  const pickVariant = async (v: GuideVariant) => {
+    if (!variantCtl || !state || v === variantCtl.variant) return;
+    // Si en la otra variante ya hay prueba, se cambia directo (cada una guarda su propio avance)
+    if (variantCtl.otherHasRun) {
+      variantCtl.choose(v);
+      toast.info(`Ahora ves las capturas ${VARIANTS[v].of}. Tu avance de esta versión sigue guardado.`);
+      return;
+    }
+    const ok = await confirm({
+      title: `¿Ver capturas ${VARIANTS[v].of}?`,
+      message: (
+        <div className="space-y-2" data-testid="variant-confirm">
+          <p>
+            Tu avance con las capturas {VARIANTS[variantCtl.variant].of} <strong>se queda guardado</strong> en este navegador. Puedes volver
+            cuando quieras con «Ver capturas de: {VARIANTS[variantCtl.variant].short}».
+          </p>
+          <p>La versión {VARIANTS[v].for} es una prueba aparte y empieza desde el inicio. Ya llenamos tus datos; solo confírmalos.</p>
+        </div>
+      ),
+      confirmLabel: `${VARIANTS[v].icon} Sí, cambiar`,
+      cancelLabel: "Cancelar",
+    });
+    if (!ok) return;
+    const t = state.tester;
+    variantCtl.choose(v, { name: t.name, email: t.email, role: t.role, fields: t.fields });
+  };
 
-  if (!loaded) return <div className="flex flex-1 items-center justify-center text-slate-500">Cargando…</div>;
+  if (!loaded) return <div className="flex flex-1 items-center justify-center text-slate-600">Cargando…</div>;
   if (!state || state.guideVersion === undefined)
-    return (
-      <>
-        {mobileBanner}
-        <Identify guide={guide} variant={variant} desktop={desktop} onSwitchVariant={onSwitchVariant} onDone={(s) => commit(s)} />
-      </>
-    );
+    return <Identify guide={guide} desktop={desktop} variantCtl={variantCtl} onDone={(s) => commit(s)} />;
 
   const answered = guide.activities.reduce(
     (n, a) => n + a.steps.filter((s) => state.steps[stepKey(a.id, s.id)]).length,
@@ -154,41 +241,49 @@ export default function GuideApp({
   const failCount = state.issues.filter((i) => i.kind === "issue").length;
 
   const topbar = (
-    <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
+    <header ref={topbarRef} className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
       <div className={"mx-auto flex max-w-xl items-center gap-3 px-4 py-2.5" + dk("lg:max-w-[1440px] lg:px-8")}>
-        <button onClick={() => nav({ name: "home" })} className="flex items-center gap-2" aria-label="Inicio de la guía">
+        <button onClick={() => nav({ name: "home" })} className="flex min-h-11 items-center gap-2" aria-label="Inicio de la guía">
           <Image src="/logo.png" alt="" width={36} height={26} />
           <span className="text-left text-sm font-semibold leading-tight">
             {guide.role}
-            <span className="block text-xs font-normal text-slate-500">{state.tester.name}</span>
+            <span className="block max-w-[9rem] truncate text-xs font-normal text-slate-600 sm:max-w-none">{state.tester.name}</span>
           </span>
         </button>
         {desktop && (
-          <span className="ml-4 hidden min-w-0 truncate border-l border-slate-200 pl-4 text-sm text-slate-500 lg:inline">{guide.title}</span>
+          <span className="ml-4 hidden min-w-0 truncate border-l border-slate-200 pl-4 text-sm text-slate-600 lg:inline">{guide.title}</span>
         )}
+        {variant && desktop && <VariantSwitch variant={variant} onPick={pickVariant} className="ml-6 hidden lg:flex" />}
         <span
-          className={`ml-auto text-xs ${syncError ? "text-amber-600" : "text-slate-400"}`}
+          className={`ml-auto text-xs ${syncError ? "font-medium text-amber-700" : "text-slate-600"}`}
           title={syncError ? "Sin conexión: se enviará al volver el internet" : "Guardado"}
+          role="status"
         >
           {syncing ? "Guardando…" : syncError || state.outbox.length ? `● ${state.outbox.length} sin enviar` : "✓ Guardado"}
         </span>
-        <Button variant="outline" onClick={() => setShowRef(true)} className="!px-3 !py-1.5">
+        <Button variant="outline" onClick={() => setShowRef(true)} className="!min-h-11 !px-3 !py-1.5 lg:!min-h-10">
           <span>
-            Datos
+            <span aria-hidden="true">📊 </span>Datos
             {desktop && <span className="hidden lg:inline"> de la prueba</span>}
           </span>
         </Button>
       </div>
-      {mobileBanner}
+      {variant && (
+        <div
+          className={`border-t px-4 py-1 ${variant === "mobile" ? "border-teal-200 bg-teal-50" : "border-slate-200 bg-slate-50"} ${desktop ? "lg:hidden" : ""}`}
+          data-testid={variant === "mobile" ? "mobile-banner" : "variant-bar"}
+        >
+          <VariantSwitch variant={variant} onPick={pickVariant} className="mx-auto max-w-xl justify-center" />
+        </div>
+      )}
     </header>
   );
 
-  // Flujo estricto: solo se abre la actividad actual (la primera sin guardar), en orden
   const ended = !!state.ended;
-  const currentAct = ended ? undefined : guide.activities.find((a) => !state.activities[a.id]?.done);
-  const canFinish = ended || !guide.activities.some((a) => !state.activities[a.id]?.done);
+  const acc = access(guide, state);
+  const { currentAct, canFinish, flexible, seqDone, isOpen } = acc;
   let cur: View = view;
-  if (cur.name === "activity" && (!state.prepDone || cur.id !== currentAct?.id)) cur = { name: "home" };
+  if (cur.name === "activity" && !isOpen(cur.id)) cur = { name: "home" };
   if ((cur.name === "summary" || cur.name === "survey") && !canFinish) cur = { name: "home" };
 
   let body: React.ReactNode;
@@ -215,10 +310,14 @@ export default function GuideApp({
               run={state}
               stepLabel={blockedStep >= 0 ? `${act.id} · Paso ${blockedStep + 1}` : act.id}
               beforeRequest={flush}
-              onRequested={(helpId, reason, at) =>
-                update((s) => ({ ...s, blocked: s.blocked && { ...s.blocked, helpId, reason, requestedAt: at } }))
-              }
-              onResolved={() => update((s) => ({ ...s, blocked: undefined }))}
+              onRequested={(helpId, reason, at) => {
+                update((s) => ({ ...s, blocked: s.blocked && { ...s.blocked, helpId, reason, requestedAt: at } }));
+                toast.success("El guía ya ve tu solicitud.", { title: "Ayuda pedida ✓" });
+              }}
+              onResolved={() => {
+                update((s) => ({ ...s, blocked: undefined }));
+                toast.success("Puedes continuar con la actividad.", { title: "Resuelto ✓" });
+              }}
               onEnded={(reason, at) => {
                 update((s) => ({ ...s, blocked: undefined, ended: { reason, at } }));
                 nav({ name: "summary" });
@@ -227,6 +326,8 @@ export default function GuideApp({
           )
         }
         onExit={() => nav({ name: "home" })}
+        dataLabel={guide.reference.title}
+        onOpenData={() => setShowRef(true)}
         onStep={(stepId, outcome) =>
           update(
             (s) => {
@@ -235,21 +336,66 @@ export default function GuideApp({
               else delete steps[stepKey(act.id, stepId)];
               return { ...s, steps };
             },
-            [{ type: "step", payload: { activityId: act.id, stepId, outcome } }]
+            [{ type: "step", payload: stepPayload(stateRef.current, act.id, stepId, outcome) }]
           )
         }
-        onReport={(kind, stepId) => setReport({ kind, activityId: act.id, stepId })}
+        onCheckpoint={(stepId, ticks) => {
+          const k = stepKey(act.id, stepId);
+          update((s) => ({ ...s, checkpoints: { ...s.checkpoints, [k]: ticks } }));
+          // Si el paso ya tenía resultado, se reenvía con las casillas actualizadas
+          const outcome = stateRef.current?.steps[k];
+          if (outcome) update((s) => s, [{ type: "step", payload: stepPayload(stateRef.current, act.id, stepId, outcome) }]);
+        }}
+        onDraft={(a) => update((s) => (s.activities[act.id]?.done ? s : { ...s, activities: { ...s.activities, [act.id]: { ...a, done: false } } }))}
+        reopened={!!state.activities[act.id]?.done}
+        onReport={(kind, stepId, markFail) => setReport({ kind, activityId: act.id, stepId, markFail })}
         onSave={(a) => {
+          const wasDone = !!stateRef.current?.activities[act.id]?.done;
           update((s) => ({ ...s, activities: { ...s.activities, [act.id]: a } }), [
             { type: "activity", payload: { activityId: act.id, result: a.result, checks: a.checks, fields: a.fields, notes: a.notes } },
           ]);
+          setSaved((p) => ({ id: act.id, n: (p?.n ?? 0) + 1 }));
+          const after = access(guide, stateRef.current!);
           const next = guide.activities.find((x) => !stateRef.current?.activities[x.id]?.done);
-          nav(next ? { name: "activity", id: next.id, step: firstPending(stateRef.current!, next.id, next.steps.map((s) => s.id)) } : { name: "summary" });
+          if (wasDone) {
+            toast.success("Puedes corregirla otra vez hasta que toques Terminar.", { title: `Cambios en ${act.id} guardados ✓` });
+            nav({ name: "home" });
+          } else if (flexible && after.seqDone && !seqDone) {
+            // Se terminó la parte en orden: se abren todas las demás a la vez
+            const opened = guide.activities.filter((x) => !stateRef.current?.activities[x.id]?.done).map((x) => x.id);
+            setFresh(opened);
+            toast.success(opened.length ? `Ya puedes abrir ${opened[0]} a ${opened[opened.length - 1]} cuando te toque.` : "Ya puedes contestar la encuesta.", {
+              title: `Actividad ${act.id} guardada ✓`,
+            });
+            nav({ name: "home" });
+          } else if (flexible && after.seqDone) {
+            toast.success(next ? `Sigue con la que te toque. Puedes corregir ${act.id} hasta que toques Terminar.` : "Ya puedes contestar la encuesta y terminar.", {
+              title: `Actividad ${act.id} guardada ✓`,
+            });
+            nav({ name: "home" });
+          } else {
+            toast.success(next ? `🔓 Se desbloqueó ${next.id}: ${next.title}` : "Terminaste todas las actividades. Falta la encuesta final.", {
+              title: `Actividad ${act.id} guardada ✓`,
+            });
+            if (next) setFresh(next.id);
+            nav(next ? { name: "activity", id: next.id, step: firstPending(stateRef.current!, next.id, next.steps.map((s) => s.id)) } : { name: "summary" });
+          }
         }}
       />
     );
   } else if (cur.name === "prep") {
-    body = <Prep guide={guide} state={state} update={update} desktop={desktop} onDone={() => nav({ name: "home" })} />;
+    body = (
+      <Prep
+        guide={guide}
+        state={state}
+        update={update}
+        desktop={desktop}
+        onDone={() => {
+          if (!state.prepDone && guide.activities[0]) setFresh(guide.activities[0].id);
+          nav({ name: "home" });
+        }}
+      />
+    );
   } else if (cur.name === "summary") {
     body = <Summary guide={guide} state={state} update={update} desktop={desktop} onSurvey={() => nav({ name: "survey" })} />;
   } else if (cur.name === "survey") {
@@ -259,6 +405,22 @@ export default function GuideApp({
         survey={guide.survey}
         initial={state.survey}
         finished={state.finished}
+        onDraft={(answers) => update((s) => ({ ...s, survey: answers }))}
+        onDraftSync={(answers) => update((s) => s, [{ type: "surveyDraft", payload: { answers } }])}
+        submitLabel={flexible && !state.finished && !ended ? "Enviar encuesta y terminar" : "Enviar encuesta"}
+        beforeSubmit={async () => {
+          if (!flexible || state.finished || ended) return true;
+          const pending = guide.activities.filter((a) => !state.activities[a.id]?.done).map((a) => a.id);
+          return confirm({
+            title: "¿Terminar la prueba?",
+            message: pending.length
+              ? `Te faltan ${pending.length === 1 ? "1 actividad" : `${pending.length} actividades`} (${pending.join(", ")}). Al terminar ya no podrás abrir ni corregir actividades.`
+              : "Al terminar ya no podrás abrir ni corregir tus actividades.",
+            confirmLabel: "Sí, terminar",
+            cancelLabel: "Todavía no",
+            tone: pending.length ? "danger" : "default",
+          });
+        }}
         onSubmit={(answers) => {
           update((s) => ({ ...s, survey: answers, finished: true }), [{ type: "survey", payload: { answers } }]);
         }}
@@ -288,9 +450,22 @@ export default function GuideApp({
         </section>
 
         {!state.prepDone && (
-          <button onClick={() => nav({ name: "prep" })} className={"w-full rounded-2xl bg-amber-50 p-4 text-left ring-1 ring-amber-200" + dk("lg:p-5 lg:hover:bg-amber-100/70")}>
-            <div className="font-semibold text-amber-900">Empieza aquí: {guide.prep.title}</div>
-            <div className="text-sm text-amber-800">Instala la app, revisa las reglas y conoce la pantalla principal.</div>
+          <button
+            onClick={() => nav({ name: "prep" })}
+            className={"attn attn-amber flex w-full items-center gap-3 rounded-2xl bg-amber-50 p-4 text-left ring-2 ring-amber-300 transition hover:bg-amber-100/70" + dk("lg:p-5")}
+          >
+            <span className="text-2xl" aria-hidden="true">
+              📋
+            </span>
+            <span className="flex-1">
+              <span className="block font-semibold text-amber-950">Empieza aquí: {guide.prep.title}</span>
+              <span className="block text-sm text-amber-900">
+                {desktop ? "Revisa tus datos de acceso, el horario del día y las reglas." : "Instala la app, revisa las reglas y conoce la pantalla principal."}
+              </span>
+            </span>
+            <span className="text-xl text-amber-800" aria-hidden="true">
+              →
+            </span>
           </button>
         )}
 
@@ -308,7 +483,12 @@ export default function GuideApp({
 
         {!ended && canFinish && (
           <Button size="lg" className="w-full" onClick={() => nav({ name: "summary" })}>
-            {state.finished ? "Ver resumen y encuesta" : "¡Terminaste! Ver resumen y contestar la encuesta"} →
+            {state.finished
+              ? "Ver resumen y encuesta"
+              : flexible && guide.activities.some((a) => !state.activities[a.id]?.done)
+                ? "Contestar la encuesta y terminar"
+                : "¡Terminaste! Ver resumen y contestar la encuesta"}{" "}
+            →
           </Button>
         )}
 
@@ -322,6 +502,7 @@ export default function GuideApp({
         {nextAct && state.prepDone && (
           <Button
             size="lg"
+            pulse={state.blocked?.activityId !== nextAct.id}
             className={"w-full" + dk("lg:w-auto lg:min-w-80")}
             onClick={() => nav({ name: "activity", id: nextAct.id, step: firstPending(state, nextAct.id, nextAct.steps.map((s) => s.id)) })}
           >
@@ -330,8 +511,25 @@ export default function GuideApp({
         )}
 
         <section>
-          <h2 className="px-1 text-sm font-semibold uppercase tracking-wide text-slate-500">Actividades</h2>
-          <p className="mb-2 px-1 text-xs text-slate-500">Se hacen en orden. Las que ya guardaste quedan cerradas y no se pueden cambiar.</p>
+          <Coachmark
+            id="tester-candados"
+            when={state.prepDone && !ended && !state.finished}
+            title={flexible ? "Las primeras van en orden" : "Las actividades van en orden"}
+            message={
+              flexible
+                ? `Haz en orden hasta ${guide.sequentialUntil}. Después se abren todas y eliges la que te toque. 🔒 quiere decir que todavía no toca.`
+                : "Solo se abre la actividad que sigue. 🔒 quiere decir que todavía no toca o que ya la guardaste."
+            }
+          >
+            <h2 className="px-1 text-sm font-semibold uppercase tracking-wide text-slate-600">Actividades</h2>
+          </Coachmark>
+          <p className="mb-2 px-1 text-xs text-slate-600">
+            {state.finished || ended
+              ? "La prueba terminó: tus actividades quedaron cerradas."
+              : flexible
+                ? `Las primeras actividades van en orden. Desde ${acc.firstFlexId ?? "la siguiente"} puedes abrirlas cuando te toque, y puedes corregir cualquiera hasta que toques Terminar.`
+                : "Se hacen en orden. Las que ya guardaste quedan cerradas y no se pueden cambiar."}
+          </p>
           <ul className={"space-y-2" + dk("lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0")}>
             {guide.activities.map((a) => {
               const st = state.activities[a.id];
@@ -341,10 +539,9 @@ export default function GuideApp({
                 ? { ok: "bg-emerald-100 text-emerald-800", issue: "bg-amber-100 text-amber-800", blocked: "bg-rose-100 text-rose-800", skipped: "bg-slate-200 text-slate-700" }[st.result]
                 : n > 0
                   ? "bg-brand-100 text-brand-700"
-                  : "bg-slate-100 text-slate-500";
-              const isCurrent = a.id === currentAct?.id;
-              const open = isCurrent && state.prepDone;
-              const isBlocked = isCurrent && state.blocked?.activityId === a.id;
+                  : "bg-slate-100 text-slate-600";
+              const open = isOpen(a.id);
+              const isBlocked = !st?.done && state.blocked?.activityId === a.id;
               const label = st?.done && st.result
                 ? ACTIVITY_RESULTS[st.result]
                 : isBlocked
@@ -356,18 +553,20 @@ export default function GuideApp({
                       : "Pendiente";
               const inner = (
                 <>
-                  <span className="mt-0.5 w-10 shrink-0 text-sm font-bold text-teal-brand">{a.id}</span>
+                  <span className="mt-0.5 w-10 shrink-0 text-sm font-bold text-teal-ink">{a.id}</span>
                     <span className="min-w-0 flex-1">
                       <span className="block font-medium leading-snug">{a.title}</span>
-                      <span className="mt-0.5 block truncate text-xs text-slate-500">
+                      <span className="mt-0.5 block text-xs text-slate-600">
+                        <span className="font-medium text-slate-700">Cuándo: </span>
                         <Rich text={a.when} />
                       </span>
                     </span>
                     <span className="flex shrink-0 flex-col items-end gap-1">
                       <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${isBlocked ? "bg-rose-100 text-rose-800" : badge}`}>{label}</span>
                       {fails > 0 && <span className="text-xs text-rose-600">{fails} ✗</span>}
+                      {open && st?.done && <span className="text-xs font-medium text-brand-700">✎ Corregir</span>}
                       {!open && (
-                        <span className="text-xs text-slate-400" aria-label={st?.done ? "Completada, cerrada" : "Bloqueada"}>
+                        <span className="text-xs text-slate-500" aria-label={st?.done ? "Completada, cerrada" : "Bloqueada"}>
                           🔒 {st?.done ? "Completada" : ""}
                         </span>
                       )}
@@ -379,7 +578,10 @@ export default function GuideApp({
                   {open ? (
                     <button
                       onClick={() => nav({ name: "activity", id: a.id, step: firstPending(state, a.id, a.steps.map((s) => s.id)) })}
-                      className="flex w-full items-start gap-3 rounded-2xl bg-white p-4 text-left shadow-sm ring-2 ring-brand-500 active:scale-[0.99]"
+                      onAnimationEnd={() => fresh.includes(a.id) && setFreshState((f) => f.filter((x) => x !== a.id))}
+                      className={`flex w-full items-start gap-3 rounded-2xl bg-white p-4 text-left shadow-sm active:scale-[0.99] ${
+                        st?.done ? "ring-1 ring-slate-300 hover:ring-brand-500" : a.id === currentAct?.id ? "ring-2 ring-brand-500" : "ring-1 ring-brand-500/50 hover:ring-brand-500"
+                      } ${fresh.includes(a.id) ? "shimmer" : ""}`}
                     >
                       {inner}
                     </button>
@@ -409,7 +611,7 @@ export default function GuideApp({
             </Button>
           )}
         </div>
-        <p className="pb-6 text-center text-xs text-slate-400">
+        <p className="pb-6 text-center text-xs text-slate-600">
           Tu avance se guarda en este navegador. Versión de la guía {guide.version}.
         </p>
       </div>
@@ -421,23 +623,26 @@ export default function GuideApp({
     <>
       {topbar}
       {desktop ? (
-        <div className="mx-auto flex w-full max-w-xl flex-1 px-4 pt-3 lg:max-w-[1440px] lg:gap-8 lg:px-8 lg:pt-6">
+        <div className="mx-auto flex w-full max-w-xl flex-1 px-4 pt-3 [overflow-x:clip] lg:max-w-[1440px] lg:gap-8 lg:px-8 lg:pt-6">
           <Sidebar
             guide={guide}
             state={state}
             view={cur}
             currentId={currentAct?.id}
+            isOpen={isOpen}
             canFinish={canFinish}
             answered={answered}
             totalSteps={totalSteps}
             doneActs={doneActs}
             nav={nav}
             onOpenRef={() => setShowRef(true)}
+            fresh={fresh}
+            onFreshSeen={(id) => setFreshState((f) => f.filter((x) => x !== id))}
           />
           <main className="min-w-0 flex-1 lg:pb-10">{body}</main>
         </div>
       ) : (
-        <main className="mx-auto w-full max-w-xl flex-1 px-4 pt-3">{body}</main>
+        <main className="mx-auto w-full max-w-xl flex-1 px-4 pt-3 [overflow-x:clip]">{body}</main>
       )}
       <ReferenceSheet guide={guide} desktop={desktop} open={showRef} onClose={() => setShowRef(false)} />
       <ReportSheet
@@ -445,11 +650,62 @@ export default function GuideApp({
         kind={report?.kind ?? "issue"}
         onClose={() => setReport(null)}
         maxUploadMb={maxUploadMb}
+        allowedMime={allowedMime}
+        reportExample={guide.reportExample}
+        orderExample={guide.orderExample}
         context={reportActivity ? `${reportActivity.id} · ${reportActivity.title}${report?.stepId ? ` · Paso ${report.stepId}` : ""}` : ""}
         onSubmit={submitReport}
       />
+      {saved && <SavedBurst key={saved.n} />}
     </>
   );
+}
+
+/** Festejo breve al guardar una actividad: una palomita que «revienta» al centro (el texto va en el aviso). */
+function SavedBurst() {
+  return (
+    <div className="pointer-events-none fixed inset-x-0 top-1/3 z-[60] flex justify-center" aria-hidden="true" data-testid="saved-burst">
+      <span className="animate-burst relative flex h-20 w-20 items-center justify-center rounded-full bg-emerald-600 shadow-xl ring-8 ring-emerald-200/70">
+        <svg viewBox="0 0 24 24" className="h-11 w-11" fill="none" stroke="white" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5 12.5l4.5 4.5L19 7.5" strokeDasharray={24} className="animate-check" />
+        </svg>
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Qué actividades se pueden abrir.
+ * - Sin `sequentialUntil`: orden estricto; solo la primera sin guardar, y las guardadas quedan cerradas.
+ * - Con `sequentialUntil`: hasta esa actividad van en orden; al guardarla se abren todas las demás, y
+ *   cualquier actividad guardada se puede reabrir y corregir hasta que el tester toque «Terminar».
+ * Al terminar (encuesta enviada) o si el guía terminó la prueba, todo queda cerrado.
+ */
+function access(guide: Guide, state: RunState) {
+  const done = (id: string) => !!state.activities[id]?.done;
+  const acts = guide.activities;
+  const seqIdx = guide.sequentialUntil ? acts.findIndex((a) => a.id === guide.sequentialUntil) : -1;
+  const flexible = seqIdx >= 0;
+  const finalized = !!state.ended || state.finished;
+  const seqDone = flexible && acts.slice(0, seqIdx + 1).every((a) => done(a.id));
+  const firstSeqPending = acts.slice(0, flexible ? seqIdx + 1 : acts.length).find((a) => !done(a.id));
+  const isOpen = (id: string) => {
+    if (!state.prepDone || finalized) return false;
+    const i = acts.findIndex((a) => a.id === id);
+    if (i < 0) return false;
+    if (!flexible) return id === firstSeqPending?.id;
+    if (i <= seqIdx) return done(id) || id === firstSeqPending?.id;
+    return seqDone;
+  };
+  const currentAct = finalized ? undefined : acts.find((a) => !done(a.id) && (state.prepDone ? isOpen(a.id) : true));
+  const canFinish = !!state.ended || (flexible ? seqDone : acts.every((a) => done(a.id)));
+  return { flexible, seqDone, isOpen, currentAct, canFinish, finalized, firstFlexId: flexible ? acts[seqIdx + 1]?.id : undefined };
+}
+
+/** Evento `step` para el servidor; en pasos de confirmación lleva las casillas (`checkpoint`). */
+function stepPayload(state: RunState | null, activityId: string, stepId: string, outcome: string | null) {
+  const ticks = state?.checkpoints?.[stepKey(activityId, stepId)];
+  return { activityId, stepId, outcome, ...(ticks ? { checkpoint: ticks } : {}) };
 }
 
 function firstPending(state: RunState, activityId: string, stepIds: string[]) {
@@ -479,7 +735,13 @@ function Sidebar({
   doneActs,
   nav,
   onOpenRef,
+  fresh = [],
+  onFreshSeen,
+  isOpen,
 }: {
+  fresh?: string[];
+  onFreshSeen?: (id: string) => void;
+  isOpen: (id: string) => boolean;
   guide: Guide;
   state: RunState;
   view: View;
@@ -500,9 +762,9 @@ function Sidebar({
     <aside className="hidden w-72 shrink-0 lg:block" aria-label="Navegación de la guía" data-testid="guide-sidebar">
       <div className="sticky top-[78px] flex max-h-[calc(100dvh-102px)] flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
         <div className="border-b border-slate-100 p-4">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-teal-brand">{guide.role}</div>
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-teal-ink">{guide.role}</div>
           <div className="mt-0.5 font-bold leading-snug">{guide.title}</div>
-          <div className="mt-3 flex items-baseline justify-between text-xs text-slate-500">
+          <div className="mt-3 flex items-baseline justify-between text-xs text-slate-600">
             <span>
               {doneActs} de {guide.activities.length} actividades
             </span>
@@ -525,37 +787,37 @@ function Sidebar({
             <span className="flex-1">{guide.prep.title}</span>
           </button>
 
-          <div className="mt-3 px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Actividades</div>
+          <div className="mt-3 px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Actividades</div>
           <ul className="space-y-0.5">
             {guide.activities.map((a) => {
               const st = state.activities[a.id];
               const done = !!st?.done;
               const isCurrent = a.id === currentId;
-              const open = isCurrent && state.prepDone;
+              const open = isOpen(a.id);
               const active = view.name === "activity" && view.id === a.id;
-              const paused = isCurrent && state.blocked?.activityId === a.id;
+              const paused = !done && state.blocked?.activityId === a.id;
               const n = a.steps.filter((x) => state.steps[stepKey(a.id, x.id)]).length;
               const inner = (
                 <>
                   <span
                     className={`flex h-6 w-9 shrink-0 items-center justify-center rounded-md text-[11px] font-bold ${
-                      active ? "bg-brand-500 text-white" : open ? "bg-brand-100 text-brand-700" : "bg-slate-100 text-slate-500"
+                      active ? "bg-brand-500 text-white" : open ? "bg-brand-100 text-brand-700" : "bg-slate-100 text-slate-600"
                     }`}
                   >
                     {a.id}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate leading-snug">{a.title}</span>
-                    <span className="block text-[11px] leading-tight text-slate-400">
+                    <span className="block text-[11px] leading-tight text-slate-600">
                       {done ? (
                         <>
                           <span className={`mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle ${RESULT_DOT[st.result ?? "ok"]}`} />
-                          🔒 Completada
+                          {open ? "Guardada · ✎ corregir" : "🔒 Completada"}
                         </>
                       ) : paused ? (
                         <span className="font-medium text-rose-600">En pausa</span>
                       ) : open ? (
-                        n > 0 ? `En curso · ${n}/${a.steps.length} pasos` : `Siguiente · ${a.steps.length} pasos`
+                        n > 0 ? `En curso · ${n}/${a.steps.length} pasos` : `${isCurrent ? "Siguiente" : "Abierta"} · ${a.steps.length} pasos`
                       ) : (
                         `🔒 ${state.ended ? "No realizada" : "Bloqueada"}`
                       )}
@@ -568,12 +830,13 @@ function Sidebar({
                   {open ? (
                     <button
                       onClick={() => nav({ name: "activity", id: a.id, step: firstPending(state, a.id, a.steps.map((x) => x.id)) })}
-                      className={`${item(active)} ${active ? "" : "ring-1 ring-brand-200"}`}
+                      onAnimationEnd={() => fresh.includes(a.id) && onFreshSeen?.(a.id)}
+                      className={`${item(active)} ${active || done ? "" : "ring-1 ring-brand-100"} ${fresh.includes(a.id) ? "shimmer" : ""}`}
                     >
                       {inner}
                     </button>
                   ) : (
-                    <div aria-disabled="true" className={`flex w-full cursor-not-allowed items-center gap-2.5 rounded-xl px-3 py-2 text-sm ${done ? "text-slate-600" : "text-slate-400"}`}>
+                    <div aria-disabled="true" className={`flex w-full cursor-not-allowed items-center gap-2.5 rounded-xl px-3 py-2 text-sm ${done ? "text-slate-600" : "text-slate-500"}`}>
                       {inner}
                     </div>
                   )}
@@ -607,48 +870,82 @@ function Sidebar({
 /* ---------- Identificación del tester ---------- */
 function Identify({
   guide,
-  variant,
   desktop = false,
-  onSwitchVariant,
+  variantCtl,
   onDone,
 }: {
   guide: Guide;
-  variant?: GuideVariant;
   desktop?: boolean;
-  onSwitchVariant?: () => void;
+  variantCtl?: VariantCtl;
   onDone: (s: RunState) => void;
 }) {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState(guide.role);
-  const [fields, setFields] = useState<Record<string, string>>({});
+  const roles = Array.from(new Set([guide.role, ...TESTER_ROLES]));
+  const d0 = variantCtl?.draft;
+  const [name, setName] = useState(d0?.name ?? "");
+  const [email, setEmail] = useState(d0?.email ?? "");
+  const [role, setRole] = useState(d0?.role && roles.includes(d0.role) ? d0.role : guide.role);
+  // Solo se llevan los datos con el mismo id en las dos guías (p. ej. la sucursal)
+  const [fields, setFields] = useState<Record<string, string>>(() =>
+    Object.fromEntries(guide.tester.fields.filter((f) => d0?.fields[f.id]).map((f) => [f.id, d0!.fields[f.id]]))
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tried, setTried] = useState(false);
+  const [serverErrors, setServerErrors] = useState<Errors>({});
+  const formRef = useRef<HTMLFormElement>(null);
 
-  const valid =
-    name.trim().length > 1 &&
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) &&
-    guide.tester.fields.every((f) => !f.required || (fields[f.id] ?? "").trim());
+  // El borrador vive en el selector de variante: si cambia de computadora a celular no se pierde lo escrito
+  const setDraft = variantCtl?.setDraft;
+  useEffect(() => {
+    setDraft?.({ name, email, role, fields });
+  }, [setDraft, name, email, role, fields]);
+
+  const errors: Errors = { ...validateFields(guide.tester.fields, fields) };
+  const nameErr = validateName(name);
+  const emailErr = validateEmail(email);
+  if (nameErr) errors._name = nameErr;
+  if (emailErr) errors._email = emailErr;
+  const shown: Errors = tried ? { ...serverErrors, ...errors } : {};
+  const valid = Object.keys(errors).length === 0;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setServerErrors({});
+    if (!valid) {
+      setTried(true);
+      focusFirstError(formRef.current);
+      return;
+    }
     setBusy(true);
     setError(null);
+    const clean = trimAll(fields);
     try {
-      const device = { ...(await detectDevice()), ...(variant ? { guideVariant: variant } : {}) };
+      const device = { ...(await detectDevice()), ...(variantCtl ? { guideVariant: variantCtl.variant } : {}) };
       const res = await fetch("/api/runs", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ guideId: guide.id, name, email, role, fields, device }),
+        body: JSON.stringify({ guideId: guide.id, name: name.trim(), email: email.trim(), role, fields: clean, device }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Error");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        // El servidor valida con las mismas reglas: sus errores por campo se muestran junto a cada campo
+        const fe = (data.fields ?? {}) as Record<string, string>;
+        const mapped: Errors = {};
+        for (const [k, v] of Object.entries(fe)) mapped[k === "name" ? "_name" : k === "email" ? "_email" : k.replace(/^fields\./, "")] = v;
+        if (Object.keys(mapped).length) {
+          setServerErrors(mapped);
+          setTried(true);
+          focusFirstError(formRef.current);
+          return;
+        }
+        throw new Error(data.error || "Error");
+      }
       onDone({
         v: 1,
         guideVersion: guide.version,
         runId: data.runId,
         token: data.token,
-        tester: { name: name.trim(), email: email.trim(), role, fields },
+        tester: { name: name.trim(), email: email.trim(), role, fields: clean },
         prep: {},
         prepDone: false,
         steps: {},
@@ -660,105 +957,236 @@ function Identify({
         outbox: [],
       });
     } catch (err) {
-      setError(err instanceof Error && err.message !== "Error" ? err.message : "No pudimos registrarte. Revisa tu conexión e inténtalo otra vez.");
+      const msg = err instanceof Error && err.message !== "Error" && !/fetch|network/i.test(err.message) ? err.message : "No pudimos registrarte. Revisa tu conexión e inténtalo otra vez.";
+      setError(msg);
+      toast.error(msg, { title: "No se pudo comenzar", action: { label: "Reintentar", onClick: () => formRef.current?.requestSubmit() } });
     } finally {
       setBusy(false);
     }
   };
 
-  return (
-    <main
-      className={
-        "animate-pop mx-auto w-full max-w-xl flex-1 px-4 py-6" +
-        (desktop ? " lg:grid lg:max-w-6xl lg:grid-cols-[minmax(0,1fr)_480px] lg:items-start lg:gap-12 lg:px-8 lg:py-14" : "")
-      }
-    >
-      <div className={desktop ? "lg:pt-2" : undefined}>
-      <Link href="/" className="text-sm text-brand-600">
-        ← Guías
-      </Link>
-      <div className="mt-3 flex items-center gap-3">
-        <Image src="/logo.png" alt="AppHouse" width={64} height={46} />
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-teal-brand">{guide.role}</div>
-          <h1 className={"text-xl font-bold leading-tight" + (desktop ? " lg:text-3xl" : "")}>{guide.title}</h1>
-          {desktop && <p className="mt-1 hidden text-slate-500 lg:block">{guide.subtitle}</p>}
-        </div>
-      </div>
-      {onSwitchVariant && (
-        <button type="button" onClick={onSwitchVariant} className="mt-3 text-sm font-medium text-brand-600 underline" data-testid="switch-variant">
-          {variant === "mobile" ? "¿Estás en computadora? Ver guía de escritorio" : "¿Estás en celular? Ver guía para celular"}
-        </button>
-      )}
-      <p className={"mt-4 text-slate-600" + (desktop ? " lg:mt-6 lg:text-lg lg:leading-relaxed" : "")}>{guide.summary}</p>
+  const intro = (
+    <>
+      <p className={"text-slate-700" + (desktop ? " lg:text-lg lg:leading-relaxed" : "")}>{guide.summary}</p>
       {guide.notice && (
         <div className="mt-3">
           <Callout tone="info">{guide.notice}</Callout>
         </div>
       )}
-      {desktop && (
-        <ul className="mt-8 hidden gap-3 text-sm text-slate-600 lg:grid lg:grid-cols-3">
-          <li className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
-            <div className="text-xl">🧭</div>
-            <div className="mt-1 font-semibold text-slate-800">{guide.activities.length} actividades en orden</div>
-            Cada una con sus pasos y capturas del panel.
-          </li>
-          <li className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
-            <div className="text-xl">🖥️</div>
-            <div className="mt-1 font-semibold text-slate-800">Capturas en grande</div>
-            Haz clic en cualquier captura para verla en pantalla completa.
-          </li>
-          <li className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
-            <div className="text-xl">🐞</div>
-            <div className="mt-1 font-semibold text-slate-800">Reporta fallas</div>
-            Con «No pude» describes qué pasó y adjuntas capturas.
-          </li>
-        </ul>
-      )}
+    </>
+  );
+
+  return (
+    <main
+      className={
+        "animate-pop mx-auto w-full max-w-xl flex-1 px-4 py-6" +
+        (desktop ? " lg:grid lg:max-w-6xl lg:grid-cols-[minmax(0,1fr)_500px] lg:items-start lg:gap-12 lg:px-8 lg:py-12" : "")
+      }
+    >
+      <div className={desktop ? "lg:sticky lg:top-8 lg:pt-2" : undefined}>
+        <Link href="/" className="inline-flex min-h-11 items-center text-sm font-medium text-brand-600 hover:underline">
+          ← Guías
+        </Link>
+        <div className="mt-1 flex items-center gap-3">
+          <Image src="/logo.png" alt="AppHouse" width={64} height={46} />
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-teal-ink">{guide.role}</div>
+            <h1 className={"text-xl font-bold leading-tight" + (desktop ? " lg:text-3xl" : "")}>{guide.title}</h1>
+            {desktop && <p className="mt-1 hidden text-slate-600 lg:block">{guide.subtitle}</p>}
+          </div>
+        </div>
+        {desktop && <div className="mt-6 hidden lg:block">{intro}</div>}
+        {desktop && (
+          <ul className="mt-8 hidden gap-3 text-sm text-slate-600 lg:grid lg:grid-cols-3">
+            <li className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+              <div className="text-xl" aria-hidden="true">🧭</div>
+              <div className="mt-1 font-semibold text-slate-800">{guide.activities.length} actividades en orden</div>
+              Cada una con sus pasos y capturas del panel.
+            </li>
+            <li className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+              <div className="text-xl" aria-hidden="true">🖥️</div>
+              <div className="mt-1 font-semibold text-slate-800">Capturas en grande</div>
+              Haz clic en cualquier captura para verla en pantalla completa.
+            </li>
+            <li className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+              <div className="text-xl" aria-hidden="true">🐞</div>
+              <div className="mt-1 font-semibold text-slate-800">Reporta fallas</div>
+              Con «No pude» describes qué pasó y adjuntas capturas.
+            </li>
+          </ul>
+        )}
       </div>
-      <form
-        onSubmit={submit}
-        className={"mt-6 space-y-4 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200" + (desktop ? " lg:mt-0 lg:p-7 lg:shadow-md" : "")}
-      >
-        <h2 className="font-semibold">¿Quién hace la prueba?</h2>
-        <label className="block">
-          <span className="mb-1 block text-sm">Nombre y apellido *</span>
-          <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" required />
-        </label>
-        <label className="block">
-          <span className="mb-1 block text-sm">Correo *</span>
-          <input className={inputCls} type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" inputMode="email" required />
-        </label>
-        <label className="block">
-          <span className="mb-1 block text-sm">Rol en la prueba</span>
-          <select className={inputCls} value={role} onChange={(e) => setRole(e.target.value)}>
-            {Array.from(new Set([guide.role, ...TESTER_ROLES])).map((r) => (
-              <option key={r}>{r}</option>
-            ))}
-          </select>
-        </label>
-        {guide.tester.fields.map((f) => (
-          <label key={f.id} className="block">
-            <span className="mb-1 block text-sm">
-              {f.label}
-              {f.required ? " *" : ""}
-            </span>
-            <input
-              className={inputCls}
-              type={f.type === "email" ? "email" : "text"}
-              placeholder={f.placeholder}
-              value={fields[f.id] ?? ""}
-              onChange={(e) => setFields({ ...fields, [f.id]: e.target.value })}
-            />
-          </label>
-        ))}
-        <p className="text-xs text-slate-500">Tu navegador, sistema y tamaño de pantalla se registran automáticamente.</p>
-        {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
-        <Button size="lg" className="w-full" disabled={!valid || busy}>
-          {busy ? "Registrando…" : "Comenzar"}
-        </Button>
-      </form>
+
+      <div className={"mt-5 space-y-5" + (desktop ? " lg:mt-0" : "")}>
+        {variantCtl && <VariantChoice ctl={variantCtl} />}
+        <div className={desktop ? "lg:hidden" : undefined}>{intro}</div>
+        {variantCtl?.carriedFrom && (
+          <Callout tone="info">
+            Tu avance con las capturas {VARIANTS[variantCtl.carriedFrom].of} quedó guardado. Aquí empiezas la versión {VARIANTS[variantCtl.variant].for}:
+            ya llenamos tus datos, revísalos y toca <strong>Comenzar</strong>.
+          </Callout>
+        )}
+        <form
+          ref={formRef}
+          onSubmit={submit}
+          noValidate
+          className={"space-y-4 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200" + (desktop ? " lg:p-7 lg:shadow-md" : "")}
+        >
+          <div>
+            <h2 className="text-lg font-semibold">{variantCtl ? "2. " : ""}¿Quién hace la prueba?</h2>
+            <p className="text-sm text-slate-600">Los datos con * son obligatorios.</p>
+          </div>
+          <FormField id="t-name" label="Nombre y apellido *" error={shown._name}>
+            {(p) => <input {...p} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" maxLength={LIMITS.name + 20} />}
+          </FormField>
+          <FormField id="t-email" label="Correo *" error={shown._email}>
+            {(p) => (
+              <input
+                {...p}
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+                inputMode="email"
+                autoCapitalize="none"
+                spellCheck={false}
+                maxLength={LIMITS.email + 20}
+              />
+            )}
+          </FormField>
+          <FormField id="t-role" label="Rol en la prueba">
+            {(p) => (
+              <select {...p} value={role} onChange={(e) => setRole(e.target.value)}>
+                {roles.map((r) => (
+                  <option key={r}>{r}</option>
+                ))}
+              </select>
+            )}
+          </FormField>
+          {guide.tester.fields.map((f) => (
+            <FormField key={f.id} id={`t-${f.id}`} label={`${f.label}${f.required ? " *" : ""}`} error={shown[f.id]} hint={f.patternHint}>
+              {(p) => (
+                <input
+                  {...p}
+                  type={f.type === "email" ? "email" : "text"}
+                  inputMode={f.type === "email" ? "email" : f.type === "number" ? "decimal" : undefined}
+                  placeholder={f.placeholder}
+                  maxLength={(f.maxLength ?? LIMITS.field) + 20}
+                  value={fields[f.id] ?? ""}
+                  onChange={(e) => setFields({ ...fields, [f.id]: e.target.value })}
+                />
+              )}
+            </FormField>
+          ))}
+          <p className="text-xs text-slate-600">Tu navegador, sistema y tamaño de pantalla se registran automáticamente.</p>
+          {tried && !valid && (
+            <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm font-medium text-rose-800" role="alert">
+              Revisa {Object.keys(errors).length === 1 ? "el dato marcado" : `los ${Object.keys(errors).length} datos marcados`} en rojo.
+            </p>
+          )}
+          {error && (
+            <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800" role="alert">
+              {error}
+            </p>
+          )}
+          <Button size="lg" className="w-full" disabled={busy} pulse={valid && !busy}>
+            {busy ? "Registrando…" : "Comenzar"}
+          </Button>
+        </form>
+      </div>
     </main>
+  );
+}
+
+/** Tarjeta «¿Dónde vas a hacer las actividades?» (antes de identificarse). */
+function VariantChoice({ ctl }: { ctl: VariantCtl }) {
+  return (
+    <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200" aria-labelledby="where-title" data-testid="variant-choice">
+      <h2 id="where-title" className="text-lg font-semibold">
+        1. ¿Dónde vas a hacer las actividades?
+      </h2>
+      <p className="mt-0.5 text-sm text-slate-600">Te mostraremos las capturas de esa pantalla. Puedes cambiarlo después.</p>
+      <div className="mt-3 grid grid-cols-2 gap-3" role="radiogroup" aria-labelledby="where-title">
+        {(["desktop", "mobile"] as GuideVariant[]).map((v) => {
+          const on = ctl.variant === v;
+          const meta = VARIANTS[v];
+          return (
+            <button
+              key={v}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              data-testid={`variant-option-${v}`}
+              tabIndex={on ? 0 : -1}
+              onKeyDown={(e) => radioKeys(e, () => ctl.choose(v === "desktop" ? "mobile" : "desktop"))}
+              onClick={() => !on && ctl.choose(v)}
+              className={`relative flex min-h-24 flex-col items-center justify-center rounded-2xl p-3 text-center ring-2 transition focus-visible:outline-none focus-visible:ring-4 ${
+                on ? "bg-brand-50 text-brand-700 ring-brand-500" : "bg-white text-slate-800 ring-slate-200 hover:bg-slate-50 hover:ring-slate-300"
+              }`}
+            >
+              {on && (
+                <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-xs text-white" aria-hidden="true">
+                  ✓
+                </span>
+              )}
+              <span className="text-3xl" aria-hidden="true">
+                {meta.icon}
+              </span>
+              <span className="mt-1 font-semibold leading-tight">
+                <span className="sr-only">{meta.icon} </span>
+                {meta.long}
+              </span>
+              <span className="text-xs text-slate-600">({meta.sub})</span>
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-3 text-xs text-slate-600">
+        Detectamos que estás en {ctl.detected === "mobile" ? "un celular" : "una computadora"}.
+        {ctl.variant !== ctl.detected && " Elegiste la otra opción: está bien si haces las actividades en otro aparato."}
+      </p>
+    </section>
+  );
+}
+
+/** Teclado de un grupo de 2 opciones (role="radio"): las flechas eligen la otra opción. */
+function radioKeys(e: React.KeyboardEvent, pickOther: () => void) {
+  if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) {
+    e.preventDefault();
+    pickOther();
+  }
+}
+
+/** Control «Ver capturas de: Computadora | Celular» (después de identificarse). */
+function VariantSwitch({ variant, onPick, className = "" }: { variant: GuideVariant; onPick: (v: GuideVariant) => void; className?: string }) {
+  return (
+    <div className={`flex items-center gap-2 ${className}`} role="radiogroup" aria-label="Ver capturas de">
+      <span className="shrink-0 text-xs font-medium text-slate-700" aria-hidden="true">
+        Ver capturas de:
+      </span>
+      <div className="flex rounded-lg bg-slate-100 p-0.5 ring-1 ring-slate-200">
+        {(["desktop", "mobile"] as GuideVariant[]).map((v) => {
+          const on = variant === v;
+          return (
+            <button
+              key={v}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              data-testid={`variant-switch-${v}`}
+              tabIndex={on ? 0 : -1}
+              onKeyDown={(e) => radioKeys(e, () => onPick(v === "desktop" ? "mobile" : "desktop"))}
+              onClick={() => !on && onPick(v)}
+              className={`flex min-h-10 items-center gap-1 rounded-md px-2.5 text-xs font-semibold transition lg:min-h-8 ${
+                on ? "bg-white text-brand-700 shadow-sm ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <span aria-hidden="true">{VARIANTS[v].icon}</span> {VARIANTS[v].short}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -854,6 +1282,7 @@ function Prep({
         size="lg"
         className={"w-full" + dk("lg:ml-auto lg:flex lg:w-auto lg:min-w-96")}
         disabled={!allChecked}
+        pulse={allChecked && !state.prepDone}
         onClick={() => {
           update((s) => ({ ...s, prepDone: true }));
           onDone();
@@ -907,15 +1336,15 @@ function Summary({
           return (
             <li key={a.id}>
               <div className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm">
-                <span className="w-9 font-bold text-teal-brand">{a.id}</span>
+                <span className="w-9 font-bold text-teal-ink">{a.id}</span>
                 {desktop && <span className="hidden w-56 shrink-0 truncate text-slate-600 lg:block">{a.title}</span>}
                 <span className="flex-1">
                   <span className="block font-medium">{st.done && st.result ? ACTIVITY_RESULTS[st.result] : state.ended ? "No realizada" : "Pendiente"}</span>
-                  <span className="text-xs text-slate-500">
+                  <span className="text-xs text-slate-600">
                     ✓ {ok} · ✗ {fail} de {a.steps.length} pasos{nIssues ? ` · ${nIssues} reporte(s)` : ""}
                   </span>
                 </span>
-                <span className="text-slate-400" aria-label="Cerrada">🔒</span>
+                <span className="text-slate-500" aria-label="Cerrada">🔒</span>
               </div>
             </li>
           );
@@ -933,15 +1362,20 @@ function Summary({
                   {i.stepId ? ` · paso ${i.stepId}` : ""} {i.blocking ? "· impide seguir" : ""}
                 </div>
                 <p className="mt-0.5">{i.description}</p>
-                {i.attachments.length > 0 && <p className="mt-1 text-xs text-slate-500">📎 {i.attachments.length} archivo(s)</p>}
+                {i.attachments.length > 0 && <p className="mt-1 text-xs text-slate-600">📎 {i.attachments.length} archivo(s)</p>}
               </li>
             ))}
           </ul>
         </section>
       )}
-      {guide.finish.checklist.length > 0 && (
+      {(guide.finish.checklist.length > 0 || !!guide.finish.text) && (
         <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
           <h2 className="mb-2 font-semibold">Al terminar</h2>
+          {guide.finish.text && (
+            <p className="mb-3 text-sm text-slate-700">
+              <Rich text={guide.finish.text} links />
+            </p>
+          )}
           {guide.finish.checklist.map((c) => (
             <label key={c.id} className="mb-2 flex items-start gap-3 rounded-xl bg-slate-50 p-3 text-sm">
               <input
@@ -960,7 +1394,7 @@ function Summary({
       )}
       </div>
       </div>
-      <Button size="lg" className={"w-full" + dk("lg:ml-auto lg:flex lg:w-auto lg:min-w-96")} onClick={onSurvey}>
+      <Button size="lg" pulse={!state.finished} className={"w-full" + dk("lg:ml-auto lg:flex lg:w-auto lg:min-w-96")} onClick={onSurvey}>
         {state.finished ? "Ver mi encuesta" : "Contestar la encuesta final"} →
       </Button>
     </div>
@@ -971,7 +1405,7 @@ function Stat({ n, label, tone }: { n: number; label: string; tone?: "warn" }) {
   return (
     <div className={`rounded-2xl p-3 shadow-sm ring-1 ${tone ? "bg-amber-50 ring-amber-200" : "bg-white ring-slate-200"}`}>
       <div className="text-2xl font-bold">{n}</div>
-      <div className="text-xs text-slate-500">{label}</div>
+      <div className="text-xs text-slate-600">{label}</div>
     </div>
   );
 }
@@ -979,6 +1413,12 @@ function Stat({ n, label, tone }: { n: number; label: string; tone?: "warn" }) {
 /* ---------- Hoja de datos / ayuda ---------- */
 function ReferenceSheet({ guide, open, onClose, desktop = false }: { guide: Guide; open: boolean; onClose: () => void; desktop?: boolean }) {
   const [tab, setTab] = useState<"data" | "help">("data");
+  const [wasOpen, setWasOpen] = useState(open);
+  // Cada vez que se abre, empieza en «Datos»
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setTab("data");
+  }
   return (
     <Sheet open={open} onClose={onClose} title={tab === "data" ? guide.reference.title : "Qué hacer si…"} size={desktop ? "wide" : "default"}>
       <div className={"mb-4 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 text-sm" + (desktop ? " lg:max-w-sm" : "")}>
@@ -986,7 +1426,12 @@ function ReferenceSheet({ guide, open, onClose, desktop = false }: { guide: Guid
           ["data", "Datos"],
           ["help", "Qué hacer si…"],
         ].map(([k, l]) => (
-          <button key={k} onClick={() => setTab(k as "data" | "help")} className={`rounded-lg py-2 font-medium ${tab === k ? "bg-white shadow-sm" : "text-slate-600"}`}>
+          <button
+            key={k}
+            onClick={() => setTab(k as "data" | "help")}
+            aria-pressed={tab === k}
+            className={`min-h-10 rounded-lg py-2 font-medium ${tab === k ? "bg-white shadow-sm" : "text-slate-700"}`}
+          >
             {l}
           </button>
         ))}
@@ -1005,7 +1450,7 @@ function ReferenceSheet({ guide, open, onClose, desktop = false }: { guide: Guid
                     </div>
                     {r.slice(1).map((c, j) => (
                       <div key={j} className="mt-0.5 text-slate-700">
-                        {t.columns.length > 2 && <span className="text-xs text-slate-500">{t.columns[j + 1]}: </span>}
+                        {t.columns.length > 2 && <span className="text-xs text-slate-600">{t.columns[j + 1]}: </span>}
                         <Rich text={c} />
                       </div>
                     ))}
@@ -1016,7 +1461,7 @@ function ReferenceSheet({ guide, open, onClose, desktop = false }: { guide: Guid
                 // En escritorio, tabla de verdad
                 <div className="hidden overflow-hidden rounded-xl ring-1 ring-slate-200 lg:block">
                   <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                    <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
                       <tr>
                         {t.columns.map((c) => (
                           <th key={c} className="px-3 py-2 font-semibold">
@@ -1039,7 +1484,7 @@ function ReferenceSheet({ guide, open, onClose, desktop = false }: { guide: Guid
                   </table>
                 </div>
               )}
-              {t.note && <p className="mt-2 text-xs text-slate-500">{t.note}</p>}
+              {t.note && <p className="mt-2 text-xs text-slate-600">{t.note}</p>}
             </section>
           ))}
         </div>

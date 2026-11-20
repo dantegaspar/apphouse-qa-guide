@@ -4,12 +4,14 @@ import { Readable } from "node:stream";
 import { getDb, UPLOAD_DIR } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
 import { err } from "@/lib/http";
+import { idError } from "@/lib/validate";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await isAdmin())) return err("No autorizado", 401);
   const { id } = await params;
+  if (idError(id)) return err("Archivo no encontrado", 404);
   const row = getDb().prepare("SELECT original_name, mime, path FROM attachments WHERE id = ?").get(id) as
     | { original_name: string; mime: string; path: string }
     | undefined;

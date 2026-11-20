@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ActivityResult } from "@/lib/types";
 
-export type Outcome = "ok" | "fail";
+/** Resultado de un paso: lo logré, no pude o «No me apareció» (pasos condicionales: terminado sin falla). */
+export type Outcome = "ok" | "fail" | "na";
 
 export type IssueAttachment = { id: string; name: string; size: number };
 export type Issue = {
@@ -21,7 +22,8 @@ export type Issue = {
 
 export type ActivityState = {
   result?: ActivityResult;
-  checks: Record<string, boolean>;
+  /** Resultado esperado: sí (true), no (false) o «No aplica» ("na", solo en los condicionales). */
+  checks: Record<string, boolean | "na">;
   fields: Record<string, string>;
   notes: string;
   done: boolean;
@@ -61,6 +63,11 @@ export type RunState = {
   blocked?: Blocked;
   /** La prueba se terminó por un bloqueo (con la contraseña del guía). */
   ended?: { reason: string; at: string };
+  /**
+   * Casillas marcadas en los pasos de confirmación (`step.checkpoint`), por `stepKey` y número de
+   * casilla. También viajan al servidor en el evento `step` (payload.checkpoint).
+   */
+  checkpoints?: Record<string, Record<string, boolean>>;
 };
 
 export const stepKey = (activityId: string, stepId: string) => `${activityId}:${stepId}`;

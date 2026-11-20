@@ -139,6 +139,30 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX courier_attachments_issue ON courier_attachments(issue_id);
   `,
+  // 4: borradores de la encuesta (se guardan mientras el tester contesta). is_draft=1 hasta el
+  // envío final; los reportes y gráficas solo cuentan is_draft=0. Además, las casillas marcadas
+  // en los pasos de confirmación (Step.checkpoint) se guardan con el resultado del paso.
+  `
+  ALTER TABLE survey_responses ADD COLUMN is_draft INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE step_results ADD COLUMN checkpoint TEXT NOT NULL DEFAULT '{}';
+  `,
+  // 5: pasos condicionales («No me apareció»): outcome 'na'. SQLite no permite cambiar un CHECK,
+  // así que se reconstruye step_results con los mismos datos.
+  `
+  CREATE TABLE step_results_new (
+    run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+    activity_id TEXT NOT NULL,
+    step_id TEXT NOT NULL,
+    outcome TEXT NOT NULL CHECK (outcome IN ('ok','fail','na')),
+    checkpoint TEXT NOT NULL DEFAULT '{}',
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (run_id, activity_id, step_id)
+  );
+  INSERT INTO step_results_new (run_id, activity_id, step_id, outcome, checkpoint, updated_at)
+    SELECT run_id, activity_id, step_id, outcome, checkpoint, updated_at FROM step_results;
+  DROP TABLE step_results;
+  ALTER TABLE step_results_new RENAME TO step_results;
+  `,
 ];
 
 function migrate(db: Database.Database) {
@@ -164,7 +188,44 @@ export function getDb(): Database.Database {
   db.pragma("busy_timeout = 5000");
   migrate(db);
   globalForDb.__qaDb = db;
+  startBackups(db);
   return db;
+}
+
+/**
+ * Respaldos automáticos de la base: cada BACKUP_EVERY_MIN minutos (por defecto 10) se copia
+ * una instantánea consistente a BACKUP_DIR (por defecto DATA_DIR/backups) y se conservan
+ * las últimas BACKUP_KEEP (por defecto 144 = 24 h). BACKUP_EVERY_MIN=0 los desactiva.
+ */
+export const BACKUP_DIR = path.resolve(
+  /* turbopackIgnore: true */ process.env.BACKUP_DIR || path.join(/* turbopackIgnore: true */ DATA_DIR, "backups"),
+);
+
+const globalForBackup = globalThis as unknown as { __qaBackupTimer?: NodeJS.Timeout };
+
+function startBackups(db: Database.Database) {
+  const every = Number(process.env.BACKUP_EVERY_MIN ?? 10);
+  const keep = Math.max(1, Number(process.env.BACKUP_KEEP ?? 144));
+  if (!Number.isFinite(every) || every <= 0 || globalForBackup.__qaBackupTimer) return;
+  const run = async () => {
+    try {
+      fs.mkdirSync(BACKUP_DIR, { recursive: true });
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+      await db.backup(path.join(/* turbopackIgnore: true */ BACKUP_DIR, `qa-${stamp}.sqlite`));
+      const files = fs
+        .readdirSync(BACKUP_DIR)
+        .filter((f) => /^qa-.*\.sqlite$/.test(f))
+        .sort();
+      for (const f of files.slice(0, Math.max(0, files.length - keep))) {
+        fs.rmSync(path.join(/* turbopackIgnore: true */ BACKUP_DIR, f), { force: true });
+      }
+    } catch (e) {
+      console.error("[db] respaldo falló:", e);
+    }
+  };
+  globalForBackup.__qaBackupTimer = setInterval(run, every * 60_000);
+  globalForBackup.__qaBackupTimer.unref();
+  setTimeout(run, 5_000).unref();
 }
 
 export const now = () => new Date().toISOString();

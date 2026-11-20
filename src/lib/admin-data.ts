@@ -20,7 +20,8 @@ export type RunRow = {
   ended_reason: string;
   ended_at: string | null;
 };
-export type StepRow = { run_id: string; activity_id: string; step_id: string; outcome: "ok" | "fail" };
+/** outcome "na" = «No me apareció» (paso condicional). */
+export type StepRow = { run_id: string; activity_id: string; step_id: string; outcome: "ok" | "fail" | "na" };
 export type ActivityRow = { run_id: string; activity_id: string; result: string | null; checks: string; fields: string; notes: string };
 export type IssueRow = {
   id: string;
@@ -135,7 +136,7 @@ export function loadAll(guideId?: string | null) {
     issues: keep(db.prepare("SELECT * FROM issues ORDER BY created_at DESC").all() as IssueRow[]),
     attachments: keep(db.prepare("SELECT id, run_id, issue_id, original_name, mime, size FROM attachments ORDER BY created_at").all() as AttachmentRow[]),
     help: keep(db.prepare("SELECT * FROM help_requests ORDER BY created_at DESC").all() as HelpRow[]),
-    surveys: keep(db.prepare("SELECT run_id, answers FROM survey_responses").all() as { run_id: string; answers: string }[]),
+    surveys: keep(db.prepare("SELECT run_id, answers FROM survey_responses WHERE is_draft = 0").all() as { run_id: string; answers: string }[]),
   };
 }
 
@@ -146,9 +147,201 @@ export const fmtDate = (iso: string | null | undefined) =>
   iso ? new Date(iso).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" }) : "";
 
 /** Estado de una verificación "qué debería pasar"; la clave puede ser el índice o el texto. */
-export function checkValue(checks: Rec, index: number, text: string): boolean | undefined {
+/** true = sí, false = no, "na" = no aplica, undefined = sin contestar. */
+export function checkValue(checks: Rec, index: number, text: string): boolean | "na" | undefined {
   for (const k of [String(index), `e${index}`, `${index}`, text]) {
-    if (k in checks) return Boolean(checks[k]);
+    if (k in checks) return checks[k] === "na" ? "na" : Boolean(checks[k]);
   }
   return undefined;
 }
+
+// ---------------------------------------------------------------------------------------------
+// Estado en vivo de cada corrida (Mesa de control y Resumen automático)
+
+/** Minutos sin ninguna señal (evento) para considerar abandonada una corrida no terminada. */
+export const ABANDON_MIN = 45;
+/** Minutos sin guardar una actividad para marcar a un tester como «sin avance». */
+export const STALL_MIN = 20;
+
+export type LiveState = "finished" | "ended_blocked" | "abandoned" | "active";
+
+/** Terminada, terminada por bloqueo, abandonada (> ABANDON_MIN sin señal) o activa. */
+export function liveState(run: Pick<RunRow, "status" | "updated_at">, nowMs = Date.now()): LiveState {
+  if (run.status === "finished") return "finished";
+  if (run.status === "ended_blocked") return "ended_blocked";
+  return nowMs - new Date(run.updated_at).getTime() > ABANDON_MIN * 60_000 ? "abandoned" : "active";
+}
+
+export const minutesSince = (iso: string | null | undefined, nowMs = Date.now()) =>
+  iso ? Math.max(0, Math.floor((nowMs - new Date(iso).getTime()) / 60_000)) : null;
+
+const SAVED_RESULTS = new Set(Object.keys(ACTIVITY_RESULTS));
+
+export type RunProgress = {
+  /** Actividades de la guía con resultado guardado. */
+  saved: number;
+  total: number;
+  /**
+   * Actividad actual: la no guardada con el paso marcado más reciente; si no hay, la primera no
+   * guardada en el orden de la guía; si ya guardó todas, la última guardada.
+   */
+  current: { id: string; title: string; known: boolean; mode: "working" | "next" | "last" } | null;
+  /** Último guardado de una actividad (incluye ids que ya no están en la guía). */
+  lastSavedAt: string | null;
+  /** Ids guardados que ya no existen en la guía (p. ej. actividades retiradas). */
+  unknownSaved: string[];
+};
+
+/** Avance de una corrida a partir de sus filas de actividad y de pasos (ya filtradas por run_id). */
+export function runProgress(
+  guideId: string,
+  acts: { activity_id: string; result: string | null; updated_at?: string }[],
+  steps: { activity_id: string; updated_at?: string }[],
+): RunProgress {
+  const g = getGuide(guideId);
+  const order = g?.activities ?? [];
+  const known = new Set(order.map((a) => a.id));
+  const saved = acts.filter((a) => a.result && SAVED_RESULTS.has(a.result));
+  const savedIds = new Set(saved.map((a) => a.activity_id));
+  const byTime = [...saved].sort((a, b) => (b.updated_at ?? "").localeCompare(a.updated_at ?? ""));
+  const lastSaved = byTime[0];
+  // Para mostrar «Última: …» se prefiere una actividad que siga en la guía
+  const lastKnown = byTime.find((a) => known.has(a.activity_id)) ?? lastSaved;
+  const title = (id: string) => order.find((a) => a.id === id)?.title ?? "";
+
+  let current: RunProgress["current"] = null;
+  const pending = order.filter((a) => !savedIds.has(a.id));
+  if (pending.length) {
+    const pendingIds = new Set(pending.map((a) => a.id));
+    const touched = steps
+      .filter((s) => pendingIds.has(s.activity_id))
+      .sort((a, b) => (b.updated_at ?? "").localeCompare(a.updated_at ?? ""))[0];
+    const a = touched ? order.find((x) => x.id === touched.activity_id)! : pending[0];
+    current = { id: a.id, title: a.title, known: true, mode: touched ? "working" : "next" };
+  } else if (lastKnown) {
+    current = { id: lastKnown.activity_id, title: title(lastKnown.activity_id), known: known.has(lastKnown.activity_id), mode: "last" };
+  }
+  return {
+    saved: order.filter((a) => savedIds.has(a.id)).length,
+    total: order.length,
+    current,
+    lastSavedAt: lastSaved?.updated_at ?? null,
+    unknownSaved: [...savedIds].filter((id) => !known.has(id)),
+  };
+}
+
+export type MesaState = "help" | "stalled" | "abandoned" | "active" | "ended_blocked" | "finished";
+
+export const MESA_STATE: Record<MesaState, { label: string; cls: string; rank: number }> = {
+  help: { label: "Pide ayuda", cls: "bg-red-600 text-white", rank: 0 },
+  stalled: { label: `Sin avance`, cls: "bg-amber-100 text-amber-900 ring-1 ring-amber-300", rank: 1 },
+  abandoned: { label: "Abandonada", cls: "bg-slate-200 text-slate-700", rank: 3 },
+  active: { label: "Avanzando", cls: "bg-sky-100 text-sky-800", rank: 4 },
+  ended_blocked: { label: "Terminada por bloqueo", cls: "bg-red-100 text-red-800", rank: 5 },
+  finished: { label: "Terminada", cls: "bg-emerald-100 text-emerald-800", rank: 6 },
+};
+
+export type MesaRow = {
+  run: RunRow;
+  guideTitle: string;
+  branch: string;
+  fields: string;
+  device: string;
+  progress: RunProgress;
+  /** Minutos desde el último guardado (o desde el inicio si no ha guardado nada). */
+  minsSinceSave: number;
+  minsSinceSignal: number;
+  failures: number;
+  blocking: number;
+  openHelp: (HelpRow & { minsOpen: number }) | null;
+  state: MesaState;
+  /** Menor = necesita atención antes. */
+  rank: number;
+  /** Por qué necesita atención (vacío si no). */
+  reason: string;
+};
+
+/** Filas de la Mesa de control: todos los testers, los que necesitan atención primero. */
+export function loadMesa(guideId?: string | null, nowMs = Date.now()) {
+  const db = getDb();
+  const runs = loadRuns(guideId);
+  const ids = new Set(runs.map((r) => r.id));
+  const by = <T extends { run_id: string }>(rows: T[]) => {
+    const m = new Map<string, T[]>();
+    for (const r of rows) if (ids.has(r.run_id)) m.set(r.run_id, [...(m.get(r.run_id) ?? []), r]);
+    return m;
+  };
+  const acts = by(db.prepare("SELECT run_id, activity_id, result, updated_at FROM activity_results").all() as { run_id: string; activity_id: string; result: string | null; updated_at: string }[]);
+  const steps = by(db.prepare("SELECT run_id, activity_id, updated_at FROM step_results").all() as { run_id: string; activity_id: string; updated_at: string }[]);
+  const issues = by(db.prepare("SELECT run_id, blocking FROM issues WHERE kind = 'issue'").all() as { run_id: string; blocking: number }[]);
+  const help = by(db.prepare("SELECT * FROM help_requests WHERE status = 'open' ORDER BY created_at").all() as HelpRow[]);
+
+  const rows: MesaRow[] = runs.map((run) => {
+    const fieldsRec = parseRec(run.tester_fields);
+    const progress = runProgress(run.guide_id, acts.get(run.id) ?? [], steps.get(run.id) ?? []);
+    const iss = issues.get(run.id) ?? [];
+    const h = (help.get(run.id) ?? [])[0];
+    const live = liveState(run, nowMs);
+    const minsSinceSave = minutesSince(progress.lastSavedAt ?? run.created_at, nowMs) ?? 0;
+    const minsSinceSignal = minutesSince(run.updated_at, nowMs) ?? 0;
+    const blocking = iss.filter((i) => i.blocking).length;
+    let state: MesaState = live;
+    if (h) state = "help";
+    else if (live === "active" && minsSinceSave > STALL_MIN) state = "stalled";
+    let rank = MESA_STATE[state].rank;
+    // Una corrida activa con fallas bloqueantes va justo después de las que piden ayuda
+    if (state === "active" && blocking) rank = 2;
+    const reason =
+      state === "help"
+        ? `Pidió ayuda hace ${minutesSince(h!.created_at, nowMs)} min`
+        : state === "stalled"
+          ? `${minsSinceSave} min sin guardar una actividad`
+          : state === "abandoned"
+            ? `Sin actividad desde hace ${fmtMinutes(minsSinceSignal)}`
+            : state === "active" && blocking
+              ? `${blocking} falla${blocking === 1 ? "" : "s"} bloqueante${blocking === 1 ? "" : "s"}`
+              : "";
+    return {
+      run,
+      guideTitle: guideShortTitle(run.guide_id),
+      branch: String(fieldsRec.branch ?? fieldsRec.sucursal ?? "").trim(),
+      fields: Object.entries(fieldsRec)
+        .filter(([k, v]) => !["branch", "sucursal", "device", "browser", "system"].includes(k) && typeof v === "string" && v.trim())
+        .map(([, v]) => String(v).trim())
+        .join(" · "),
+      device: deviceSummary(parseRec(run.device), fieldsRec),
+      progress,
+      minsSinceSave,
+      minsSinceSignal,
+      failures: iss.length,
+      blocking,
+      openHelp: h ? { ...h, minsOpen: minutesSince(h.created_at, nowMs) ?? 0 } : null,
+      state,
+      rank,
+      reason,
+    };
+  });
+  rows.sort(
+    (a, b) =>
+      a.rank - b.rank ||
+      // dentro del mismo grupo: el que lleva más tiempo sin guardar primero (terminadas: la más reciente primero)
+      (a.rank >= MESA_STATE.ended_blocked.rank ? b.run.updated_at.localeCompare(a.run.updated_at) : b.minsSinceSave - a.minsSinceSave) ||
+      a.run.name.localeCompare(b.run.name),
+  );
+  return { rows, at: nowMs };
+}
+
+/** "45 min", "1 h 20 min", "2 día(s)". */
+export function fmtMinutes(m: number) {
+  if (m < 60) return `${Math.round(m)} min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} h${m % 60 ? ` ${Math.round(m % 60)} min` : ""}`;
+  const d = Math.floor(h / 24);
+  return `${d} día${d === 1 ? "" : "s"}`;
+}
+
+/** Título corto de la guía: "Manual del Cliente final" → "Cliente final". */
+export const guideShortTitle = (id: string) => {
+  const t = getGuide(id)?.title ?? id;
+  return t.replace(/^Manual (del|de la|de) /i, "");
+};

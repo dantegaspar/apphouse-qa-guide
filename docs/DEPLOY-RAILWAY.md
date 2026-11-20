@@ -41,7 +41,8 @@ Abre el servicio, pestaña **Variables**, **New Variable** (o **Raw Editor** y p
 | `RAILWAY_RUN_UID` | `0` |
 
 - **Generar `SESSION_SECRET`** en tu computadora: `openssl rand -hex 32` (o en Node: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`). Pega el resultado.
-- **`RAILWAY_RUN_UID=0`:** la imagen corre como usuario `node`, pero Railway monta el volumen como `root`; sin esto la app no puede escribir en `/app/data` (error de permisos al abrir SQLite). Es la solución que indica la documentación de Railway.
+- **`RAILWAY_RUN_UID=0`:** Railway monta el volumen como `root`. La imagen ya arranca como root, da permisos a `/app/data` y luego corre la app como `node`, así que esta variable es solo una garantía extra; déjala puesta.
+- **Respaldos:** la app guarda una copia de la base cada 10 minutos en `/app/data/backups` (últimas 24 h), dentro del mismo volumen.
 - **No definas `PORT`:** Railway lo inyecta y el servidor de Next.js (standalone) lo respeta; el `Dockerfile` ya fija `HOSTNAME=0.0.0.0`.
 
 Pulsa **Deploy** para aplicar los cambios.

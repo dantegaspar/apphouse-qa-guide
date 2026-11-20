@@ -3,40 +3,147 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
-/** Texto con **negritas** (único formato que usan las guías). */
-export function Rich({ text, className }: { text: string; className?: string }) {
+/**
+ * Texto con **negritas** (único formato que usan las guías). Con `links`, las direcciones
+ * https://… se vuelven enlaces que abren en otra pestaña, con un botón «Copiar».
+ */
+export function Rich({ text, className, links = false }: { text: string; className?: string; links?: boolean }) {
   const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  const render = (t: string, key: string | number) => (links ? <Linkified key={key} text={t} /> : <span key={key}>{t}</span>);
   return (
     <span className={className}>
       {parts.map((p, i) =>
         p.startsWith("**") && p.endsWith("**") ? (
           <strong key={i} className="font-semibold text-slate-900">
-            {p.slice(2, -2)}
+            {render(p.slice(2, -2), "s")}
           </strong>
         ) : (
-          <span key={i}>{p}</span>
+          render(p, i)
         )
       )}
     </span>
   );
 }
 
+const URL_RE = /(https?:\/\/[^\s<>«»"]+[^\s<>«»".,;:!?)])/g;
+
+function Linkified({ text }: { text: string }) {
+  const parts = text.split(URL_RE);
+  return (
+    <>
+      {parts.map((p, i) =>
+        i % 2 === 1 ? (
+          <span key={i} className="inline">
+            <a href={p} target="_blank" rel="noopener noreferrer" className="break-all font-semibold text-brand-600 underline underline-offset-2 hover:text-brand-700">
+              {p}
+              <span className="sr-only"> (se abre en otra pestaña)</span>
+            </a>{" "}
+            <CopyButton value={p} />
+          </span>
+        ) : (
+          <span key={i}>{p}</span>
+        )
+      )}
+    </>
+  );
+}
+
+function CopyButton({ value }: { value: string }) {
+  const [done, setDone] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(value);
+        } catch {
+          // Respaldo para navegadores sin permiso de portapapeles
+          const ta = document.createElement("textarea");
+          ta.value = value;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand("copy");
+          ta.remove();
+        }
+        setDone(true);
+        setTimeout(() => setDone(false), 1500);
+      }}
+      className="ml-0.5 inline-flex min-h-8 items-center gap-1 rounded-md bg-brand-50 px-2 py-0.5 align-middle text-xs font-semibold text-brand-700 ring-1 ring-brand-100 hover:bg-brand-100"
+      aria-label={`Copiar ${value}`}
+    >
+      {done ? "✓ Copiado" : "Copiar"}
+    </button>
+  );
+}
+
 type BtnProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: "primary" | "success" | "danger" | "ghost" | "outline";
   size?: "md" | "lg";
+  /** Pulso de atención: marca la siguiente acción recomendada. */
+  pulse?: boolean;
 };
-export function Button({ variant = "primary", size = "md", className = "", ...rest }: BtnProps) {
+export function Button({ variant = "primary", size = "md", pulse = false, className = "", ...rest }: BtnProps) {
   const base =
-    "inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none";
-  const sizes = { md: "px-4 py-2.5 text-sm", lg: "px-5 py-3.5 text-base" };
+    "inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-500/40 disabled:opacity-50 disabled:pointer-events-none";
+  const sizes = { md: "min-h-11 px-4 py-2.5 text-sm", lg: "min-h-12 px-5 py-3.5 text-base" };
   const variants = {
     primary: "bg-brand-500 text-white hover:bg-brand-600",
-    success: "bg-emerald-600 text-white hover:bg-emerald-700",
+    success: "bg-emerald-700 text-white hover:bg-emerald-800",
     danger: "bg-white text-rose-700 ring-2 ring-rose-200 hover:bg-rose-50",
     outline: "bg-white text-slate-800 ring-1 ring-slate-300 hover:bg-slate-50",
     ghost: "text-brand-600 hover:bg-brand-50",
   };
-  return <button className={`${base} ${sizes[size]} ${variants[variant]} ${className}`} {...rest} />;
+  const attn = pulse && !rest.disabled ? ` attn${variant === "success" ? " attn-success" : ""}` : "";
+  return <button className={`${base} ${sizes[size]} ${variants[variant]}${attn} ${className}`} {...rest} />;
+}
+
+/**
+ * Campo de formulario accesible: etiqueta asociada, ayuda y error en línea (aria-invalid y
+ * aria-describedby). `children` recibe las props que debe llevar el input.
+ */
+export function FormField({
+  id,
+  label,
+  hint,
+  error,
+  className = "",
+  labelClassName = "mb-1 block text-sm font-medium text-slate-800",
+  children,
+}: {
+  id: string;
+  label: ReactNode;
+  hint?: ReactNode;
+  error?: string | null;
+  className?: string;
+  labelClassName?: string;
+  children: (p: { id: string; "aria-invalid": boolean; "aria-describedby"?: string; className: string }) => ReactNode;
+}) {
+  const hintId = hint ? `${id}-hint` : undefined;
+  const errId = error ? `${id}-err` : undefined;
+  const describedBy = [errId, hintId].filter(Boolean).join(" ") || undefined;
+  return (
+    <div className={className}>
+      <label htmlFor={id} className={labelClassName}>
+        {label}
+      </label>
+      {children({ id, "aria-invalid": !!error, "aria-describedby": describedBy, className: error ? inputErrCls : inputCls })}
+      {error && <FieldError id={errId!}>{error}</FieldError>}
+      {hint && (
+        <p id={hintId} className="mt-1 text-xs text-slate-600">
+          {hint}
+        </p>
+      )}
+    </div>
+  );
+}
+
+export function FieldError({ id, children }: { id?: string; children: ReactNode }) {
+  return (
+    <p id={id} className="mt-1.5 flex items-start gap-1.5 text-sm font-medium text-rose-700">
+      <span aria-hidden="true">⚠</span>
+      <span>{children}</span>
+    </p>
+  );
 }
 
 /** Hoja modal que sube desde abajo (móvil) o centrada (escritorio). */
@@ -56,6 +163,7 @@ export function Sheet({
   /** "wide": modal amplio en pantallas grandes (p. ej. tablas de datos en la guía de escritorio). */
   size?: "default" | "wide";
 }) {
+  const panelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
@@ -67,14 +175,25 @@ export function Sheet({
       window.removeEventListener("keydown", onKey);
     };
   }, [open, onClose]);
+  // Foco: al abrir pasa a la hoja (lectores de pantalla y teclado); al cerrar vuelve a donde estaba
+  useEffect(() => {
+    if (!open) return;
+    const before = document.activeElement as HTMLElement | null;
+    panelRef.current?.focus({ preventScroll: true });
+    return () => before?.focus?.({ preventScroll: true });
+  }, [open]);
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-label={title}>
       <div className="absolute inset-0 bg-slate-900/50" onClick={onClose} />
-      <div className={`animate-pop relative flex max-h-[92dvh] w-full max-w-xl flex-col rounded-t-3xl bg-white shadow-xl sm:rounded-3xl ${size === "wide" ? "lg:max-h-[86vh] lg:max-w-4xl" : ""}`}>
+      <div
+        ref={panelRef}
+        tabIndex={-1}
+        className={`animate-pop relative flex max-h-[92dvh] w-full max-w-xl flex-col rounded-t-3xl bg-white shadow-xl outline-none sm:rounded-3xl ${size === "wide" ? "lg:max-h-[86vh] lg:max-w-4xl" : ""}`}
+      >
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
           <h2 className="text-lg font-semibold">{title}</h2>
-          <button onClick={onClose} className="rounded-full p-2 text-slate-500 hover:bg-slate-100" aria-label="Cerrar">
+          <button onClick={onClose} className="flex h-11 w-11 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100" aria-label="Cerrar">
             ✕
           </button>
         </div>
@@ -96,12 +215,15 @@ export function StepImage({
   caption,
   desktop = false,
   captionAside = false,
+  flash = false,
 }: {
   src: string;
   caption?: string;
   desktop?: boolean;
   /** En escritorio la leyenda ya se muestra junto a la captura (no se repite abajo). */
   captionAside?: boolean;
+  /** Resalta un instante la leyenda (al cambiar de paso). */
+  flash?: boolean;
 }) {
   const [open, setOpen] = useState<null | "tap" | "button">(null);
   const [wide, setWide] = useState(false);
@@ -145,14 +267,18 @@ export function StepImage({
         </button>
       )}
       {desktop ? (
-        <figcaption className="mt-2 text-center text-xs text-slate-500">
-          {caption && <span className="lg:hidden">{caption} · toca para ampliar</span>}
+        <figcaption className="mt-2 text-center text-xs text-slate-600">
+          {caption && <span className={`rounded-lg px-2 py-1 lg:hidden ${flash ? "animate-flash" : ""}`}>{caption} · toca para ampliar</span>}
           <span className="hidden lg:inline">
             {caption && !captionAside ? `${caption} · ` : ""}Haz clic en la captura para verla en pantalla completa
           </span>
         </figcaption>
       ) : (
-        caption && <figcaption className="mt-2 text-center text-xs text-slate-500">{caption} · toca para ampliar</figcaption>
+        caption && (
+          <figcaption className={`mt-2 rounded-lg px-2 py-1 text-center text-xs text-slate-600 ${flash ? "animate-flash" : ""}`}>
+            {caption} · toca para ampliar
+          </figcaption>
+        )
       )}
       {open && <Lightbox src={src} caption={caption} nativeFullscreen={open === "button"} onClose={() => setOpen(null)} />}
     </figure>
@@ -284,4 +410,6 @@ export function Callout({ tone = "warn", children }: { tone?: "warn" | "info"; c
 }
 
 export const inputCls =
-  "w-full rounded-xl border-0 bg-white px-3.5 py-3 text-base text-slate-900 ring-1 ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-brand-500 focus:outline-none";
+  "w-full rounded-xl border-0 bg-white px-3.5 py-3 text-base text-slate-900 ring-1 ring-slate-300 placeholder:text-slate-500 focus:ring-2 focus:ring-brand-500 focus:outline-none";
+export const inputErrCls =
+  "w-full rounded-xl border-0 bg-rose-50/40 px-3.5 py-3 text-base text-slate-900 ring-2 ring-rose-500 placeholder:text-slate-500 focus:ring-2 focus:ring-rose-600 focus:outline-none";

@@ -45,3 +45,6 @@ data/
 uploads/
 .env
 !.env.example
+
+# datos locales de Docker (bind mounts)
+/qa-data/

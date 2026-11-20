@@ -1,6 +1,7 @@
 import { deviceSummary, fmtDate, isImage, parseRec } from "@/lib/admin-data";
 import { COURIER_QUESTIONS, FACES, faceOf } from "@/lib/courier";
 import { answerOf, courierStats, loadCourier } from "@/lib/courier-data";
+import { ExportButton } from "@/components/admin/ExportButton";
 import { Bars, ChartCard, COLORS, Columns, Empty, fmt, Kpi } from "@/components/admin/charts/Charts";
 
 /** Encuesta de repartidores en el panel y en las gráficas (no depende del filtro de guía). */
@@ -38,9 +39,9 @@ export function CourierAdminSection() {
         <h2 className="text-lg font-semibold text-slate-900">Repartidores</h2>
         <div className="flex flex-wrap gap-2">
           {COURIER_EXPORTS.map(([k, label]) => (
-            <a key={k} href={`/api/admin/export/${k}`} className="rounded-lg bg-gradient-to-r from-[#2F5DA8] to-[#3BA3A8] px-3 py-2 text-sm font-medium text-white">
+            <ExportButton key={k} href={`/api/admin/export/${k}`} label={label} className="rounded-lg bg-gradient-to-r from-[#2F5DA8] to-[#3BA3A8] px-3 py-2 text-sm font-medium text-white">
               {label}
-            </a>
+            </ExportButton>
           ))}
         </div>
       </div>

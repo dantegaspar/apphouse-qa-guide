@@ -8,7 +8,7 @@ export default function Home() {
       <div className="flex flex-col items-center text-center">
         <Image src="/logo.png" alt="AppHouse" width={150} height={108} priority />
         <h1 className="mt-4 text-2xl font-bold">Guía de pruebas QA</h1>
-        <p className="mt-2 text-slate-600">
+        <p className="mt-2 text-slate-700">
           Elige tu guía. Te llevaremos paso a paso y podrás reportar cualquier falla con una captura.
         </p>
       </div>
@@ -19,9 +19,9 @@ export default function Home() {
               href={`/g/${g.id}`}
               className="block rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 transition hover:ring-brand-500 active:scale-[0.99]"
             >
-              <div className="text-xs font-semibold uppercase tracking-wide text-teal-brand">{g.role}</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-teal-ink">{g.role}</div>
               <div className="mt-1 text-lg font-semibold">{g.title}</div>
-              <div className="mt-1 text-sm text-slate-600">
+              <div className="mt-1 text-sm text-slate-700">
                 {g.activities.length} actividades · {g.activities.reduce((n, a) => n + a.steps.length, 0)} pasos
               </div>
             </Link>
@@ -32,9 +32,9 @@ export default function Home() {
             href="/repartidor"
             className="block rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 transition hover:ring-brand-500 active:scale-[0.99]"
           >
-            <div className="text-xs font-semibold uppercase tracking-wide text-teal-brand">Repartidor</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-teal-ink">Repartidor</div>
             <div className="mt-1 text-lg font-semibold">Encuesta para repartidores</div>
-            <div className="mt-1 text-sm text-slate-600">6 preguntas con caritas · reporta fallas con una foto</div>
+            <div className="mt-1 text-sm text-slate-700">6 preguntas con caritas · reporta fallas con una foto</div>
           </Link>
         </li>
       </ul>

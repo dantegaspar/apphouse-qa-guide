@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { toast } from "@/components/feedback";
 
 export function LoginForm() {
   const router = useRouter();
@@ -20,14 +21,21 @@ export function LoginForm() {
         body: JSON.stringify({ password }),
       });
       if (res.ok) {
+        toast.success("Sesión iniciada. ¡Bienvenido!", { id: "admin-login" });
         router.replace("/admin");
         router.refresh();
         return;
       }
       const data = await res.json().catch(() => ({}));
-      setError(data.error || "No se pudo entrar");
+      const msg = data.error || "No se pudo entrar";
+      setError(msg);
+      toast.error(res.status === 401 ? "Revisa la contraseña e intenta de nuevo." : msg, {
+        id: "admin-login",
+        title: res.status === 401 ? "Contraseña incorrecta" : "No se pudo entrar",
+      });
     } catch {
       setError("Sin conexión. Intenta de nuevo.");
+      toast.error("Revisa tu internet e intenta de nuevo.", { id: "admin-login", title: "Sin conexión" });
     }
     setBusy(false);
   }

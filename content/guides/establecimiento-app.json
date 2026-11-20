@@ -1,14 +1,17 @@
 {
   "id": "establecimiento-app",
-  "version": "1.0.1",
+  "version": "1.2.0",
   "role": "Establecimiento",
   "hidden": true,
   "title": "Manual del Establecimiento · App móvil",
   "subtitle": "Guía de prueba de la app móvil de tu sucursal",
   "summary": "Esta guía te dice qué hacer en la app AppHouse Establecimientos de tu celular durante la prueba. No necesitas experiencia previa: sigue los pasos y marca cada actividad al terminar. Ningún cobro es real.",
-  "source": "manual_app.pdf",
+  "source": "Manual_Establecimiento_App.pdf",
   "notice": "Haz toda la prueba desde la app AppHouse Establecimientos de tu celular. No uses el panel web en la computadora al mismo tiempo, salvo que Mesa de control te lo pida.",
-  "glossary": "**Toca** = tocar con el dedo · **Escribe** = escribir letras o números · **Toma una captura** = foto de la pantalla del celular · **El grupo** = el grupo de WhatsApp de la prueba.",
+  "glossary": "**Toca** = tocar con el dedo · **Escribe** = escribir letras o números · **Toma una captura** = foto de la pantalla del celular · **El grupo** = el grupo de WhatsApp de la prueba (solo para emergencias).",
+  "sequentialUntil": "E04",
+  "reportExample": "Ej. Toqué Confirmar pedido y el pedido no cambió de estado.",
+  "orderExample": "Ej. 261120-0004",
   "tester": {
     "fields": [
       {
@@ -48,22 +51,17 @@
           "**Usuario:** tu correo electrónico: el mismo que proporcionaste a Mesa de control.",
           "**Contraseña:** la que te enviaron a ese correo.",
           "**Barra de abajo:** la app tiene 5 botones abajo: **Inicio, Pedidos, Menú, Monitoreo y Más**. Casi todo empieza ahí.",
-          "**Grabar pantalla:** **Android:** baja la barra de arriba y toca **Grabar pantalla** · **iPhone:** Centro de control › círculo con punto."
+          "**Grabar pantalla:** **Android:** baja la barra de arriba y toca **Grabar pantalla** · **iPhone:** Centro de control › círculo con punto. Si no puedes grabar, toma capturas en cada paso que lo pida."
         ]
       },
       {
-        "title": "Mensajes del grupo",
+        "title": "Cómo va la prueba",
         "items": [
-          "**HORARIO LISTO - Sucursal (tu sucursal)** (tú, al terminar E02).",
-          "**REPARTIDORES LISTOS - Sucursal (tu sucursal)** (tú, al terminar E03).",
-          "**LISTA - Sucursal (tu sucursal)** (tú, al terminar E04).",
-          "**ABIERTA - Sucursal (tu sucursal)** (tú, al terminar E05).",
-          "**EN PREPARACIÓN 5 MIN - Folio (número) - Sucursal (tu sucursal)** (tú, en E07).",
-          "**E08 - Rechaza el folio (número)** / **E08 - Cancela el folio (número)** (Mesa de control: haces E08).",
-          "**E09 - No respondas el folio (número)** (Mesa de control: haces E09).",
-          "**E10 - Agota Papas en Sucursal (nombre)** (Mesa de control: haces E10).",
-          "**FALLA - Sucursal: (tu sucursal) - APP MÓVIL** (tú, si algo no pasa como dice la guía).",
-          "**TERMINADA - Sucursal (tu sucursal)** (tú, al final)."
+          "**Primero preparas tu sucursal:** E01 a E04. Al terminar, manda al grupo de WhatsApp: **Sucursal (nombre de tu sucursal) lista**. Es el único mensaje que mandas en toda la prueba.",
+          "Tu sucursal se abre sola con el horario que configuraste en E02 (E05).",
+          "Después llegan los pedidos de los clientes: E06, E07 y E11 con cada uno.",
+          "Con 3 pedidos que tú elijas: rechaza uno, confirma y luego cancela otro, y deja uno sin responder (E08 y E09). Los demás, atiéndelos normal.",
+          "**Al final:** cuando Mesa de control dé por terminada la prueba, termina los pedidos que tengas, contesta la encuesta y toca **Terminar**."
         ]
       }
     ],
@@ -83,12 +81,17 @@
       {
         "id": "equipment",
         "label": "Mi celular tiene internet, el volumen arriba, sin modo silencio, y batería suficiente."
+      },
+      {
+        "id": "guideOpen",
+        "label": "Tengo esta guía abierta para ir marcando cada paso (de preferencia en otro aparato, para no cerrar la app de la prueba)."
       }
     ],
     "rules": [
       "Ningún cobro es real. Todos los pagos son de prueba.",
-      "Rechazar o cancelar un pedido cuando Mesa de control lo pide no es un error.",
-      "Si algo no pasa como dice la guía, repórtalo con el botón **No pude** o **Reportar falla** del paso y avisa en el grupo con **FALLA - Sucursal: (tu sucursal) - APP MÓVIL**."
+      "Rechazar, cancelar o dejar sin responder los pedidos que elijas para E08 y E09 no es un error: es parte de la prueba.",
+      "Si algo no pasa como dice la guía, toca **No pude** en ese paso, o **Reportar falla**, y escribe qué pasó. No necesitas avisar por WhatsApp: Mesa de control ve tus reportes en el sitio.",
+      "No necesitas esperar mensajes del grupo para avanzar: la guía te dice qué sigue. El único mensaje que mandas es **Sucursal (nombre de tu sucursal) lista**, al terminar E04. El grupo también sirve para emergencias, por ejemplo si el panel deja de abrir."
     ],
     "tour": {
       "title": "Conoce la barra de abajo",
@@ -105,76 +108,129 @@
   },
   "reference": {
     "title": "Datos para tu sucursal",
-    "intro": "Hoja de consulta: no necesitas memorizarla.",
+    "intro": "Hoja de consulta: no necesitas memorizarla. Tu sucursal empieza sin nada creado: vas a crear 5 categorías (Pizzas, Hamburguesas, Botanas, Bebidas y Paquetes), 8 productos, 1 grupo de variantes y 6 grupos de complementos.",
     "tables": [
       {
-        "title": "Productos que debes crear (E04 · Parte A)",
+        "title": "Categorías y productos que debes crear (E04 · Parte A)",
         "columns": [
-          "Producto",
           "Categoría",
-          "Tamaño y precio",
-          "Opciones y extras",
-          "Al iniciar"
+          "Producto",
+          "Precio",
+          "Variante (tamaño y precio)",
+          "Complemento (opciones y extras)"
         ],
         "rows": [
           [
+            "Pizzas",
             "Pizza Hawaiana",
-            "Pizzas",
-            "Chica $120 · Mediana $150 · Grande $180",
-            "Queso extra +$20 · Orilla rellena +$30 (opcionales)",
-            "Disponible, con promoción"
+            "$120",
+            "Tamaño de pizza",
+            "Extras pizza Hawaiana"
           ],
           [
+            "Pizzas",
             "Pizza Pepperoni",
-            "Pizzas",
-            "Chica $110 · Mediana $140 · Grande $170",
-            "Queso extra +$20 (opcional)",
-            "Disponible"
+            "$110",
+            "Tamaño de pizza",
+            "Queso extra pizza"
           ],
           [
-            "Hamburguesa doble carne",
             "Hamburguesas",
-            "Única $130",
-            "Tocino +$20 (opcional)",
-            "Agotado (Parte C)"
+            "Hamburguesa doble carne",
+            "$130",
+            "—",
+            "Extras hamburguesa"
           ],
           [
+            "Botanas",
             "Alitas 10 piezas",
-            "Botanas",
-            "Única $140",
-            "Sabor, elige 1 (obligatorio): BBQ · Mango habanero · Búfalo",
-            "Disponible"
+            "$140",
+            "—",
+            "Sabor de alitas"
           ],
           [
+            "Botanas",
             "Papas a la francesa",
-            "Botanas",
-            "Única $50",
-            "Queso cheddar +$15 (opcional)",
-            "Disponible"
+            "$50",
+            "—",
+            "Extras papas"
           ],
           [
+            "Bebidas",
             "Agua de limón 1 L",
-            "Bebidas",
-            "Única $35",
-            "Sin opciones",
-            "Disponible"
+            "$35",
+            "—",
+            "—"
           ],
           [
+            "Bebidas",
             "Refresco 600 ml",
-            "Bebidas",
-            "Única $25",
-            "Sabor, elige 1 (obligatorio): Cola · Naranja · Limón",
-            "Disponible"
+            "$25",
+            "—",
+            "Sabor de refresco"
           ],
           [
-            "Paquete fiesta",
             "Paquetes",
-            "Único $650 (3 pizzas grandes, alitas y 2 refrescos)",
-            "Sin opciones",
-            "Disponible"
+            "Paquete fiesta",
+            "$650",
+            "—",
+            "—"
+          ]
+        ]
+      },
+      {
+        "title": "Grupos de variantes y complementos (E04 · Parte A)",
+        "columns": [
+          "Grupo",
+          "Tipo",
+          "Cuántas elige el cliente",
+          "Opciones y lo que suman"
+        ],
+        "rows": [
+          [
+            "Tamaño de pizza",
+            "Variante",
+            "Una, obligatoria",
+            "Chica +$0 · Mediana +$30 · Grande +$60"
+          ],
+          [
+            "Extras pizza Hawaiana",
+            "Complemento",
+            "Las que quiera (opcional)",
+            "Queso extra +$20 · Orilla rellena +$30"
+          ],
+          [
+            "Queso extra pizza",
+            "Complemento",
+            "Las que quiera (opcional)",
+            "Queso extra +$20"
+          ],
+          [
+            "Extras hamburguesa",
+            "Complemento",
+            "Las que quiera (opcional)",
+            "Tocino +$20"
+          ],
+          [
+            "Sabor de alitas",
+            "Complemento",
+            "Una, obligatoria (mínimo 1, máximo 1)",
+            "BBQ · Mango habanero · Búfalo, todos +$0"
+          ],
+          [
+            "Extras papas",
+            "Complemento",
+            "Las que quiera (opcional)",
+            "Queso cheddar +$15"
+          ],
+          [
+            "Sabor de refresco",
+            "Complemento",
+            "Una, obligatoria (mínimo 1, máximo 1)",
+            "Cola · Naranja · Limón, todos +$0"
           ]
         ],
-        "note": "El precio de la ficha es el más bajo (Chica o Única). Los tamaños y los sabores van en Variantes (el cliente elige uno). Los extras van en Complementos (el cliente elige los que quiera)."
+        "note": "El precio del producto es el más bajo (Chica o Única). La Pepperoni usa el mismo «Tamaño de pizza»: Chica $110 · Mediana $140 · Grande $170. La variante (el tamaño con su precio) va en Variantes; las opciones y extras van en Complementos."
       },
       {
         "title": "Datos de prueba",
@@ -185,27 +241,35 @@
         "rows": [
           [
             "Horario de la prueba",
-            "Viernes 20 de noviembre de 2026, de 2:00 p.m. a 5:00 p.m."
+            "Viernes 20 de noviembre de 2026, de 2:00 p.m. a 5:00 p.m. (E02)."
+          ],
+          [
+            "Repartidores",
+            "Mesa de control te entrega el nombre, correo y teléfono de cada uno antes de empezar (E03)."
           ],
           [
             "Promoción",
-            "Pizza Hawaiana 20 %, solo sobre el producto base."
+            "Pizza Hawaiana 20 % · Tipo Porcentaje 20 · Solo el producto base · Unos productos: la Pizza Hawaiana de PIZZAS · sin importe mínimo · vigencia apagada (Parte B)."
           ],
           [
             "Envío",
-            "Tarifa base $25 · 1 km incluido · $10 por kilómetro adicional · radio 3 km → $25 / $35 / $45."
+            "Tarifa base $25 · 1 km incluido · $10 por kilómetro adicional · radio 3 km · envío gratis vacío → $25 / $35 / $45 (Parte D)."
           ],
           [
             "Plazo para confirmar",
-            "5 minutos."
+            "5 minutos (Parte E)."
+          ],
+          [
+            "Pago con tarjeta",
+            "«Aceptar pago con tarjeta en tu app» encendido. Lo deja listo el representante legal: solo revísalo (Parte E)."
           ],
           [
             "Topes",
-            "Pedido máximo $1,000 · pago en efectivo máximo $700."
+            "Pedido máximo $1,000 · pago en efectivo máximo $700 (Parte E)."
           ],
           [
             "Hoja de pedidos",
-            "Un pedido por renglón: folio, llegó (Creado), confirmé, listo para salir, repartidor (hora y nombre), entregado o estado final y notas. Copia las horas de Estado, dentro del pedido. Si un paso no aplicó, pon un guion (-). Ejemplo (tus folios y horas serán distintos): 261120-0004 · 3:14 · 3:17 · 3:18 · 3:31 Carlos · Entregado 3:35 · -"
+            "Un pedido por renglón en la tabla de E07 (botón **Agregar pedido**): folio, llegó, confirmé, listo para salir, repartidor, estado final y notas. Las horas están en el historial de Estado, dentro del pedido. Si un paso no aplicó, déjalo vacío. Ejemplo de folio: 261120-0004."
           ]
         ]
       }
@@ -222,7 +286,7 @@
     ],
     [
       "Tocaste **Marcar agotado** o **Quitar tarifas** por error.",
-      "Toca **Deshacer** en el aviso de abajo o vuelve a escribir las tarifas. Avisa en el grupo."
+      "Toca **Deshacer** en el aviso de abajo o vuelve a escribir las tarifas. Repórtalo con **Reportar falla**."
     ],
     [
       "Se cortó el internet.",
@@ -230,11 +294,11 @@
     ],
     [
       "La app se cerró sola.",
-      "Vuelve a abrirla. Si te pide iniciar sesión otra vez, avisa en el grupo."
+      "Vuelve a abrirla. Si te pide iniciar sesión otra vez, repórtalo con **Reportar falla**."
     ],
     [
       "No hay repartidores libres.",
-      "Si un pedido pasa más de 3 minutos en cola, avisa en el grupo."
+      "Si un pedido pasa más de 3 minutos en cola, repórtalo con **Reportar falla** y escribe el folio."
     ],
     [
       "Un pedido con tarjeta rechazado dice **reembolsado**.",
@@ -242,14 +306,14 @@
     ],
     [
       "Para reportar una falla.",
-      "Toma una captura o un video corto (15 a 30 segundos) del celular y mándalo al grupo con este texto: **FALLA - Sucursal: (tu sucursal) - APP MÓVIL · Actividad: (ejemplo: E07) · Folio del pedido: (si aplica) · Qué estaba haciendo y qué pasó · ¿Me impide seguir?: Sí / No**."
+      "Toca **No pude** en el paso donde pasó, o **Reportar falla**. Escribe qué estabas haciendo y qué pasó, y adjunta una captura o un video corto."
     ]
   ],
   "activities": [
     {
       "id": "E01",
       "title": "Inicia sesión en la app",
-      "when": "30 minutos antes de abrir la sucursal.",
+      "when": "Al llegar.",
       "where": "App AppHouse Establecimientos en tu celular.",
       "steps": [
         {
@@ -276,11 +340,13 @@
         },
         {
           "id": "5",
-          "text": "Si te pide una contraseña nueva, créala y vuelve a entrar."
+          "text": "Si te pide una contraseña nueva, créala y vuelve a entrar.",
+          "conditional": true
         },
         {
           "id": "6",
-          "text": "Si el celular pregunta si la app puede enviarte notificaciones, toca **Permitir**."
+          "text": "Si el celular pregunta si la app puede enviarte notificaciones, toca **Permitir**.",
+          "conditional": true
         },
         {
           "id": "7",
@@ -291,26 +357,38 @@
       ],
       "expected": [
         "Entré y vi la pantalla Inicio de mi sucursal.",
-        "La pantalla no se movió mientras escribía.",
-        "Si mi contraseña era temporal, la app me pidió cambiarla antes de dejarme seguir.",
-        "La app pidió permiso para enviarme notificaciones."
+        "La pantalla se quedó quieta mientras escribía.",
+        {
+          "text": "Mi contraseña era temporal y la app me pidió cambiarla antes de dejarme seguir.",
+          "conditional": true
+        },
+        {
+          "text": "La app pidió permiso para enviarme notificaciones.",
+          "conditional": true
+        }
       ],
       "fields": [
         {
           "id": "entryTime",
           "label": "Hora de entrada",
-          "type": "time"
+          "type": "time",
+          "required": true,
+          "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d(\\s?[aApP]\\.?\\s?[mM]\\.?)?$",
+          "patternHint": "Escribe la hora y los minutos, por ejemplo 2:15 p.m.",
+          "maxLength": 11
         },
         {
           "id": "shakeField",
-          "label": "Si la pantalla se movió, ¿en qué campo?"
+          "label": "Si la pantalla se movió, ¿en qué campo? (si no se movió, déjalo vacío)",
+          "placeholder": "Ej. Contraseña",
+          "maxLength": 100
         }
       ]
     },
     {
       "id": "E02",
       "title": "Configura el horario de tu sucursal",
-      "when": "Justo después de E01, antes de dar de alta a tus repartidores.",
+      "when": "Justo después de E01.",
       "where": "Barra de abajo de la app › **Más** › **Horario**.",
       "warnings": [
         "Tu sucursal debe recibir pedidos solo de 2:00 p.m. a 5:00 p.m. el día de la prueba. Solo cambia el renglón del viernes: los demás días déjalos como están."
@@ -327,7 +405,8 @@
           "id": "2",
           "text": "Toca **Horario (1)**.",
           "image": "/guides/establecimiento-app/e02-03-mas.jpg",
-          "caption": "1 = Horario"
+          "caption": "1 = Horario",
+          "warning": "No toques **Cerrar ahora**: cierra tu sucursal el resto del día."
         },
         {
           "id": "3",
@@ -349,7 +428,8 @@
         },
         {
           "id": "6",
-          "text": "Si el viernes tiene otro tramo, bórralo con el bote rojo."
+          "text": "Si el viernes tiene otro tramo, bórralo con el bote rojo.",
+          "conditional": true
         },
         {
           "id": "7",
@@ -369,13 +449,9 @@
         },
         {
           "id": "10",
-          "text": "Baja hasta **Días que no abres (7)** y revisa que no aparezca el 20 de noviembre. Si aparece, avisa en el grupo.",
+          "text": "Baja hasta **Días que no abres (7)** y revisa que no aparezca el 20 de noviembre. Si aparece, repórtalo con **Reportar falla**.",
           "image": "/guides/establecimiento-app/e02-07-horario-dias.jpg",
           "caption": "7 = días que no abres"
-        },
-        {
-          "id": "11",
-          "text": "Envía al grupo: **HORARIO LISTO - Sucursal (tu sucursal)**."
         }
       ],
       "expected": [
@@ -387,22 +463,31 @@
       "fields": [
         {
           "id": "fridaySchedule",
-          "label": "Horario del viernes que quedó guardado"
+          "label": "Horario del viernes que quedó guardado",
+          "placeholder": "Ej. 2:00 p.m. a 5:00 p.m.",
+          "required": true,
+          "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d\\s?([aApP]\\.?\\s?[mM]\\.?)?\\s*(a|-|–|—)\\s*([01]?\\d|2[0-3]):[0-5]\\d\\s?([aApP]\\.?\\s?[mM]\\.?)?$",
+          "patternHint": "Escribe la hora en que abre y la hora en que cierra, por ejemplo 2:00 p.m. a 5:00 p.m.",
+          "maxLength": 40
         },
         {
           "id": "horarioListoTime",
-          "label": "Hora en que avisé HORARIO LISTO",
-          "type": "time"
+          "label": "Hora en que terminé E02",
+          "type": "time",
+          "required": true,
+          "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d(\\s?[aApP]\\.?\\s?[mM]\\.?)?$",
+          "patternHint": "Escribe la hora y los minutos, por ejemplo 2:15 p.m.",
+          "maxLength": 11
         }
       ]
     },
     {
       "id": "E03",
       "title": "Da de alta a tus repartidores",
-      "when": "Después de E02 y antes de preparar tu sucursal (E04).",
+      "when": "Después de E02.",
       "where": "Barra de abajo de la app › **Más** › sección **Equipo** › **Repartidores**.",
       "warnings": [
-        "Mesa de control te manda por WhatsApp los datos de cada repartidor: nombre, correo y teléfono. Da de alta a todos los que te indique."
+        "Mesa de control te entrega los datos de cada repartidor: nombre, correo y teléfono. Da de alta a todos los que te indique."
       ],
       "steps": [
         {
@@ -426,7 +511,7 @@
         },
         {
           "id": "4",
-          "text": "Escribe **Nombre (4)**, **Apellido paterno (5)**, el apellido materno si lo tiene, **Correo (6)** y **Teléfono (7)**, tal como te los mandó Mesa de control. Deja la lada en +52.",
+          "text": "Escribe **Nombre (4)**, **Apellido paterno (5)**, el apellido materno si lo tiene, **Correo (6)** y **Teléfono (7)**, tal como te los entregó Mesa de control. Deja la lada en +52.",
           "image": "/guides/establecimiento-app/e03-10-alta-faltan.jpg",
           "caption": "4 a 7 = datos del repartidor · 8 = Dar de alta"
         },
@@ -438,109 +523,150 @@
         },
         {
           "id": "6",
-          "text": "Repite con cada repartidor. En **Tu equipo hoy (2)**, **Activos** debe subir en el número de repartidores que diste de alta.",
+          "text": "Repite con cada repartidor. En **Tu equipo hoy (2)**, **Activos** debe mostrar cuántos diste de alta.",
           "image": "/guides/establecimiento-app/e03-09-repartidores.jpg",
           "caption": "2 = Activos y Disponibles ahora · 3 = Dar de alta"
-        },
-        {
-          "id": "7",
-          "text": "Avisa en el grupo: **REPARTIDORES LISTOS - Sucursal (tu sucursal)**."
         },
         {
           "id": "8",
-          "text": "Cuando cada repartidor entre a su app y toque **Disponible**, debe subir **Disponibles ahora (2)**.",
+          "text": "Cuando cada repartidor entre a su app y toque **Disponible**, debe subir **Disponibles ahora (2)**. Si aún no entran, sigue con E04 y revisa esto después.",
           "image": "/guides/establecimiento-app/e03-09-repartidores.jpg",
-          "caption": "2 = Activos y Disponibles ahora · 3 = Dar de alta"
+          "caption": "2 = Activos y Disponibles ahora · 3 = Dar de alta",
+          "conditional": true
         }
       ],
       "expected": [
         "Con los datos vacíos, la app no me dejó guardar y marcó los campos que faltan.",
         "Cada repartidor aparece en la lista con su nombre, correo y teléfono correctos.",
-        "Activos subió en tantos repartidores como di de alta.",
-        "Cuando un repartidor tocó Disponible en su app, subió Disponibles ahora."
+        "Activos muestra cuántos repartidores di de alta.",
+        {
+          "text": "Cuando un repartidor tocó Disponible en su app, subió Disponibles ahora.",
+          "conditional": true
+        }
       ],
       "fields": [
         {
           "id": "couriersCount",
           "label": "Repartidores que di de alta (cuántos)",
-          "type": "number"
+          "type": "number",
+          "required": true,
+          "pattern": "^\\d{1,2}$",
+          "patternHint": "Escribe solo el número, por ejemplo 3.",
+          "maxLength": 2
         },
         {
           "id": "repListosTime",
-          "label": "Hora en que avisé REPARTIDORES LISTOS",
-          "type": "time"
+          "label": "Hora en que terminé E03",
+          "type": "time",
+          "required": true,
+          "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d(\\s?[aApP]\\.?\\s?[mM]\\.?)?$",
+          "patternHint": "Escribe la hora y los minutos, por ejemplo 2:15 p.m.",
+          "maxLength": 11
         }
       ]
     },
     {
       "id": "E04",
       "title": "Prepara tu sucursal",
-      "when": "30 minutos antes de abrir. Tiene 5 partes (A a E).",
+      "when": "Después de E03. Tiene 5 partes (A a E). Al terminar mandas el único mensaje de la prueba.",
       "where": "Barra de abajo de la app: **Menú › pestaña Sucursal**, **Más › Promociones**, **Más › Costo de envío**, **Más › Cómo opera** y **Más › Horario**.",
       "warnings": [
-        "En la Parte C no toques **Borrar** (quita el producto del menú) ni **Deshacer**."
+        "Tu sucursal empieza **sin nada creado**: no hay categorías, productos, variantes ni complementos. Si ya ves productos o categorías, **no los borres**: repórtalo con **Reportar falla** antes de seguir."
       ],
-      "notes": "**Cómo leer la tabla de productos** (en la hoja de **Datos**): el precio de la ficha es el más bajo (Chica o Única). Los tamaños y los sabores van en **Variantes** (el cliente elige uno). Los extras van en **Complementos** (el cliente elige los que quiera).",
+      "notes": "**Variante** = el tamaño con su precio (va en **Variantes**; el cliente elige uno). **Complemento** = las opciones y extras: sabores, queso, tocino (va en **Complementos**). Dos reglas: primero la categoría y después el producto; cada cosa se crea una sola vez.",
       "steps": [
         {
           "id": "A1",
-          "text": "**Parte A · Crea los productos.** Ruta: barra de abajo de la app › **Menú** › pestaña **Sucursal**. Crea los 8 productos de la tabla de **Datos** (Productos que debes crear). Abajo se explica cómo crear la Pizza Hawaiana; los demás se crean igual, solo cambian los datos."
+          "text": "**Parte A · Crea tu menú desde cero.** Toca **Menú** en la barra de abajo y la pestaña **Sucursal (1)**. Debe decir «Aún no hay productos. Agrega el primero.» **(V)**.",
+          "image": "/guides/establecimiento-app/e04-11-menu-vacio.jpg",
+          "caption": "1 = pestaña Sucursal · C = crear categoría · V = menú vacío · 2 = Agregar producto"
         },
         {
           "id": "A2",
-          "text": "**Ejemplo, Pizza Hawaiana:** toca **Menú** en la barra de abajo y luego la pestaña **Sucursal (1)**.",
-          "image": "/guides/establecimiento-app/e04-11-menu.jpg",
-          "caption": "1 = pestaña Sucursal · 2 = Agregar producto"
+          "text": "Vas a crear **5 categorías**, **8 productos**, **1 grupo de variantes** y **6 grupos de complementos** (tablas en **Datos para tu sucursal**). Dos reglas: primero la categoría, después el producto; y cada cosa se crea una sola vez: si un producto necesita un grupo que ya creaste, lo eliges, no lo creas otra vez.",
+          "dataButton": true
         },
         {
           "id": "A3",
-          "text": "Toca **Agregar producto (2)**.",
-          "image": "/guides/establecimiento-app/e04-11-menu.jpg",
-          "caption": "1 = pestaña Sucursal · 2 = Agregar producto"
+          "text": "**Primero las 5 categorías:** toca arriba el ícono de **carpeta con + (C)**. Escribe **Pizzas** y guarda. Repite con **Hamburguesas**, **Botanas**, **Bebidas** y **Paquetes**.",
+          "image": "/guides/establecimiento-app/e04-11-menu-vacio.jpg",
+          "caption": "1 = pestaña Sucursal · C = crear categoría · V = menú vacío · 2 = Agregar producto",
+          "dataButton": true,
+          "warning": "Si el ícono de carpeta no te deja crear la categoría, repórtalo antes de crear productos."
         },
         {
           "id": "A4",
-          "text": "Escribe el **Nombre** «Pizza Hawaiana» **(3)** y el **Precio** 120 **(4)**. Deja encendido **Disponible hoy (5)**.",
+          "text": "**Pizza Hawaiana:** toca **Agregar producto (2)**. Escribe el **Nombre** «Pizza Hawaiana» **(3)** y el **Precio** 120 **(4)**. Deja encendido **Disponible hoy (5)**.",
           "image": "/guides/establecimiento-app/e04-12-producto1.jpg",
-          "caption": "3 = Nombre · 4 = Precio · 5 = Disponible hoy"
+          "caption": "3 = Nombre · 4 = Precio · 5 = Disponible hoy",
+          "dataButton": true
         },
         {
           "id": "A5",
-          "text": "Baja a **Categoría (6)** y elige «Pizzas». Si todavía no existe, deja «Nueva categoría…» y escribe Pizzas en **Nombre de la categoría nueva**. No crees dos veces la misma categoría.",
+          "text": "En **Categoría (6)** elige «Pizzas», la que ya creaste. No uses «Nueva categoría…».",
           "image": "/guides/establecimiento-app/e04-13-producto2.jpg",
-          "caption": "6 = Categoría · 7 = Variantes · 8 = Complementos · 9 = Agregar al menú"
+          "caption": "6 = Categoría · 7 = Variantes · 8 = Complementos · 9 = Agregar al menú",
+          "dataButton": true
         },
         {
           "id": "A6",
-          "text": "Toca **Variantes (7)** (se abre una ventana llamada «Variaciones»).",
-          "image": "/guides/establecimiento-app/e04-13-producto2.jpg",
-          "caption": "6 = Categoría · 7 = Variantes · 8 = Complementos · 9 = Agregar al menú"
+          "text": "**Variante:** toca **Variantes (7)** (se abre la ventana «Variaciones») y luego **Crear grupo (G)**. Nómbralo «Tamaño de pizza», deja **una, obligatoria** y agrega **Chica 0**, **Mediana 30** y **Grande 60**. Guárdalo, revisa que quede elegido y toca **Listo (L)**.",
+          "image": "/guides/establecimiento-app/e04-14-variaciones-crear.jpg",
+          "caption": "T = Tamaño de pizza · G = Crear grupo · L = Listo. Los grupos de la imagen son de ejemplo: en tu sucursal la lista empieza vacía.",
+          "dataButton": true
         },
         {
           "id": "A7",
-          "text": "En la lista elige **Tamaño de pizza (T)**: Chica, Mediana +$30, Grande +$60. Toca **Listo (L)**. Si no existe, toca **Crear grupo** y agrégalo con esos precios. Para Alitas elige **Sabor de alitas (3)** y para Refresco **Sabor del refresco 600 ml (3)**, no el grupo de 6 sabores «Sabor del refresco».",
-          "image": "/guides/establecimiento-app/e04-14-variaciones.jpg",
-          "caption": "T = Tamaño de pizza · L = Listo"
+          "text": "**Complemento:** toca **Complementos (8)** y luego **Crear grupo**. Nómbralo «Extras pizza Hawaiana», déjalo **opcional** y agrega **Queso extra 20** y **Orilla rellena 30**. Guárdalo y toca **Listo**.",
+          "image": "/guides/establecimiento-app/e04-13-producto2.jpg",
+          "caption": "6 = Categoría · 7 = Variantes · 8 = Complementos · 9 = Agregar al menú",
+          "dataButton": true
         },
         {
           "id": "A8",
-          "text": "Toca **Complementos (8)** y elige **Extras pizza Hawaiana** (Queso extra $20 · Orilla rellena $30). Si no existe, créalo igual.",
-          "image": "/guides/establecimiento-app/e04-13-producto2.jpg",
-          "caption": "6 = Categoría · 7 = Variantes · 8 = Complementos · 9 = Agregar al menú"
+          "text": "Toca **Agregar al menú (9)**. La pizza aparece en la categoría **Pizzas (2)**.",
+          "image": "/guides/establecimiento-app/e04-15-menu-sucursal.jpg",
+          "caption": "1 = pestaña Sucursal · 2 = producto ya guardado en su categoría (la imagen muestra Papas como ejemplo)",
+          "dataButton": true
         },
         {
           "id": "A9",
-          "text": "Toca **Agregar al menú (9)**. La pizza aparece en su categoría (2).",
-          "image": "/guides/establecimiento-app/e04-15-menu-sucursal.jpg",
-          "caption": "1 = pestaña Sucursal · 2 = producto ya guardado en su categoría (la imagen muestra Papas como ejemplo)"
+          "text": "**Los otros 7 productos:** toca **Agregar producto** y llena la ficha con los datos de la tabla. Su categoría ya existe: elígela en **Categoría**.",
+          "dataButton": true
         },
         {
           "id": "A10",
-          "text": "Repite con los demás productos de la tabla. Para Alitas y Refresco el sabor va en **Variantes**: en Alitas elige **Sabor de alitas (3)**; en Refresco elige **Sabor del refresco 600 ml (3)**, no el grupo de 6 sabores «Sabor del refresco»."
+          "text": "Si su grupo **ya lo creaste** (la Pepperoni usa «Tamaño de pizza»): en **Variantes** o **Complementos** elígelo de la lista **Usar uno que ya tienes** y toca **Listo**. No lo crees otra vez.",
+          "dataButton": true
+        },
+        {
+          "id": "A11",
+          "text": "Si su grupo **todavía no existe** (por ejemplo «Sabor de alitas»): en **Complementos** toca **Crear grupo** y créalo con la tabla de grupos. Para los sabores pon que el cliente elija **mínimo 1 y máximo 1**.",
+          "dataButton": true
+        },
+        {
+          "id": "A12",
+          "text": "El **Agua de limón** y el **Paquete fiesta** no llevan grupos. En cada producto toca **Agregar al menú**. Al final revisa que estén los **8 productos**.",
+          "dataButton": true
+        },
+        {
+          "id": "A-OK",
+          "text": "Antes de seguir, confirma que terminaste la Parte A.",
+          "checkpoint": {
+            "title": "Parte A · Tu menú quedó completo",
+            "items": [
+              "Creé las 5 categorías: Pizzas, Hamburguesas, Botanas, Bebidas y Paquetes, cada una una sola vez.",
+              "Creé los 8 productos de la tabla, cada uno en su categoría y con su precio.",
+              "Creé 1 grupo de variantes («Tamaño de pizza») y 6 grupos de complementos, cada uno una sola vez.",
+              "Las 2 pizzas tienen «Tamaño de pizza» con Chica, Mediana y Grande, y cada una su grupo de extras.",
+              "Las Alitas y el Refresco piden elegir 1 sabor; el Agua y el Paquete no tienen grupos.",
+              "No hay categorías, productos ni grupos repetidos."
+            ]
+          }
         },
         {
           "id": "B1",
-          "text": "**Parte B · Crea la promoción** Pizza Hawaiana 20 % (después de crear los productos de la Parte A). Ruta: barra de abajo › **Más** › **Promociones**. Toca **Agregar (1)**.",
+          "text": "**Parte B · Crea la promoción Pizza Hawaiana 20 %** (hazlo después de crear los productos de la Parte A). Ruta: barra de abajo › **Más** › **Promociones**. Toca **Agregar (1)**.",
           "image": "/guides/establecimiento-app/e04-16-promos.jpg",
           "caption": "1 = Agregar"
         },
@@ -554,25 +680,29 @@
           "id": "B3",
           "text": "Escribe el **Nombre** «Pizza Hawaiana 20 %» **(3)**. En **Tipo** deja «Porcentaje» **(4)** y escribe 20 **(5)**.",
           "image": "/guides/establecimiento-app/e04-18-promo1.jpg",
-          "caption": "3 = Nombre · 4 = Tipo · 5 = cuánto · 6 = Solo el producto base"
+          "caption": "3 = Nombre · 4 = Tipo · 5 = cuánto · 6 = Solo el producto base",
+          "dataButton": true
         },
         {
           "id": "B4",
           "text": "En **¿Sobre qué se aplica?** elige **Solo el producto base (6)**: así baja el precio de la pizza y los tamaños y extras cuestan igual.",
           "image": "/guides/establecimiento-app/e04-18-promo1.jpg",
-          "caption": "3 = Nombre · 4 = Tipo · 5 = cuánto · 6 = Solo el producto base"
+          "caption": "3 = Nombre · 4 = Tipo · 5 = cuánto · 6 = Solo el producto base",
+          "dataButton": true
         },
         {
           "id": "B5",
           "text": "En **A qué se aplica (7)** elige «Unos productos» y marca la Pizza Hawaiana de PIZZAS. Si aparece otra «Hawaiana», no la marques.",
           "image": "/guides/establecimiento-app/e04-19-promo2.jpg",
-          "caption": "7 = A qué se aplica · 8 = importe mínimo vacío · 9 = vigencia · 10 = Guardar"
+          "caption": "7 = A qué se aplica · 8 = importe mínimo vacío · 9 = vigencia · 10 = Guardar",
+          "dataButton": true
         },
         {
           "id": "B6",
           "text": "Deja vacío **Aplica cuando el pedido sea de al menos (8)** y apagadas las fechas de **Vigencia (9)**.",
           "image": "/guides/establecimiento-app/e04-19-promo2.jpg",
-          "caption": "7 = A qué se aplica · 8 = importe mínimo vacío · 9 = vigencia · 10 = Guardar"
+          "caption": "7 = A qué se aplica · 8 = importe mínimo vacío · 9 = vigencia · 10 = Guardar",
+          "dataButton": true
         },
         {
           "id": "B7",
@@ -582,6 +712,19 @@
           "evidence": true
         },
         {
+          "id": "B-OK",
+          "text": "Antes de seguir, confirma que terminaste la Parte B.",
+          "checkpoint": {
+            "title": "Parte B · La promoción quedó lista",
+            "items": [
+              "Guardé la promoción «Pizza Hawaiana 20 %» con Tipo Porcentaje y 20.",
+              "Se aplica solo al producto base de la Pizza Hawaiana de PIZZAS.",
+              "Dejé vacío el importe mínimo y apagadas las fechas de Vigencia.",
+              "La promoción aparece en Promociones como vigente y tomé la captura."
+            ]
+          }
+        },
+        {
           "id": "C1",
           "text": "**Parte C · Marca como agotada la Hamburguesa doble carne.** Ruta: barra de abajo › **Menú** › pestaña **Sucursal**. Busca «Hamburguesa doble carne»."
         },
@@ -589,68 +732,115 @@
           "id": "C2",
           "text": "Toca los **tres puntos (1)** del producto y elige **Marcar agotado (2)**.",
           "image": "/guides/establecimiento-app/e04-20-menu-opciones.jpg",
-          "caption": "1 = tres puntos del producto · 2 = Marcar agotado (la imagen muestra Papas como ejemplo)"
+          "caption": "1 = tres puntos del producto · 2 = Marcar agotado (la imagen muestra Papas como ejemplo)",
+          "warning": "No toques **Borrar**: quita el producto del menú."
         },
         {
           "id": "C3",
           "text": "Revisa que aparezca la etiqueta naranja **Agotado (3)** y el aviso de abajo. No toques **Deshacer (5)**. Toma una captura.",
           "image": "/guides/establecimiento-app/e04-21-papas-agotadas.jpg",
-          "caption": "3 = etiqueta Agotado · 4 = volver a ofrecer (no tocar ahora) · 5 = Deshacer (no tocar) (la imagen muestra Papas como ejemplo; tú verás Hamburguesa doble carne)",
+          "caption": "3 = etiqueta Agotado · 4 = volver a ofrecer (no tocar ahora) · 5 = Deshacer (no tocar). La imagen es de otro producto; en la tuya debe decir Hamburguesa doble carne.",
           "evidence": true
         },
         {
+          "id": "C-OK",
+          "text": "Antes de seguir, confirma que terminaste la Parte C.",
+          "checkpoint": {
+            "title": "Parte C · La hamburguesa quedó agotada",
+            "items": [
+              "La Hamburguesa doble carne muestra la etiqueta naranja «Agotado».",
+              "No toqué Borrar, volver a ofrecer ni Deshacer.",
+              "Tomé la captura."
+            ]
+          }
+        },
+        {
           "id": "D1",
-          "text": "**Parte D · Revisa el costo de envío.** Ruta: barra de abajo › **Más** › **Costo de envío**. Revisa o escribe: **Tarifa base** 25 **(1)**, **Kilómetros incluidos** 1 **(2)**, **Cada kilómetro adicional** 10 **(3)**.",
+          "text": "**Parte D · Escribe el costo de envío.** Ruta: barra de abajo › **Más** › **Costo de envío**. Escribe: **Tarifa base** 25 **(1)**, **Kilómetros incluidos** 1 **(2)**, **Cada kilómetro adicional** 10 **(3)**.",
           "image": "/guides/establecimiento-app/e04-22-envio1.jpg",
-          "caption": "1 a 5 = datos del envío"
+          "caption": "1 a 5 = datos del envío",
+          "dataButton": true
         },
         {
           "id": "D2",
-          "text": "Revisa o escribe **Radio de entrega** 3 **(4)**. La imagen muestra 2 km: tú debes cambiarlo a 3. Deja vacío **Envío gratis a partir de (5)**.",
+          "text": "Escribe **Radio de entrega** 3 **(4)**. La imagen muestra 2 km: tú debes cambiarlo a 3. Deja vacío **Envío gratis a partir de (5)**.",
           "image": "/guides/establecimiento-app/e04-22-envio1.jpg",
-          "caption": "1 a 5 = datos del envío"
+          "caption": "1 a 5 = datos del envío",
+          "dataButton": true
         },
         {
           "id": "D3",
-          "text": "Si cambiaste algo, toca **Guardar cambios**, el botón morado abajo de la pantalla. No toques **Quitar tarifas (7)**.",
+          "text": "Toca **Guardar cambios**, el botón morado de abajo.",
           "image": "/guides/establecimiento-app/e04-23-envio2.jpg",
-          "caption": "6 = así se cobraría · 7 = Quitar tarifas (no tocar)"
+          "caption": "6 = así se cobraría · 7 = Quitar tarifas (no tocar)",
+          "warning": "No toques **Quitar tarifas (7)**."
         },
         {
           "id": "D4",
           "text": "Revisa **Así se cobraría (6)**: A 1 km $25 · A 2 km $35 · A 3 km $45. La imagen no tiene el renglón A 3 km $45, pero el tuyo sí debe mostrarlo.",
           "image": "/guides/establecimiento-app/e04-23-envio2.jpg",
-          "caption": "6 = así se cobraría · 7 = Quitar tarifas (no tocar)"
+          "caption": "6 = así se cobraría · 7 = Quitar tarifas (no tocar)",
+          "dataButton": true
         },
         {
           "id": "D5",
           "text": "Sal y vuelve a entrar a **Costo de envío** para revisar que los números se quedaron."
         },
         {
+          "id": "D-OK",
+          "text": "Antes de seguir, confirma que terminaste la Parte D.",
+          "checkpoint": {
+            "title": "Parte D · El envío quedó guardado",
+            "items": [
+              "Radio de entrega de 3 km.",
+              "«Así se cobraría» muestra A 1 km $25 · A 2 km $35 · A 3 km $45.",
+              "Envío gratis a partir de quedó vacío.",
+              "Al salir y volver a entrar a Costo de envío, los valores se conservaron."
+            ]
+          }
+        },
+        {
           "id": "E1",
-          "text": "**Parte E · Revisa tiempo para confirmar, pagos, topes y horario.** Ruta: barra de abajo › **Más** › **Cómo opera**. Baja hasta **Pagos**: **Aceptar pago con tarjeta en tu app (1)** debe estar encendido (se ve en gris claro porque solo el representante legal puede cambiarlo). Solo revísalo.",
+          "text": "**Parte E · Revisa tiempo para confirmar, pagos, topes y horario.** Ruta: barra de abajo › **Más** › **Cómo opera**. Baja hasta **Pagos**: **Aceptar pago con tarjeta en tu app (1)** debe estar encendido. Lo deja listo el representante legal: solo revísalo.",
           "image": "/guides/establecimiento-app/e04-24-pagos-plazo.jpg",
-          "caption": "1 = pago con tarjeta · 2 = 5 minutos para confirmar"
+          "caption": "1 = pago con tarjeta · 2 = 5 minutos para confirmar",
+          "dataButton": true
         },
         {
           "id": "E2",
           "text": "En **Plazo para confirmar**, **Minutos para confirmar (2)** debe decir 5. Si dice otro número, escribe 5 y guarda.",
           "image": "/guides/establecimiento-app/e04-24-pagos-plazo.jpg",
-          "caption": "1 = pago con tarjeta · 2 = 5 minutos para confirmar"
+          "caption": "1 = pago con tarjeta · 2 = 5 minutos para confirmar",
+          "dataButton": true
         },
         {
           "id": "E3",
           "text": "Revisa que los **Topes del pedido (3)** digan $1,000.00 y $700.00.",
           "image": "/guides/establecimiento-app/e04-25-topes.jpg",
-          "caption": "3 = topes del pedido"
+          "caption": "3 = topes del pedido",
+          "dataButton": true
         },
         {
           "id": "E4",
-          "text": "Toca **Más** › **Horario** y revisa que el viernes siga de 2:00 p.m. a 5:00 p.m. (lo configuraste en E02)."
+          "text": "Toca **Más** › **Horario** y revisa que el viernes siga con el horario que configuraste en E02. Si cambió, repórtalo con **Reportar falla**."
         },
         {
           "id": "E5",
-          "text": "Envía al grupo: **LISTA - Sucursal (tu sucursal)**."
+          "text": "Envía al grupo de WhatsApp: **Sucursal (nombre de tu sucursal) lista**. Es el único mensaje que mandas en la prueba."
+        },
+        {
+          "id": "E-OK",
+          "text": "Para cerrar E04, confirma que terminaste la Parte E.",
+          "checkpoint": {
+            "title": "Parte E · Tu sucursal quedó lista",
+            "items": [
+              "Minutos para confirmar: 5.",
+              "Aceptar pago con tarjeta en tu app está encendido.",
+              "Topes del pedido: $1,000.00 (pedido máximo) y $700.00 (máximo en efectivo).",
+              "El horario del viernes sigue como lo configuré en E02.",
+              "Envié al grupo: Sucursal (nombre de mi sucursal) lista."
+            ]
+          }
         }
       ],
       "expected": [
@@ -662,7 +852,7 @@
         "La Hamburguesa doble carne muestra «Agotado».",
         "Radio de 3 km y tarifas de $25 / $35 / $45.",
         "Envío gratis a partir de queda vacío.",
-        "Después de actualizar la pantalla (desliza hacia abajo), los valores se conservaron.",
+        "Después de salir y volver a entrar a Costo de envío, los valores se conservaron.",
         "Tiempo para aceptar: 5 minutos.",
         "Pago con tarjeta activo.",
         "Pedido máximo de $1,000 y máximo en efectivo de $700.",
@@ -671,50 +861,61 @@
       "fields": [
         {
           "id": "pending",
-          "label": "¿Quedó algo pendiente? ¿Qué?"
+          "label": "¿Quedó algo pendiente? ¿Qué?",
+          "maxLength": 500
         },
         {
           "id": "listoTime",
-          "label": "Hora en que envié LISTA",
-          "type": "time"
+          "label": "Hora en que terminé E04",
+          "type": "time",
+          "required": true,
+          "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d(\\s?[aApP]\\.?\\s?[mM]\\.?)?$",
+          "patternHint": "Escribe la hora y los minutos, por ejemplo 2:15 p.m.",
+          "maxLength": 11
         }
       ]
     },
     {
       "id": "E05",
       "title": "Abre la sucursal",
-      "when": "Después de enviar LISTA, cuando Mesa de control lo indique.",
+      "when": "Después de E04.",
       "where": "Estado de la sucursal, arriba en cualquier pantalla de la app.",
       "steps": [
         {
           "id": "1",
-          "text": "Mira el estado de arriba **(1)**: si dice **Abierta · cierra (hora)** en verde, está bien. Si dice **Cerrada**, avisa en el grupo.",
-          "image": "/guides/establecimiento-app/e05-26-estado.jpg",
-          "caption": "1 = sucursal Abierta y hora de cierre · 2 = Cancelar · 3 = Cerrar ahora (no tocar)"
+          "text": "Mientras preparas tu sucursal, el estado de arriba **(1)** puede decir **Cerrada**. Es normal."
         },
         {
           "id": "2",
-          "text": "Si tocas el estado sale una ventana: toca **Cancelar (2)**. No toques **Cerrar ahora (3)**: cierra tu sucursal el resto del día.",
+          "text": "Cuando llegue la hora de apertura que pusiste en E02, el estado debe cambiar solo a **Abierta**, sin que toques nada. Si sigue **Cerrada** después de esa hora, desliza la pantalla hacia abajo para actualizarla; si sigue igual, toca **No pude**.",
           "image": "/guides/establecimiento-app/e05-26-estado.jpg",
-          "caption": "1 = sucursal Abierta y hora de cierre · 2 = Cancelar · 3 = Cerrar ahora (no tocar)"
+          "caption": "1 = estado de la sucursal · 2 = Cancelar · 3 = Cerrar ahora (no tocar)"
         },
         {
           "id": "3",
+          "text": "Si tocas el estado sale una ventana: toca **Cancelar (2)**.",
+          "image": "/guides/establecimiento-app/e05-26-estado.jpg",
+          "caption": "1 = estado de la sucursal · 2 = Cancelar · 3 = Cerrar ahora (no tocar)",
+          "warning": "No toques **Cerrar ahora (3)**."
+        },
+        {
+          "id": "4",
           "text": "Toca la campana de arriba: revisa que **Avisos con sonido (4)** esté encendido y que diga **En vivo**. Sube el volumen del celular.",
           "image": "/guides/establecimiento-app/e05-27-actividad.jpg",
           "caption": "4 = avisos con sonido"
         },
         {
-          "id": "4",
-          "text": "Toma una captura y envía al grupo: **ABIERTA - Sucursal (tu sucursal)**.",
+          "id": "5",
+          "text": "Toma una captura del estado **Abierta**.",
           "evidence": true
         },
         {
-          "id": "5",
-          "text": "Deja la app abierta en **Pedidos** y espera el primer pedido: debe sonar, salir un aviso y un número rojo en la campana."
+          "id": "6",
+          "text": "Deja la app abierta en **Pedidos**. Cuando empiecen a llegar pedidos, cada uno debe sonar, mostrar un aviso y poner un número rojo en la campana."
         }
       ],
       "expected": [
+        "A la hora de apertura, la sucursal pasó sola a Abierta.",
         "La sucursal aparece como Abierta.",
         "Los pedidos llegaron sin actualizar la pantalla.",
         "Cada pedido nuevo sonó y mostró un aviso."
@@ -723,12 +924,20 @@
         {
           "id": "openTime",
           "label": "Hora de apertura",
-          "type": "time"
+          "type": "time",
+          "required": true,
+          "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d(\\s?[aApP]\\.?\\s?[mM]\\.?)?$",
+          "patternHint": "Escribe la hora y los minutos, por ejemplo 2:15 p.m.",
+          "maxLength": 11
         },
         {
           "id": "firstOrderTime",
           "label": "Hora del primer pedido",
-          "type": "time"
+          "type": "time",
+          "required": true,
+          "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d(\\s?[aApP]\\.?\\s?[mM]\\.?)?$",
+          "patternHint": "Escribe la hora y los minutos, por ejemplo 2:15 p.m.",
+          "maxLength": 11
         }
       ]
     },
@@ -745,23 +954,24 @@
           "id": "1",
           "text": "Cuando llega un pedido sale un aviso **(5)** y arriba dice «pedido esperando tu respuesta».",
           "image": "/guides/establecimiento-app/e06-29-aviso-pedido.jpg",
-          "caption": "5 = aviso de pedido nuevo"
+          "caption": "5 = aviso de pedido nuevo",
+          "warning": "No toques **Crear pedido**."
         },
         {
           "id": "2",
           "text": "Revisa el nombre del cliente y el folio **(1)**.",
           "image": "/guides/establecimiento-app/e06-28-por-confirmar.jpg",
-          "caption": "1 = cliente y folio · 2 = tiempo para responder · 3 = sonido activo · 4 = Rechazar / Confirmar La pantalla puede verse un poco distinta."
+          "caption": "1 = cliente y folio · 2 = tiempo para responder · 3 = sonido activo · 4 = Rechazar / Confirmar. La pantalla puede verse un poco distinta."
         },
         {
           "id": "3",
           "text": "Fíjate en el **tiempo que queda para responder (2)**. «Sonando · silenciar» **(3)** indica que el sonido está activo.",
           "image": "/guides/establecimiento-app/e06-28-por-confirmar.jpg",
-          "caption": "1 = cliente y folio · 2 = tiempo para responder · 3 = sonido activo · 4 = Rechazar / Confirmar La pantalla puede verse un poco distinta."
+          "caption": "1 = cliente y folio · 2 = tiempo para responder · 3 = sonido activo · 4 = Rechazar / Confirmar. La pantalla puede verse un poco distinta."
         },
         {
           "id": "4",
-          "text": "Toca el pedido para abrirlo: arriba dice el folio y la sucursal. Si es de otra sucursal, no lo confirmes ni lo rechaces y avisa el folio en el grupo."
+          "text": "Toca el pedido para abrirlo: arriba dice el folio y la sucursal. Si es de otra sucursal, no lo confirmes ni lo rechaces: toca **Reportar falla** y escribe el folio."
         }
       ],
       "expected": [
@@ -770,14 +980,18 @@
       "fields": [
         {
           "id": "otherFolios",
-          "label": "Folios de otra sucursal (si hubo)"
+          "label": "Folios de otra sucursal (si hubo)",
+          "placeholder": "Ej. 261120-0004, 261120-0007",
+          "pattern": "^#?\\d{6}-\\d{4}([,;\\s]+#?\\d{6}-\\d{4})*[,;\\s]*$",
+          "patternHint": "Escribe cada folio como 261120-0004, separados por coma.",
+          "maxLength": 200
         }
       ]
     },
     {
       "id": "E07",
       "title": "Confirma y avanza los pedidos",
-      "when": "Con cada pedido, excepto los que Mesa de control indique para E08 y E09.",
+      "when": "Con cada pedido. Excepto los 3 pedidos que elijas para E08 y E09.",
       "where": "Barra de abajo de la app › **Pedidos**.",
       "warnings": [
         "No toques **Reasignar** ni **Quitar asignación**: cuando el pedido está en **Asignado**, **En ruta** o **Entregado**, lo mueve el repartidor."
@@ -788,7 +1002,7 @@
           "id": "1",
           "text": "En el pedido nuevo toma una captura con los botones **Rechazar** y **Confirmar (4)**.",
           "image": "/guides/establecimiento-app/e06-28-por-confirmar.jpg",
-          "caption": "1 = cliente y folio · 2 = tiempo para responder · 3 = sonido activo · 4 = Rechazar / Confirmar La pantalla puede verse un poco distinta.",
+          "caption": "1 = cliente y folio · 2 = tiempo para responder · 3 = sonido activo · 4 = Rechazar / Confirmar. La pantalla puede verse un poco distinta.",
           "evidence": true
         },
         {
@@ -799,30 +1013,30 @@
           "id": "3",
           "text": "Elige el **Tiempo de preparación (1)**: toca **10 minutos** (el diálogo ofrece 10, 15, 20, 30 u Otro).",
           "image": "/guides/establecimiento-app/e07-30-confirmar-tiempo.jpg",
-          "caption": "1 = tiempo de preparación · 2 = Confirmar La pantalla puede verse un poco distinta."
+          "caption": "1 = tiempo de preparación · 2 = Confirmar. La pantalla puede verse un poco distinta."
         },
         {
           "id": "4",
           "text": "Toca **Confirmar** arriba a la derecha **(2)**.",
           "image": "/guides/establecimiento-app/e07-30-confirmar-tiempo.jpg",
-          "caption": "1 = tiempo de preparación · 2 = Confirmar La pantalla puede verse un poco distinta."
+          "caption": "1 = tiempo de preparación · 2 = Confirmar. La pantalla puede verse un poco distinta."
         },
         {
           "id": "5",
-          "text": "En UN SOLO pedido: al confirmarlo, escribe en el grupo **EN PREPARACIÓN 5 MIN - Folio (número) - Sucursal (tu sucursal)** y espera 5 minutos sin tocar **Marcar listo**. Los 5 minutos son lo que tú esperas antes de tocar **Marcar listo**; no los elijas en el diálogo. El cliente intentará cancelarlo; a ti no debe cancelársete."
+          "text": "Con todos los pedidos: después de confirmar, espera unos 5 minutos antes de tocar **Marcar listo**. En ese tiempo el cliente prueba que ya no puede cancelarlo. En el diálogo elige 10 minutos de preparación."
         },
         {
           "id": "6",
           "text": "El pedido pasa a **pedidos en la cocina (3)**. Cuando esté empacado, toca **Marcar listo (4)** y toma una captura.",
           "image": "/guides/establecimiento-app/e07-31-en-cocina.jpg",
-          "caption": "3 = pedidos en la cocina · 4 = Marcar listo La pantalla puede verse un poco distinta.",
+          "caption": "3 = pedidos en la cocina · 4 = Marcar listo. La pantalla puede verse un poco distinta.",
           "evidence": true
         },
         {
           "id": "7",
-          "text": "Después de **Marcar listo**, abre el pedido y copia las horas en la **Hoja de pedidos**. En **Estado (5)** deben salir Creado, Confirmado por la sucursal y Listo para salir (la imagen es de antes de marcar listo). No copies «Listo a las»: es solo la hora estimada.",
+          "text": "Después de **Marcar listo**, abre el pedido y anótalo en la **Hoja de pedidos**, un renglón por pedido. Las horas están en **Estado (5)**: deben salir Creado, Confirmado por la sucursal y Listo para salir (la imagen es de antes de marcar listo). No copies «Listo a las»: es solo la hora estimada. Si un paso no aplicó, déjalo vacío.",
           "image": "/guides/establecimiento-app/e07-32-detalle-preparacion.jpg",
-          "caption": "5 = estado y horas del pedido · 6 = Cancelar La pantalla puede verse un poco distinta."
+          "caption": "5 = estado y horas del pedido · 6 = Cancelar. La pantalla puede verse un poco distinta."
         }
       ],
       "expected": [
@@ -834,33 +1048,35 @@
       "fields": [
         {
           "id": "orderSheet",
-          "label": "Hoja de pedidos: un pedido por renglón (folio, llegó, confirmé, listo para salir, repartidor, entregado o estado final, notas)",
-          "placeholder": "Ej. 261120-0004 · 3:14 · 3:17 · 3:18 · 3:31 Carlos · Entregado 3:35 · -"
+          "label": "Hoja de pedidos",
+          "type": "orders",
+          "required": true
         }
       ]
     },
     {
       "id": "E08",
       "title": "Rechaza un pedido y cancela otro",
-      "when": "Solo cuando Mesa de control envíe «E08 - Rechaza el folio…» o «E08 - Cancela el folio…».",
+      "when": "Con 2 pedidos que tú elijas: uno lo rechazas y otro lo confirmas y luego lo cancelas. Puede ser cualquier pedido; los demás, atiéndelos normal (E07).",
       "where": "Barra de abajo de la app › **Pedidos**.",
-      "notes": "**Rechazar** = pedido nuevo que aún no confirmas. **Cancelar** = pedido que ya confirmaste. El cliente lee el motivo tal cual. Escribir «ab» es una prueba: la app no debe aceptar motivos de menos de 3 letras. Si dice **Pagó en la app · reembolsado**, es normal: el sistema devuelve solo el pago con tarjeta al cliente.",
+      "notes": "Usa pedidos distintos para rechazar, para cancelar y para dejar sin responder (E09). **Rechazar** = pedido nuevo que aún no confirmas. **Cancelar** = pedido que ya confirmaste. El cliente lee el motivo tal cual. Escribir «ab» es una prueba: la app no debe aceptar motivos de menos de 3 letras. Si dice **Pagó en la app · reembolsado**, es normal: el sistema devuelve solo el pago con tarjeta al cliente.",
       "steps": [
         {
           "id": "1",
-          "text": "**Rechazar:** en el pedido con el folio indicado toca **Rechazar**."
+          "text": "**Rechazar:** elige un pedido nuevo que todavía no hayas confirmado y toca **Rechazar**."
         },
         {
           "id": "2",
-          "text": "Elige un motivo de la lista **(1)**, por ejemplo «La sucursal está saturada en este momento».",
+          "text": "En la lista de motivos **(1)** elige **Otro motivo**.",
           "image": "/guides/establecimiento-app/e08-33-rechazo-motivo.jpg",
           "caption": "1 = motivos · 2 = Rechazar el pedido"
         },
         {
           "id": "3",
-          "text": "Si eliges **Otro motivo**, escribe solo **ab** y revisa que no te deje seguir; luego escribe **Prueba: producto no disponible**.",
+          "text": "Escribe solo **ab**: **Rechazar el pedido** no debe dejarte seguir. Toma una captura. Luego borra «ab» y escribe **Prueba: producto no disponible**.",
           "image": "/guides/establecimiento-app/e08-33-rechazo-motivo.jpg",
-          "caption": "1 = motivos · 2 = Rechazar el pedido"
+          "caption": "1 = motivos · 2 = Rechazar el pedido",
+          "evidence": true
         },
         {
           "id": "4",
@@ -869,18 +1085,14 @@
           "caption": "3 = aviso de rechazo y reembolso"
         },
         {
-          "id": "5",
-          "text": "Avisa: **LISTO E08 - Folio (número) rechazado - Sucursal (tu sucursal)**."
-        },
-        {
           "id": "6",
-          "text": "**Cancelar:** en el pedido con el folio indicado toca **Confirmar** (con su tiempo de preparación)."
+          "text": "**Cancelar:** elige otro pedido, toca **Confirmar** y elige 10 minutos."
         },
         {
           "id": "7",
           "text": "Abre el pedido y toca **Cancelar**, arriba a la derecha **(6)**.",
           "image": "/guides/establecimiento-app/e07-32-detalle-preparacion.jpg",
-          "caption": "5 = estado y horas del pedido · 6 = Cancelar La pantalla puede verse un poco distinta."
+          "caption": "5 = estado y horas del pedido · 6 = Cancelar. La pantalla puede verse un poco distinta."
         },
         {
           "id": "8",
@@ -891,7 +1103,7 @@
         },
         {
           "id": "9",
-          "text": "Borra «ab», escribe **Prueba: producto no disponible** y toca **Confirmar**. En **Estado** debe decir **Cancelado** con tu motivo **(6)**. Avisa en el grupo.",
+          "text": "Borra «ab», escribe **Prueba: producto no disponible** y toca **Confirmar**. En **Estado** debe decir **Cancelado** con tu motivo **(6)**.",
           "image": "/guides/establecimiento-app/e08-36-cancelado.jpg",
           "caption": "6 = pedido Cancelado con su motivo"
         }
@@ -899,29 +1111,38 @@
       "expected": [
         "Con «ab», la app no permitió confirmar y explicó el motivo.",
         "Con el motivo válido, el pedido quedó como Rechazado o Cancelado.",
-        "El motivo quedó guardado en el pedido.",
-        "El cliente confirmó en el grupo que vio el cambio y recibió la notificación."
+        "El motivo quedó guardado en el pedido."
       ],
       "fields": [
         {
           "id": "rejectedFolio",
-          "label": "Folio rechazado y hora"
+          "label": "Folio rechazado y hora",
+          "placeholder": "Ej. 261120-0004 · 3:25 p.m.",
+          "required": true,
+          "pattern": "^#?\\d{6}-\\d{4}\\s*[·,\\-–—]?\\s*([01]?\\d|2[0-3]):[0-5]\\d(\\s?[aApP]\\.?\\s?[mM]\\.?)?$",
+          "patternHint": "Escribe el folio (6 números, guion y 4 números) y después la hora, por ejemplo 261120-0004 · 3:25 p.m.",
+          "maxLength": 30
         },
         {
           "id": "cancelledFolio",
-          "label": "Folio cancelado y hora"
+          "label": "Folio cancelado y hora",
+          "placeholder": "Ej. 261120-0004 · 3:25 p.m.",
+          "required": true,
+          "pattern": "^#?\\d{6}-\\d{4}\\s*[·,\\-–—]?\\s*([01]?\\d|2[0-3]):[0-5]\\d(\\s?[aApP]\\.?\\s?[mM]\\.?)?$",
+          "patternHint": "Escribe el folio (6 números, guion y 4 números) y después la hora, por ejemplo 261120-0004 · 3:25 p.m.",
+          "maxLength": 30
         }
       ]
     },
     {
       "id": "E09",
       "title": "Deja un pedido sin responder",
-      "when": "Solo cuando Mesa de control envíe «E09 - No respondas el folio…».",
+      "when": "Con un pedido que tú elijas, distinto de los de E08.",
       "where": "Barra de abajo de la app › **Pedidos**.",
       "steps": [
         {
           "id": "1",
-          "text": "Cuando entre el folio indicado, anota la hora y no lo toques. Deja abierta la pantalla **Pedidos**."
+          "text": "Elige un pedido nuevo, anota la hora y no lo toques. Deja abierta la pantalla **Pedidos** sin actualizarla."
         },
         {
           "id": "2",
@@ -939,83 +1160,35 @@
       ],
       "expected": [
         "Se rechazó automáticamente a los 5 minutos (con tolerancia de 1 minuto).",
-        "Cuando se rechazó solo, el sonido se apagó.",
-        "El cliente confirmó que lo vio como rechazado."
+        "Cuando se rechazó solo, el sonido se apagó."
       ],
       "fields": [
         {
           "id": "folio",
-          "label": "Folio"
+          "label": "Folio",
+          "placeholder": "Ej. 261120-0004",
+          "required": true,
+          "pattern": "^#?\\d{6}-\\d{4}$",
+          "patternHint": "Escribe el folio tal como sale en el pedido: 6 números, un guion y 4 números (ej. 261120-0004).",
+          "maxLength": 12
         },
         {
           "id": "arrivalTime",
           "label": "Hora de llegada",
-          "type": "time"
+          "type": "time",
+          "required": true,
+          "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d(\\s?[aApP]\\.?\\s?[mM]\\.?)?$",
+          "patternHint": "Escribe la hora y los minutos, por ejemplo 2:15 p.m.",
+          "maxLength": 11
         },
         {
           "id": "autoRejectTime",
           "label": "Hora del rechazo automático",
-          "type": "time"
-        }
-      ]
-    },
-    {
-      "id": "E10",
-      "title": "Agota las Papas y vuelve a ofrecerlas",
-      "when": "Solo cuando Mesa de control envíe «E10 - Agota Papas en Sucursal…».",
-      "where": "Barra de abajo de la app › **Menú** › pestaña **Sucursal**.",
-      "steps": [
-        {
-          "id": "1",
-          "text": "En la pestaña **Sucursal** busca «Papas a la francesa».",
-          "image": "/guides/establecimiento-app/e04-15-menu-sucursal.jpg",
-          "caption": "1 = pestaña Sucursal · 2 = Papas a la francesa"
-        },
-        {
-          "id": "2",
-          "text": "Toca los **tres puntos** del producto y elige **Marcar agotado**. No toques **Borrar**.",
-          "image": "/guides/establecimiento-app/e04-20-menu-opciones.jpg",
-          "caption": "1 = tres puntos del producto · 2 = Marcar agotado"
-        },
-        {
-          "id": "3",
-          "text": "Revisa la etiqueta **Agotado (3)**. Toma una captura y manda: **PAPAS AGOTADAS - Sucursal (tu sucursal) - (hora)**. No toques **Deshacer (5)**.",
-          "image": "/guides/establecimiento-app/e04-21-papas-agotadas.jpg",
-          "caption": "3 = etiqueta Agotado · 4 = volver a ofrecer (no tocar ahora) · 5 = Deshacer (no tocar)",
-          "evidence": true
-        },
-        {
-          "id": "4",
-          "text": "Espera a que el cliente confirme en el grupo que ya revisó su carrito."
-        },
-        {
-          "id": "5",
-          "text": "Toca el botón de la palomita **(4)** para volver a ofrecerlas.",
-          "image": "/guides/establecimiento-app/e04-21-papas-agotadas.jpg",
-          "caption": "3 = etiqueta Agotado · 4 = volver a ofrecer (no tocar ahora) · 5 = Deshacer (no tocar)"
-        },
-        {
-          "id": "6",
-          "text": "Debe salir «se vuelve a ofrecer» **(7)** y el botón cambia **(6)**. Manda: **PAPAS DISPONIBLES - Sucursal (tu sucursal) - (hora)**.",
-          "image": "/guides/establecimiento-app/e10-41-papas-ofrecer.jpg",
-          "caption": "6 = el botón cambió · 7 = aviso de que se vuelve a ofrecer"
-        }
-      ],
-      "expected": [
-        "El cambio se guardó al momento.",
-        "El cliente vio las Papas agotadas y no pudo pagar.",
-        "Al volver a ofrecerlas, el cliente pudo agregarlas de nuevo."
-      ],
-      "fields": [
-        {
-          "id": "soldOutTime",
-          "label": "Hora en que las agoté",
-          "type": "time"
-        },
-        {
-          "id": "backTime",
-          "label": "Hora en que las volví a ofrecer",
-          "type": "time"
+          "type": "time",
+          "required": true,
+          "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d(\\s?[aApP]\\.?\\s?[mM]\\.?)?$",
+          "patternHint": "Escribe la hora y los minutos, por ejemplo 2:15 p.m.",
+          "maxLength": 11
         }
       ]
     },
@@ -1042,7 +1215,7 @@
         },
         {
           "id": "3",
-          "text": "Si el pedido pasa más de 3 minutos en cola, avisa en el grupo."
+          "text": "Si el pedido se queda más de 3 minutos en cola, toca **Reportar falla** y escribe el folio."
         },
         {
           "id": "4",
@@ -1066,16 +1239,25 @@
         {
           "id": "assignMinutes",
           "label": "Minutos que tardó en asignarse el repartidor",
-          "type": "number"
+          "type": "number",
+          "required": true,
+          "pattern": "^\\d{1,3}$",
+          "patternHint": "Escribe solo los minutos, por ejemplo 2.",
+          "maxLength": 3
         }
       ]
     }
   ],
   "finish": {
+    "text": "Cuando Mesa de control dé por terminada la prueba, revisa esta lista y toca Terminar.",
     "checklist": [
       {
         "id": "resultsMarked",
-        "label": "Revisé que cada actividad tenga marcado su resultado y que la hoja de pedidos esté completa."
+        "label": "Revisé que cada actividad tenga marcado su resultado."
+      },
+      {
+        "id": "ordersSheet",
+        "label": "Mi hoja de pedidos tiene todos los pedidos que atendí."
       },
       {
         "id": "surveyDone",
@@ -1084,21 +1266,17 @@
       {
         "id": "screenRecOff",
         "label": "Apagué la grabación de pantalla."
-      },
-      {
-        "id": "doneMsg",
-        "label": "Mandé al grupo: TERMINADA - Sucursal (tu sucursal)."
       }
     ]
   },
   "survey": {
     "title": "Encuesta del Establecimiento",
-    "intro": "Tus respuestas nos ayudan a mejorar la app. Toma 2 minutos.",
+    "intro": "Tus respuestas nos ayudan a mejorar la app. Son 13 preguntas cortas; toma unos 3 minutos.",
     "questions": [
       {
-        "id": "ease",
+        "id": "schedule",
         "type": "scale",
-        "label": "¿Qué tan fácil fue usar la app de AppHouse?",
+        "label": "¿Qué tan fácil fue configurar el horario del viernes en la app (E02)?",
         "min": 1,
         "max": 5,
         "minLabel": "Muy difícil",
@@ -1106,34 +1284,108 @@
         "required": true
       },
       {
-        "id": "setup",
+        "id": "riders",
         "type": "scale",
-        "label": "¿Qué tan sencillo fue preparar tu sucursal (productos, promoción, envío)?",
+        "label": "¿Qué tan fácil fue dar de alta a tus repartidores (E03)?",
         "min": 1,
         "max": 5,
-        "minLabel": "Muy complicado",
-        "maxLabel": "Muy sencillo",
+        "minLabel": "Muy difícil",
+        "maxLabel": "Muy fácil",
+        "required": true
+      },
+      {
+        "id": "menu",
+        "type": "scale",
+        "label": "¿Qué tan fácil fue crear tu menú desde cero: las 5 categorías, los 8 productos, sus variantes y sus complementos (E04 · Parte A)?",
+        "min": 1,
+        "max": 5,
+        "minLabel": "Muy difícil",
+        "maxLabel": "Muy fácil",
+        "required": true
+      },
+      {
+        "id": "promo",
+        "type": "scale",
+        "label": "¿Qué tan fácil fue crear la promoción Pizza Hawaiana 20 % (E04 · Parte B)?",
+        "min": 1,
+        "max": 5,
+        "minLabel": "Muy difícil",
+        "maxLabel": "Muy fácil",
+        "required": true
+      },
+      {
+        "id": "shippingRules",
+        "type": "scale",
+        "label": "¿Qué tan claro fue escribir el costo de envío y revisar en Cómo opera el tiempo para confirmar, el pago con tarjeta y los topes (E04 · Partes D y E)?",
+        "min": 1,
+        "max": 5,
+        "minLabel": "Nada claro",
+        "maxLabel": "Muy claro",
         "required": true
       },
       {
         "id": "alerts",
         "type": "choice",
-        "label": "¿Los avisos y el sonido de los pedidos nuevos funcionaron bien?",
+        "label": "Con la sucursal abierta, ¿los pedidos nuevos llegaron solos, con sonido y aviso en el celular (E05)?",
         "options": [
           "Sí, siempre",
           "Casi siempre",
-          "Fallaron varias veces"
+          "Fallaron varias veces",
+          "No llegaron solos"
         ],
         "required": true
       },
       {
         "id": "flow",
         "type": "scale",
-        "label": "¿Qué tan claro fue confirmar y avanzar los pedidos?",
+        "label": "¿Qué tan claro fue revisar, confirmar y marcar listos los pedidos (E06 y E07)?",
         "min": 1,
         "max": 5,
         "minLabel": "Nada claro",
         "maxLabel": "Muy claro",
+        "required": true
+      },
+      {
+        "id": "rejectCancel",
+        "type": "scale",
+        "label": "¿Qué tan claro fue rechazar un pedido y cancelar otro escribiendo el motivo (E08)? Déjala en blanco si no te tocó.",
+        "min": 1,
+        "max": 5,
+        "minLabel": "Nada claro",
+        "maxLabel": "Muy claro"
+      },
+      {
+        "id": "autoReject",
+        "type": "choice",
+        "label": "Cuando dejaste un pedido sin responder (E09), ¿se rechazó solo a tiempo?",
+        "options": [
+          "Sí, a los 5 minutos (máximo 6)",
+          "Sí, pero tardó más de 6 minutos",
+          "No se rechazó solo",
+          "No me tocó"
+        ],
+        "required": true
+      },
+      {
+        "id": "assignment",
+        "type": "choice",
+        "label": "¿La app te mostró claramente cuándo se asignó un repartidor y su nombre (E11)?",
+        "options": [
+          "Sí, siempre",
+          "A veces",
+          "No",
+          "No me tocó"
+        ],
+        "required": true
+      },
+      {
+        "id": "ease",
+        "type": "scale",
+        "label": "En general, ¿qué tan fácil fue usar la app AppHouse Establecimientos?",
+        "min": 1,
+        "max": 5,
+        "minLabel": "Muy difícil",
+        "maxLabel": "Muy fácil",
         "required": true
       },
       {
@@ -1143,23 +1395,9 @@
         "required": true
       },
       {
-        "id": "liked",
-        "type": "text",
-        "label": "¿Qué fue lo que más te gustó?"
-      },
-      {
         "id": "improve",
         "type": "text",
-        "label": "¿Qué mejorarías primero?"
-      },
-      {
-        "id": "guide",
-        "type": "scale",
-        "label": "¿Qué tan clara fue esta guía de pruebas?",
-        "min": 1,
-        "max": 5,
-        "minLabel": "Nada clara",
-        "maxLabel": "Muy clara"
+        "label": "¿Qué fue lo más difícil o confuso, y qué mejorarías primero?"
       }
     ]
   }

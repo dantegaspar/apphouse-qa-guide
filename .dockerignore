@@ -32,3 +32,4 @@ yarn-error.log*
 Dockerfile
 docker-compose.yml
 .dockerignore
+qa-data

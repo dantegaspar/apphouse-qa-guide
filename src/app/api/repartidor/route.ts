@@ -3,46 +3,81 @@ import path from "node:path";
 import { getDb, now, UPLOAD_DIR } from "@/lib/db";
 import { sha256 } from "@/lib/auth";
 import { checkCourierToken } from "@/lib/courier-data";
-import { COURIER_ID_RE, COURIER_QUESTIONS } from "@/lib/courier";
-import { cleanRecord, err, json, str } from "@/lib/http";
+import { COURIER_QUESTIONS } from "@/lib/courier";
+import { cleanRecord, err, hasErrors, invalid, json, readJsonObject } from "@/lib/http";
+import {
+  collect,
+  COURIER_RULES,
+  courierAnswerError,
+  courierCommentError,
+  courierIssueError,
+  courierNameError,
+  idError,
+  isPlainObject,
+  objectError,
+  phoneError,
+  text,
+  type FieldErrors,
+} from "@/lib/validate";
 
-const MAX_ISSUES = 30;
+const TOKEN_RE = /^[A-Za-z0-9_-]{20,200}$/;
 
 /**
  * Guarda la encuesta de un repartidor. El navegador genera el id y el token (guarda el token y aquí
  * solo se guarda su sha256), así que reenviar la misma encuesta (p. ej. tras perder la conexión)
  * la actualiza en lugar de duplicarla. Los problemas se sincronizan con la lista enviada.
+ *
+ * Reglas: id (8–64, letras/números/-/_) y token (20–200) del navegador; nombre 2–80; teléfono
+ * opcional (números, espacios, + o -, 8–20); answers: cada pregunta conocida con un entero 1–5
+ * y sin llaves desconocidas; comment ≤2000; issues ≤30, cada uno con id válido (sin repetir) y
+ * descripción 3–1000; device objeto plano ≤30 datos, ≤8 KB.
  */
 export async function POST(req: Request) {
-  const body = await req.json().catch(() => null);
-  if (!body || typeof body !== "object") return err("Datos inválidos");
-  const id = str(body.id, 64);
-  const token = str(body.token, 200);
-  if (!COURIER_ID_RE.test(id) || token.length < 20) return err("Datos inválidos");
-  const name = str(body.name, 120);
-  if (!name) return err("Escribe tu nombre");
-  const phone = str(body.phone, 40);
+  const { body, res } = await readJsonObject(req, 256 * 1024);
+  if (res) return res;
+  const errors: FieldErrors = collect([
+    ["id", idError(body.id, { label: "la encuesta" })],
+    ["token", typeof body.token === "string" && TOKEN_RE.test(body.token) ? null : "La clave de la encuesta no es válida."],
+    ["name", courierNameError(body.name)],
+    ["phone", phoneError(body.phone)],
+    ["comment", courierCommentError(body.comment)],
+    ["device", objectError(body.device, { maxKeys: 30, maxString: 500, maxBytes: 8 * 1024, label: "los datos del celular" })],
+  ]);
 
-  const rawAnswers = body.answers && typeof body.answers === "object" ? (body.answers as Record<string, unknown>) : {};
   const answers: Record<string, number> = {};
-  for (const q of COURIER_QUESTIONS) {
-    const v = Number(rawAnswers[q.id]);
-    if (!Number.isInteger(v) || v < 1 || v > 5) return err(`Falta contestar: «${q.label}»`);
-    answers[q.id] = v;
+  if (!isPlainObject(body.answers)) errors.answers = "Faltan las respuestas.";
+  else {
+    const known = new Set(COURIER_QUESTIONS.map((q) => q.id));
+    for (const k of Object.keys(body.answers)) if (!known.has(k)) errors[`answers.${k.slice(0, 64)}`] = "Esta pregunta no existe.";
+    for (const q of COURIER_QUESTIONS) {
+      const v = body.answers[q.id];
+      if (courierAnswerError(v)) errors[`answers.${q.id}`] = `Toca una carita en «${q.label}».`;
+      else answers[q.id] = v as number;
+    }
   }
-  const comment = str(body.comment, 4000);
 
-  const rawIssues: unknown[] = Array.isArray(body.issues) ? body.issues : [];
-  if (rawIssues.length > MAX_ISSUES) return err(`Máximo ${MAX_ISSUES} problemas`);
   const issues: { id: string; description: string }[] = [];
-  for (const it of rawIssues) {
-    const r = (it && typeof it === "object" ? it : {}) as Record<string, unknown>;
-    const issueId = str(r.id, 64);
-    const description = str(r.description, 2000);
-    if (!COURIER_ID_RE.test(issueId)) return err("Datos inválidos");
-    if (!description) return err("Falta escribir qué pasó en un problema");
-    issues.push({ id: issueId, description });
+  if (body.issues !== undefined && !Array.isArray(body.issues)) errors.issues = "Los problemas no tienen el formato correcto.";
+  const rawIssues: unknown[] = Array.isArray(body.issues) ? body.issues : [];
+  if (rawIssues.length > COURIER_RULES.maxIssues) errors.issues = `Máximo ${COURIER_RULES.maxIssues} problemas.`;
+  else {
+    const seen = new Set<string>();
+    rawIssues.forEach((it, i) => {
+      const r = isPlainObject(it) ? it : {};
+      const idErr = idError(r.id, { label: "el problema" }) || (seen.has(r.id as string) ? "Problema repetido." : null);
+      const descErr = courierIssueError(r.description);
+      if (idErr) errors[`issues.${i}.id`] = idErr;
+      if (descErr) errors[`issues.${i}.description`] = `Problema ${i + 1}: ${descErr.charAt(0).toLowerCase()}${descErr.slice(1)}`;
+      if (!idErr && !descErr) issues.push({ id: r.id as string, description: text(r.description) });
+      if (typeof r.id === "string") seen.add(r.id);
+    });
   }
+  if (hasErrors(errors)) return invalid(errors);
+  const id = body.id as string;
+  const token = body.token as string;
+  const name = text(body.name);
+  const phone = text(body.phone);
+  const comment = text(body.comment);
 
   const db = getDb();
   const exists = db.prepare("SELECT 1 FROM courier_feedback WHERE id = ?").get(id);

@@ -2,7 +2,8 @@ import crypto from "node:crypto";
 import { getDb, now } from "@/lib/db";
 import { getGuide } from "@/lib/guides";
 import { checkRunToken } from "@/lib/auth";
-import { err, json, str } from "@/lib/http";
+import { err, hasErrors, invalid, json, readJsonObject } from "@/lib/http";
+import { collect, idError, text, textError } from "@/lib/validate";
 
 export const dynamic = "force-dynamic";
 
@@ -30,22 +31,32 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   return json({ status: run.status, endedReason: run.ended_reason, endedAt: run.ended_at, open: open ? helpOut(open) : null });
 }
 
-/** El tester pide ayuda al guía porque una falla le impide seguir. */
+/**
+ * El tester pide ayuda al guía porque una falla le impide seguir.
+ * Reglas: activityId de la guía; stepId opcional de esa actividad; issueId opcional (id del
+ * navegador); reason obligatorio 3–4000.
+ */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!checkRunToken(id, req.headers.get("x-run-token"))) return err("No autorizado", 401);
-  const body = await req.json().catch(() => null);
-  if (!body) return err("JSON inválido");
+  const { body, res } = await readJsonObject(req, 32 * 1024);
+  if (res) return res;
   const db = getDb();
   const run = db.prepare("SELECT guide_id, status FROM runs WHERE id = ?").get(id) as RunRow;
   if (run.status === "ended_blocked") return err("La prueba ya terminó", 409);
   const guide = getGuide(run.guide_id);
-  const activityId = str(body.activityId, 32);
-  if (!guide?.activities.some((a) => a.id === activityId)) return err("Actividad no encontrada", 404);
-  const reason = str(body.reason, 4000);
-  if (reason.length < 3) return err("Escribe por qué no puedes seguir con la prueba");
-  const stepId = str(body.stepId, 32) || null;
-  const issueId = str(body.issueId, 64) || null;
+  const act = guide?.activities.find((a) => a.id === body.activityId);
+  if (!act) return invalid({ activityId: "La actividad no existe en esta guía." }, 400, "Actividad no encontrada");
+  const errors = collect([
+    ["reason", textError(body.reason, { min: 3, max: 4000, required: true, label: "por qué no puedes seguir con la prueba" })],
+    ["stepId", idError(body.stepId, { known: act.steps.map((s) => s.id), required: false, label: "el paso" })],
+    ["issueId", idError(body.issueId, { required: false, label: "el reporte" })],
+  ]);
+  if (hasErrors(errors)) return invalid(errors);
+  const activityId = act.id;
+  const reason = text(body.reason);
+  const stepId = text(body.stepId) || null;
+  const issueId = text(body.issueId) || null;
   const ts = now();
 
   // Una sola solicitud abierta por corrida: si ya existe, se actualiza (reintentos no duplican)

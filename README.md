@@ -69,26 +69,27 @@ La base de datos se guarda en `./data/qa.sqlite` y las subidas en `./uploads/`. 
 
 Detalles del despliegue:
 
-- **Volúmenes:** `qa_data` guarda la base de datos (`/app/data`) y `qa_uploads` guarda las capturas y videos (`/app/uploads`). Los datos sobreviven a reinicios y a `docker compose up -d --build`. No borres los volúmenes salvo que quieras perder todo.
+- **Datos en carpetas del servidor:** todo vive en `./qa-data/` junto al `docker-compose.yml` (o en la ruta de `QA_DATA_PATH`): `data/` (base `qa.sqlite`), `uploads/` (capturas y videos) y `backups/` (respaldos automáticos). Son carpetas normales, no volúmenes de Docker, así que **ningún comando de Docker las borra**: ni `docker compose down -v`, ni `docker volume prune`, ni `docker system prune -a --volumes`, ni reconstruir la imagen. Solo se pierden si alguien borra la carpeta en el servidor.
+- **Permisos:** el contenedor arranca como root solo para crear esas carpetas y darles dueño `node`, y luego corre la app como `node`.
 - **Una sola instancia:** SQLite no admite varias réplicas del servicio. Mantén `app` con una sola instancia.
 - **Reinicio:** el contenedor usa `restart: unless-stopped`.
 
 ### Respaldos
 
-SQLite usa modo WAL: además de `qa.sqlite` existen `qa.sqlite-wal` y `qa.sqlite-shm`. Los cambios recientes pueden estar todavía en el archivo `-wal`, así que **copiar solo `qa.sqlite` puede dejar un respaldo incompleto**.
+**Automáticos:** la app copia la base completa cada 10 minutos a `qa-data/backups/qa-<fecha>.sqlite` y guarda las últimas 144 copias (24 h). Se ajusta con `BACKUP_EVERY_MIN` y `BACKUP_KEEP`. Cada copia es consistente (usa la API de respaldo de SQLite, incluye lo que está en el WAL).
 
-Forma segura de respaldar los volúmenes (detiene la app un momento):
+**Restaurar un respaldo:**
 
 ```bash
 docker compose stop app
-docker run --rm -v apphouse-qa-guide_qa_data:/data -v "$PWD":/backup alpine \
-  tar czf /backup/qa_data-$(date +%F).tar.gz -C /data .
-docker run --rm -v apphouse-qa-guide_qa_uploads:/data -v "$PWD":/backup alpine \
-  tar czf /backup/qa_uploads-$(date +%F).tar.gz -C /data .
+cp qa-data/backups/qa-<fecha>.sqlite qa-data/data/qa.sqlite
+rm -f qa-data/data/qa.sqlite-wal qa-data/data/qa.sqlite-shm
 docker compose start app
 ```
 
-El nombre de los volúmenes depende del nombre de la carpeta del proyecto; revísalo con `docker volume ls`.
+**Copia completa a otro lugar** (base + fotos): `tar czf apphouse-qa-$(date +%F).tar.gz qa-data/`. Para que sea consistente, hazlo con la app detenida o usa el respaldo más reciente de `qa-data/backups/`.
+
+SQLite usa modo WAL: además de `qa.sqlite` existen `qa.sqlite-wal` y `qa.sqlite-shm`; copiar solo `qa.sqlite` con la app encendida puede dejar un respaldo incompleto.
 
 Si la base de datos está accesible en disco (desarrollo o una carpeta montada), puedes respaldarla con la app encendida usando el comando `.backup` de `sqlite3`, que incluye también lo que está en el WAL:
 
@@ -108,7 +109,21 @@ public/guides/<id>/     Imágenes de cada guía (las rutas en el JSON empiezan c
 src/lib/db.ts           Conexión a SQLite y migraciones
 src/lib/guides.ts       Registro de guías disponibles
 src/app/                Páginas y rutas de API (Next.js App Router)
+src/components/feedback Avisos (toasts), confirmaciones, banners y consejos compartidos
 ```
+
+### Avisos y ventanas para el usuario
+
+Todas las páginas tienen avisos flotantes, diálogo de confirmación y un banner automático de "Sin conexión" (montados en `src/app/layout.tsx`). Desde cualquier componente cliente:
+
+```tsx
+import { toast, confirm, Banner, Coachmark } from "@/components/feedback";
+
+toast.success("Respuesta guardada");
+const ok = await confirm({ title: "¿Borrar la foto?", tone: "danger", confirmLabel: "Sí, borrar" });
+```
+
+Uso completo y ejemplos en [`src/components/feedback/README.md`](src/components/feedback/README.md).
 
 ### Migraciones de base de datos
 

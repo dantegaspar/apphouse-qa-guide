@@ -7,14 +7,15 @@ import { useEffect } from "react";
 export function AutoRefresh({ seconds = 20 }: { seconds?: number }) {
   const router = useRouter();
   useEffect(() => {
-    const t = setInterval(() => {
-      if (document.visibilityState === "visible") router.refresh();
-    }, seconds * 1000);
-    const onVisible = () => document.visibilityState === "visible" && router.refresh();
-    document.addEventListener("visibilitychange", onVisible);
+    // Sin conexión no se refresca: Next haría una recarga completa y mostraría la página de error del navegador.
+    const refresh = () => document.visibilityState === "visible" && navigator.onLine && router.refresh();
+    const t = setInterval(refresh, seconds * 1000);
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("online", refresh);
     return () => {
       clearInterval(t);
-      document.removeEventListener("visibilitychange", onVisible);
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("online", refresh);
     };
   }, [router, seconds]);
   return null;

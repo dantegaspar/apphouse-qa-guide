@@ -48,13 +48,13 @@ function safeAll<T>(sql: string): T[] {
   }
 }
 
-const family = (s: string) => {
+export const family = (s: string) => {
   const t = s.replace(/\s*\(navegador interno\)/, "").trim();
   // Quita la versión: "Chrome 120.0.1" → "Chrome", "iOS 17.2" → "iOS", "Android 14" → "Android"
   return t.replace(/\s+[\d._]+.*$/, "").trim() || "Desconocido";
 };
 
-function deviceKind(dev: Record<string, unknown>): string {
+export function deviceKind(dev: Record<string, unknown>): string {
   const os = String(dev.os ?? "");
   const variant = String(dev.guideVariant ?? "");
   if (/iPad/.test(os)) return "Tableta";
@@ -109,7 +109,7 @@ export function loadStats(guideId?: string | null) {
   const steps = keep(safeAll<{ run_id: string; activity_id: string; step_id: string; outcome: string }>("SELECT run_id, activity_id, step_id, outcome FROM step_results"));
   const acts = keep(safeAll<{ run_id: string; activity_id: string; result: string | null }>("SELECT run_id, activity_id, result FROM activity_results"));
   const issues = keep(safeAll<{ run_id: string; activity_id: string; step_id: string | null; kind: string; blocking: number }>("SELECT run_id, activity_id, step_id, kind, blocking FROM issues"));
-  const surveys = keep(safeAll<{ run_id: string; answers: string }>("SELECT run_id, answers FROM survey_responses"));
+  const surveys = keep(safeAll<{ run_id: string; answers: string }>("SELECT run_id, answers FROM survey_responses WHERE is_draft = 0"));
   const runById = new Map<string, RunRow>(runs.map((r) => [r.id, r]));
 
   // Guías presentes, en el orden del registro

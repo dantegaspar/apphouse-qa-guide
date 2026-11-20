@@ -1,6 +1,14 @@
 # Despliegue de AppHouse QA Guide con Docker Compose.
 # Uso: cp .env.example .env  (y define ADMIN_PASSWORD)  ->  docker compose up -d --build
 #
+# DATOS PERSISTENTES: todo se guarda en una carpeta normal del servidor (por defecto
+# ./qa-data junto a este archivo; cámbiala con QA_DATA_PATH en .env). Como no son
+# volúmenes de Docker, NINGÚN comando de Docker los borra: ni "docker compose down -v",
+# ni "docker volume prune", ni "docker system prune -a --volumes", ni reconstruir la imagen.
+#   qa-data/data      base SQLite (qa.sqlite)
+#   qa-data/uploads   fotos y videos de los reportes
+#   qa-data/backups   respaldos automáticos de la base cada 10 min (se guardan las últimas 24 h)
+#
 # IMPORTANTE: la base de datos es SQLite (archivo local con modo WAL).
 # Solo puede haber UNA instancia (réplica) del servicio: no escales a varias
 # réplicas ni las pongas en varias máquinas, porque se corromperían los datos.
@@ -27,11 +35,21 @@ services:
       PORT: "3000"
       DATA_DIR: /app/data
       UPLOAD_DIR: /app/uploads
+      BACKUP_DIR: /app/backups
+      BACKUP_EVERY_MIN: "${BACKUP_EVERY_MIN:-10}"
+      BACKUP_KEEP: "${BACKUP_KEEP:-144}"
     volumes:
-      - qa_data:/app/data
-      - qa_uploads:/app/uploads
+      # Carpetas del servidor (bind mounts), no volúmenes de Docker.
+      - type: bind
+        source: ${QA_DATA_PATH:-./qa-data}/data
+        target: /app/data
+        bind: { create_host_path: true }
+      - type: bind
+        source: ${QA_DATA_PATH:-./qa-data}/uploads
+        target: /app/uploads
+        bind: { create_host_path: true }
+      - type: bind
+        source: ${QA_DATA_PATH:-./qa-data}/backups
+        target: /app/backups
+        bind: { create_host_path: true }
     restart: unless-stopped
-
-volumes:
-  qa_data:
-  qa_uploads:

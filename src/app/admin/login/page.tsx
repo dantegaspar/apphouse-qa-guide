@@ -8,7 +8,7 @@ export default async function AdminLoginPage() {
   if (await isAdmin()) redirect("/admin");
   const configured = adminConfigured();
   return (
-    <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-5 py-10">
+    <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center px-5 py-10">
       <div className="rounded-2xl bg-white p-6 shadow-lg ring-1 ring-slate-200">
         <div className="mb-5 h-1.5 w-16 rounded-full bg-gradient-to-r from-[#2F5DA8] to-[#3BA3A8]" />
         <h1 className="text-xl font-bold text-slate-900">Panel de administración</h1>
