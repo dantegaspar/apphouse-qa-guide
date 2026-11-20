@@ -9,7 +9,7 @@ const prefKey = (guideId: string) => `apphouse-qa:variant:${guideId}`;
 
 /**
  * Elige entre la guía de computadora y su variante para celular (otra guía, `mobileGuideId`).
- * Orden al cargar: prueba ya empezada en este navegador › elección del tester › tipo de dispositivo.
+ * Se elige solo según el aparato (celular o computadora); el tester ya no la cambia a mano.
  * Cada variante guarda su propia prueba en localStorage, así que cambiar no borra el avance.
  */
 export default function GuideVariantPicker({
@@ -30,19 +30,9 @@ export default function GuideVariantPicker({
 
   useEffect(() => {
     if (!mobileGuide) return;
-    let pref: string | null = null;
-    try {
-      pref = localStorage.getItem(prefKey(guide.id));
-    } catch {
-      /* modo privado */
-    }
-    const runDesktop = hasStoredRun(guide.id);
-    const runMobile = hasStoredRun(mobileGuide.id);
     const det: GuideVariant = isPhone() ? "mobile" : "desktop";
-    let v: GuideVariant;
-    if (runDesktop !== runMobile) v = runMobile ? "mobile" : "desktop";
-    else if (pref === "mobile" || pref === "desktop") v = pref;
-    else v = det;
+    // Sin selector manual: siempre la versión del aparato detectado (celular o computadora)
+    const v: GuideVariant = det;
     /* eslint-disable react-hooks/set-state-in-effect -- el dispositivo y localStorage solo existen en el cliente */
     setDetected(det);
     setVariant(v);

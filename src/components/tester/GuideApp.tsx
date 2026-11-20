@@ -60,7 +60,6 @@ export default function GuideApp({
   /** Solo en guías con variante de computadora y de celular. */
   variantCtl?: VariantCtl;
 }) {
-  const variant = variantCtl?.variant;
   const { state, loaded, syncing, syncError, commit, update, flush, stateRef } = useRun(guide.id);
   const [view, setView] = useState<View>({ name: "home" });
   const [showRef, setShowRef] = useState(false);
@@ -204,33 +203,6 @@ export default function GuideApp({
     };
   }, [runId, update, stateRef]);
 
-  const pickVariant = async (v: GuideVariant) => {
-    if (!variantCtl || !state || v === variantCtl.variant) return;
-    // Si en la otra variante ya hay prueba, se cambia directo (cada una guarda su propio avance)
-    if (variantCtl.otherHasRun) {
-      variantCtl.choose(v);
-      toast.info(`Ahora ves las capturas ${VARIANTS[v].of}. Tu avance de esta versión sigue guardado.`);
-      return;
-    }
-    const ok = await confirm({
-      title: `¿Ver capturas ${VARIANTS[v].of}?`,
-      message: (
-        <div className="space-y-2" data-testid="variant-confirm">
-          <p>
-            Tu avance con las capturas {VARIANTS[variantCtl.variant].of} <strong>se queda guardado</strong> en este navegador. Puedes volver
-            cuando quieras con «Ver capturas de: {VARIANTS[variantCtl.variant].short}».
-          </p>
-          <p>La versión {VARIANTS[v].for} es una prueba aparte y empieza desde el inicio. Ya llenamos tus datos; solo confírmalos.</p>
-        </div>
-      ),
-      confirmLabel: `${VARIANTS[v].icon} Sí, cambiar`,
-      cancelLabel: "Cancelar",
-    });
-    if (!ok) return;
-    const t = state.tester;
-    variantCtl.choose(v, { name: t.name, email: t.email, role: t.role, fields: t.fields });
-  };
-
   if (!loaded) return <div className="flex flex-1 items-center justify-center text-slate-600">Cargando…</div>;
   if (!state || state.guideVersion === undefined)
     return <Identify guide={guide} desktop={desktop} variantCtl={variantCtl} onDone={(s) => commit(s)} />;
@@ -244,40 +216,33 @@ export default function GuideApp({
 
   const topbar = (
     <header ref={topbarRef} className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
-      <div className={"mx-auto flex max-w-xl items-center gap-3 px-4 py-2.5" + dk("lg:max-w-[1440px] lg:px-8")}>
-        <button onClick={() => nav({ name: "home" })} className="flex min-h-11 items-center gap-2" aria-label="Inicio de la guía">
-          <Image src="/logo.png" alt="" width={36} height={26} />
-          <span className="text-left text-sm font-semibold leading-tight">
+      {/* En celular la barra es compacta (una línea, ~44 px) para dejar más espacio a la actividad */}
+      <div className={"mx-auto flex max-w-xl items-center gap-2 px-3 py-1" + dk("lg:max-w-[1440px] lg:gap-3 lg:px-8 lg:py-2.5")}>
+        <button onClick={() => nav({ name: "home" })} className={"flex min-h-9 min-w-0 items-center gap-1.5" + dk("lg:min-h-11 lg:gap-2")} aria-label="Inicio de la guía">
+          <Image src="/logo.png" alt="" width={36} height={26} className={"h-5 w-auto shrink-0" + dk("lg:h-[26px]")} />
+          <span className={"min-w-0 truncate text-left text-xs font-semibold leading-tight" + dk("lg:text-sm")}>
             {guide.role}
-            <span className="block max-w-[9rem] truncate text-xs font-normal text-slate-600 sm:max-w-none">{state.tester.name}</span>
+            <span className={"font-normal text-slate-600" + dk("lg:hidden")}> · {state.tester.name.split(" ")[0]}</span>
+            {desktop && <span className="hidden truncate text-xs font-normal text-slate-600 lg:block">{state.tester.name}</span>}
           </span>
         </button>
         {desktop && (
           <span className="ml-4 hidden min-w-0 truncate border-l border-slate-200 pl-4 text-sm text-slate-600 lg:inline">{guide.title}</span>
         )}
-        {variant && desktop && <VariantSwitch variant={variant} onPick={pickVariant} className="ml-6 hidden lg:flex" />}
         <span
-          className={`ml-auto text-xs ${syncError ? "font-medium text-amber-700" : "text-slate-600"}`}
+          className={`ml-auto shrink-0 text-[11px] sm:text-xs ${syncError ? "font-medium text-amber-700" : "text-slate-600"}`}
           title={syncError ? "Sin conexión: se enviará al volver el internet" : "Guardado"}
           role="status"
         >
           {syncing ? "Guardando…" : syncError || state.outbox.length ? `● ${state.outbox.length} sin enviar` : "✓ Guardado"}
         </span>
-        <Button variant="outline" onClick={() => setShowRef(true)} className="!min-h-11 !px-3 !py-1.5 lg:!min-h-10">
+        <Button variant="outline" onClick={() => setShowRef(true)} className="shrink-0 !min-h-9 !rounded-lg !px-2.5 !py-1 !text-sm lg:!min-h-10 lg:!rounded-xl lg:!px-3 lg:!py-1.5">
           <span>
             <span aria-hidden="true">📊 </span>Datos
             {desktop && <span className="hidden lg:inline"> de la prueba</span>}
           </span>
         </Button>
       </div>
-      {variant && (
-        <div
-          className={`border-t px-4 py-1 ${variant === "mobile" ? "border-teal-200 bg-teal-50" : "border-slate-200 bg-slate-50"} ${desktop ? "lg:hidden" : ""}`}
-          data-testid={variant === "mobile" ? "mobile-banner" : "variant-bar"}
-        >
-          <VariantSwitch variant={variant} onPick={pickVariant} className="mx-auto max-w-xl justify-center" />
-        </div>
-      )}
     </header>
   );
 
@@ -645,7 +610,6 @@ export default function GuideApp({
             totalSteps={totalSteps}
             doneActs={doneActs}
             nav={nav}
-            onOpenRef={() => setShowRef(true)}
             fresh={fresh}
             onFreshSeen={(id) => setFreshState((f) => f.filter((x) => x !== id))}
           />
@@ -758,7 +722,6 @@ function Sidebar({
   totalSteps,
   doneActs,
   nav,
-  onOpenRef,
   fresh = [],
   onFreshSeen,
   isOpen,
@@ -775,7 +738,6 @@ function Sidebar({
   totalSteps: number;
   doneActs: number;
   nav: (v: View) => void;
-  onOpenRef: () => void;
 }) {
   const pct = Math.round((answered / totalSteps) * 100);
   const reduce = useReducedMotion();
@@ -875,12 +837,6 @@ function Sidebar({
         </nav>
 
         <div className="space-y-0.5 border-t border-slate-100 p-2">
-          <button onClick={onOpenRef} className={item(false)}>
-            <span className="w-5 text-center" aria-hidden="true">
-              📊
-            </span>
-            {guide.reference.title}
-          </button>
           {canFinish && (
             <button onClick={() => nav({ name: "summary" })} className={item(view.name === "summary" || view.name === "survey")}>
               <span className="w-5 text-center" aria-hidden="true">
@@ -1046,7 +1002,6 @@ function Identify({
       </div>
 
       <div className={"mt-5 space-y-5" + (desktop ? " lg:mt-0" : "")}>
-        {variantCtl && <VariantChoice ctl={variantCtl} />}
         <div className={desktop ? "lg:hidden" : undefined}>{intro}</div>
         {variantCtl?.carriedFrom && (
           <Callout tone="info">
@@ -1061,7 +1016,7 @@ function Identify({
           className={"space-y-4 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200" + (desktop ? " lg:p-7 lg:shadow-md" : "")}
         >
           <div>
-            <h2 className="text-lg font-semibold">{variantCtl ? "2. " : ""}¿Quién hace la prueba?</h2>
+            <h2 className="text-lg font-semibold">¿Quién hace la prueba?</h2>
             <p className="text-sm text-slate-600">Los datos con * son obligatorios.</p>
           </div>
           <FormField id="t-name" label="Nombre y apellido *" error={shown._name}>
@@ -1114,98 +1069,6 @@ function Identify({
         </form>
       </div>
     </main>
-  );
-}
-
-/** Tarjeta «¿Dónde vas a hacer las actividades?» (antes de identificarse). */
-function VariantChoice({ ctl }: { ctl: VariantCtl }) {
-  return (
-    <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200" aria-labelledby="where-title" data-testid="variant-choice">
-      <h2 id="where-title" className="text-lg font-semibold">
-        1. ¿Dónde vas a hacer las actividades?
-      </h2>
-      <p className="mt-0.5 text-sm text-slate-600">Te mostraremos las capturas de esa pantalla. Puedes cambiarlo después.</p>
-      <div className="mt-3 grid grid-cols-2 gap-3" role="radiogroup" aria-labelledby="where-title">
-        {(["desktop", "mobile"] as GuideVariant[]).map((v) => {
-          const on = ctl.variant === v;
-          const meta = VARIANTS[v];
-          return (
-            <button
-              key={v}
-              type="button"
-              role="radio"
-              aria-checked={on}
-              data-testid={`variant-option-${v}`}
-              tabIndex={on ? 0 : -1}
-              onKeyDown={(e) => radioKeys(e, () => ctl.choose(v === "desktop" ? "mobile" : "desktop"))}
-              onClick={() => !on && ctl.choose(v)}
-              className={`relative flex min-h-24 flex-col items-center justify-center rounded-2xl p-3 text-center ring-2 transition focus-visible:outline-none focus-visible:ring-4 ${
-                on ? "bg-brand-50 text-brand-700 ring-brand-500" : "bg-white text-slate-800 ring-slate-200 hover:bg-slate-50 hover:ring-slate-300"
-              }`}
-            >
-              {on && (
-                <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-xs text-white" aria-hidden="true">
-                  ✓
-                </span>
-              )}
-              <span className="text-3xl" aria-hidden="true">
-                {meta.icon}
-              </span>
-              <span className="mt-1 font-semibold leading-tight">
-                <span className="sr-only">{meta.icon} </span>
-                {meta.long}
-              </span>
-              <span className="text-xs text-slate-600">({meta.sub})</span>
-            </button>
-          );
-        })}
-      </div>
-      <p className="mt-3 text-xs text-slate-600">
-        Detectamos que estás en {ctl.detected === "mobile" ? "un celular" : "una computadora"}.
-        {ctl.variant !== ctl.detected && " Elegiste la otra opción: está bien si haces las actividades en otro aparato."}
-      </p>
-    </section>
-  );
-}
-
-/** Teclado de un grupo de 2 opciones (role="radio"): las flechas eligen la otra opción. */
-function radioKeys(e: React.KeyboardEvent, pickOther: () => void) {
-  if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) {
-    e.preventDefault();
-    pickOther();
-  }
-}
-
-/** Control «Ver capturas de: Computadora | Celular» (después de identificarse). */
-function VariantSwitch({ variant, onPick, className = "" }: { variant: GuideVariant; onPick: (v: GuideVariant) => void; className?: string }) {
-  return (
-    <div className={`flex items-center gap-2 ${className}`} role="radiogroup" aria-label="Ver capturas de">
-      <span className="shrink-0 text-xs font-medium text-slate-700" aria-hidden="true">
-        Ver capturas de:
-      </span>
-      <div className="flex rounded-lg bg-slate-100 p-0.5 ring-1 ring-slate-200">
-        {(["desktop", "mobile"] as GuideVariant[]).map((v) => {
-          const on = variant === v;
-          return (
-            <button
-              key={v}
-              type="button"
-              role="radio"
-              aria-checked={on}
-              data-testid={`variant-switch-${v}`}
-              tabIndex={on ? 0 : -1}
-              onKeyDown={(e) => radioKeys(e, () => onPick(v === "desktop" ? "mobile" : "desktop"))}
-              onClick={() => !on && onPick(v)}
-              className={`flex min-h-10 items-center gap-1 rounded-md px-2.5 text-xs font-semibold transition lg:min-h-8 ${
-                on ? "bg-white text-brand-700 shadow-sm ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <span aria-hidden="true">{VARIANTS[v].icon}</span> {VARIANTS[v].short}
-            </button>
-          );
-        })}
-      </div>
-    </div>
   );
 }
 

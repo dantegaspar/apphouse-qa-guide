@@ -167,25 +167,25 @@ export default function ActivityView({
   );
 
   const header = (
-    <div className={"sticky top-[var(--topbar-h,0px)] z-20 -mx-4 bg-[#f4f6fa]/95 px-4 pb-3 pt-3 backdrop-blur" + dk("lg:static lg:mx-0 lg:bg-transparent lg:px-0 lg:pb-1 lg:pt-1 lg:backdrop-blur-none")}>
+    <div className={"sticky top-[var(--topbar-h,0px)] z-20 -mx-4 bg-[#f4f6fa]/95 px-4 pb-2 pt-1 backdrop-blur" + dk("lg:static lg:mx-0 lg:bg-transparent lg:px-0 lg:pb-1 lg:pt-1 lg:backdrop-blur-none")}>
       <div className="flex items-center gap-2">
-        <button onClick={onExit} className={"-ml-2 min-h-11 rounded-lg px-2 py-1 text-sm font-medium text-brand-600 hover:bg-brand-50" + dk("lg:min-h-9")}>
+        <button onClick={onExit} className={"-ml-2 min-h-9 rounded-lg px-2 py-0.5 text-sm font-medium text-brand-600 hover:bg-brand-50" + dk("lg:py-1")}>
           ← Actividades
         </button>
         <span className="ml-auto text-xs text-slate-600">
           Actividad {index + 1} de {total}
         </span>
       </div>
-      <h1 className={"mt-1 text-xl font-bold leading-tight" + dk("lg:text-[26px]")}>
+      <h1 className={"line-clamp-2 text-lg font-bold leading-tight" + dk("lg:mt-1 lg:line-clamp-none lg:text-[26px]")}>
         <span className="text-teal-ink">{activity.id}</span> · {activity.title}
       </h1>
       {pos < steps.length && parts.list.length > 1 && parts.of(steps[pos].id) && (
-        <p className={"mt-1 text-sm font-semibold text-brand-700" + dk("lg:text-base")} data-testid="part-indicator">
+        <p className={"mt-0.5 text-xs font-semibold text-brand-700" + dk("lg:mt-1 lg:text-base")} data-testid="part-indicator">
           Parte {parts.of(steps[pos].id)} de {parts.list[parts.list.length - 1]}
           {parts.titles[parts.of(steps[pos].id)!] ? ` · ${parts.titles[parts.of(steps[pos].id)!]}` : ""}
         </p>
       )}
-      <div className={"mt-2 flex items-center gap-2" + dk("lg:mt-3 lg:gap-3")}>
+      <div className={"mt-1.5 flex items-center gap-2" + dk("lg:mt-3 lg:gap-3")}>
         <ProgressBar value={pos / steps.length} />
         <span className={"shrink-0 text-xs font-medium text-slate-600" + dk("lg:text-sm")}>
           {pos < steps.length ? `Paso ${pos + 1}/${steps.length}` : "Cierre"}

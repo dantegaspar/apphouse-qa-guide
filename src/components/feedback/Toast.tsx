@@ -239,7 +239,7 @@ function ToastCard({ item, hidden }: { item: ToastItem; hidden: boolean }) {
       style={style}
       className={
         "pointer-events-auto relative flex w-full touch-none select-none items-start gap-3 overflow-hidden rounded-2xl bg-white py-3 pl-4 pr-2 shadow-[0_10px_30px_-8px_rgb(15_23_42/0.35)] ring-1 ring-slate-900/10 " +
-        "transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none starting:translate-y-4 starting:opacity-0 " +
+        "transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none starting:-translate-y-4 starting:opacity-0 sm:starting:translate-y-4 " +
         (item.leaving && !fling ? "translate-y-2 scale-95 opacity-0" : "")
       }
     >
@@ -295,7 +295,7 @@ export function Toaster() {
       </div>
       <section
         aria-label="Avisos"
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-[100] px-3 sm:left-auto sm:right-5 sm:w-[25rem] sm:px-0"
+        className="pointer-events-none fixed inset-x-0 top-0 z-[100] px-3 pt-[max(0.5rem,env(safe-area-inset-top))] sm:top-auto sm:bottom-0 sm:left-auto sm:right-5 sm:w-[25rem] sm:px-0 sm:pt-0"
         style={{ paddingBottom: "calc(max(0.75rem, env(safe-area-inset-bottom)) + var(--toast-offset, 0px))" }}
       >
         <ol className="mx-auto flex w-full max-w-md flex-col gap-2">
