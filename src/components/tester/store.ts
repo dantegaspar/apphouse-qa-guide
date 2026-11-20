@@ -135,6 +135,7 @@ export function useRun(guideId: string) {
     if (flushing.current) {
       await flushing.current;
     }
+    let recovered = false;
     const run = async (): Promise<boolean> => {
       const s = stateRef.current;
       if (!s || s.outbox.length === 0) return true;
@@ -146,7 +147,18 @@ export function useRun(guideId: string) {
           headers: { "content-type": "application/json", "x-run-token": s.token },
           body: JSON.stringify({ events: batch }),
         });
-        if (!res.ok) throw new Error(String(res.status));
+        if ((res.status === 401 || res.status === 404) && !recovered) {
+          recovered = true;
+          // El servidor ya no conoce esta prueba (p. ej. se reinició su base de datos): se registra
+          // otra vez con los mismos datos y se reenvía todo lo guardado en este navegador.
+          const rec = await recoverRun(guideId, stateRef.current!);
+          commit(rec);
+          return await run();
+        }
+        if (!res.ok) {
+          console.warn("[sync] el servidor respondió", res.status);
+          throw new Error(String(res.status));
+        }
         const cur = stateRef.current!;
         commit({ ...cur, outbox: cur.outbox.slice(batch.length) });
         setSyncError(false);
@@ -162,7 +174,7 @@ export function useRun(guideId: string) {
     const ok = await flushing.current;
     flushing.current = null;
     return ok;
-  }, [commit]);
+  }, [commit, guideId]);
 
   /** Aplica un cambio local y encola los eventos para el servidor. */
   const update = useCallback(
@@ -191,6 +203,51 @@ export function useRun(guideId: string) {
   }, [flush, loaded]);
 
   return { state, loaded, syncing, syncError, commit, update, flush, stateRef };
+}
+
+/**
+ * Vuelve a registrar una prueba que el servidor ya no reconoce y arma de nuevo, desde el estado
+ * guardado en el navegador, todos los eventos (preparación, pasos, fallas, actividades, cierre y
+ * encuesta). Las capturas ya subidas al servidor anterior no se pueden recuperar.
+ */
+async function recoverRun(guideId: string, s: RunState): Promise<RunState> {
+  let device: Record<string, string | number> = {};
+  try {
+    device = await detectDevice();
+  } catch {
+    /* sin datos del aparato */
+  }
+  const res = await fetch("/api/runs", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      guideId,
+      name: s.tester.name,
+      email: s.tester.email,
+      fields: s.tester.fields,
+      device: { ...device, recoveredFrom: s.runId.slice(0, 36) },
+    }),
+  });
+  if (!res.ok) throw new Error(String(res.status));
+  const data = (await res.json()) as { runId: string; token: string };
+  return { ...s, runId: data.runId, token: data.token, outbox: rebuildEvents(s) };
+}
+
+function rebuildEvents(s: RunState): QAEvent[] {
+  const ev: QAEvent[] = [];
+  if (Object.keys(s.prep ?? {}).length) ev.push({ type: "run", payload: { prep: s.prep } });
+  for (const [k, outcome] of Object.entries(s.steps ?? {})) {
+    const i = k.indexOf(":");
+    const ticks = s.checkpoints?.[k];
+    ev.push({ type: "step", payload: { activityId: k.slice(0, i), stepId: k.slice(i + 1), outcome, ...(ticks ? { checkpoint: ticks } : {}) } });
+  }
+  for (const issue of s.issues ?? []) ev.push({ type: "issue", payload: { ...issue, attachments: [] } });
+  for (const [activityId, a] of Object.entries(s.activities ?? {})) {
+    if (a.done) ev.push({ type: "activity", payload: { activityId, result: a.result, checks: a.checks, fields: a.fields, notes: a.notes } });
+  }
+  if (Object.keys(s.finish ?? {}).length) ev.push({ type: "run", payload: { finish: s.finish } });
+  if (Object.keys(s.survey ?? {}).length) ev.push({ type: s.finished ? "survey" : "surveyDraft", payload: { answers: s.survey } });
+  return ev;
 }
 
 const PHONE_QUERY = "(max-width: 767px)";
