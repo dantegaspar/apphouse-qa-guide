@@ -345,3 +345,126 @@ export const guideShortTitle = (id: string) => {
   const t = getGuide(id)?.title ?? id;
   return t.replace(/^Manual (del|de la|de) /i, "");
 };
+
+// ---------------------------------------------------------------------------------------------
+// Mapa de testers (Mesa de control): una ficha por corrida, en orden de llegada
+
+/**
+ * blocked = pide ayuda, actividad en pausa por una falla bloqueante o terminada por bloqueo ·
+ * active = avanzando · stalled = sin guardar > STALL_MIN · idle = aún no marca nada ·
+ * abandoned = sin señal > ABANDON_MIN · finished = terminó la guía.
+ */
+export type QaTileKind = "blocked" | "active" | "stalled" | "idle" | "abandoned" | "finished";
+
+export type QaTile = {
+  id: string;
+  name: string;
+  guideId: string;
+  guideTitle: string;
+  branch: string;
+  kind: QaTileKind;
+  /** Por qué está bloqueado (vacío si no lo está). */
+  blockedWhy: string;
+  saved: number;
+  total: number;
+  pct: number;
+  /** "E05 · Paso 3", "Sigue: E06", "Terminó"… */
+  where: string;
+  whereTitle: string;
+  /** Última señal del tester (cualquier evento). */
+  lastSignalAt: string;
+  minsSinceSave: number;
+};
+
+/** Fichas del mapa de testers a partir de las filas de la Mesa (mismo filtro de guía). */
+export function qaTiles(rows: MesaRow[]): QaTile[] {
+  const db = getDb();
+  const ids = new Set(rows.map((r) => r.run.id));
+  const blockIss = (db
+    .prepare("SELECT run_id, activity_id, step_id, created_at FROM issues WHERE kind = 'issue' AND blocking = 1 ORDER BY created_at DESC")
+    .all() as { run_id: string; activity_id: string; step_id: string | null; created_at: string }[]).filter((i) => ids.has(i.run_id));
+  const resolved = (db
+    .prepare("SELECT run_id, activity_id, resolved_at FROM help_requests WHERE status = 'resolved'")
+    .all() as { run_id: string; activity_id: string; resolved_at: string | null }[]).filter((h) => ids.has(h.run_id));
+  const saved = (db.prepare("SELECT run_id, activity_id FROM activity_results WHERE result IS NOT NULL").all() as { run_id: string; activity_id: string }[])
+    .filter((a) => ids.has(a.run_id));
+  const savedKey = new Set(saved.map((a) => `${a.run_id}|${a.activity_id}`));
+  const lastStep = new Map<string, { step_id: string; updated_at: string }>();
+  for (const s of db.prepare("SELECT run_id, activity_id, step_id, updated_at FROM step_results ORDER BY updated_at").all() as {
+    run_id: string;
+    activity_id: string;
+    step_id: string;
+    updated_at: string;
+  }[])
+    if (ids.has(s.run_id)) lastStep.set(`${s.run_id}|${s.activity_id}`, s);
+  const touched = new Set([...lastStep.keys()].map((k) => k.split("|")[0]));
+
+  const stepLabel = (guideId: string, actId: string, stepId: string | null | undefined) => {
+    const act = getGuide(guideId)?.activities.find((a) => a.id === actId);
+    const i = stepId && act ? act.steps.findIndex((s) => s.id === stepId) : -1;
+    return { label: i >= 0 ? `${actId} · Paso ${i + 1}` : actId, title: act?.title ?? "" };
+  };
+
+  // Orden fijo (de llegada) para que cada tester conserve su lugar en el mapa
+  return [...rows]
+    .sort((a, b) => a.run.created_at.localeCompare(b.run.created_at) || a.run.name.localeCompare(b.run.name))
+    .map((r): QaTile => {
+      const { run, progress } = r;
+      const ended = r.state === "finished" || r.state === "ended_blocked";
+      // Pausa: falla bloqueante en una actividad aún sin guardar y que el guía no ha destrabado después
+      const pause = ended
+        ? undefined
+        : blockIss.find(
+            (i) =>
+              i.run_id === run.id &&
+              !savedKey.has(`${run.id}|${i.activity_id}`) &&
+              !resolved.some((h) => h.run_id === run.id && h.activity_id === i.activity_id && (h.resolved_at ?? "") >= i.created_at),
+          );
+      const kind: QaTileKind =
+        r.openHelp || r.state === "ended_blocked" || pause
+          ? "blocked"
+          : r.state === "finished"
+            ? "finished"
+            : r.state === "abandoned"
+              ? "abandoned"
+              : r.state === "stalled"
+                ? "stalled"
+                : !progress.saved && !touched.has(run.id)
+                  ? "idle"
+                  : "active";
+      const blockedWhy = r.openHelp
+        ? `Pide ayuda · ${r.openHelp.minsOpen} min`
+        : r.state === "ended_blocked"
+          ? "Terminó por bloqueo"
+          : pause
+            ? "Falla bloqueante"
+            : "";
+      const c = progress.current;
+      let where = "Sin empezar";
+      let whereTitle = "";
+      if (r.openHelp) ({ label: where, title: whereTitle } = stepLabel(run.guide_id, r.openHelp.activity_id, r.openHelp.step_id));
+      else if (pause) ({ label: where, title: whereTitle } = stepLabel(run.guide_id, pause.activity_id, pause.step_id));
+      else if (r.state === "finished") where = "Terminó la guía";
+      else if (c) {
+        const s = stepLabel(run.guide_id, c.id, lastStep.get(`${run.id}|${c.id}`)?.step_id);
+        where = c.mode === "working" ? s.label : c.mode === "next" ? (progress.saved ? `Sigue: ${c.id}` : `Por empezar: ${c.id}`) : `Última: ${c.id}`;
+        whereTitle = c.title;
+      }
+      return {
+        id: run.id,
+        name: run.name,
+        guideId: run.guide_id,
+        guideTitle: r.guideTitle,
+        branch: r.branch,
+        kind,
+        blockedWhy,
+        saved: progress.saved,
+        total: progress.total,
+        pct: progress.total ? Math.round((progress.saved / progress.total) * 100) : 0,
+        where,
+        whereTitle,
+        lastSignalAt: run.updated_at,
+        minsSinceSave: r.minsSinceSave,
+      };
+    });
+}

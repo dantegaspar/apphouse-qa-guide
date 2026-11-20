@@ -1,11 +1,10 @@
 import type { FieldDef } from "@/lib/types";
+import { daysError, folioTimeError, timeError, timeRangeError } from "@/lib/time-fields";
 
 /** Errores por campo: id → mensaje en español simple. */
 export type Errors = Record<string, string>;
 
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-/** Hora de 24 h (14:35) o de 12 h (2:35 p.m.). */
-const TIME_RE = /^([01]?\d|2[0-3]):[0-5]\d(:[0-5]\d)?(\s?[ap]\.?\s?m\.?)?$/i;
 
 /** Límites del texto libre (el servidor recorta en 4000; aquí avisamos antes). */
 export const LIMITS = {
@@ -36,17 +35,29 @@ export function validateEmail(v: string, required = true): string | null {
   return null;
 }
 
+/** Mensaje de obligatorio para los campos que se llenan con selectores. */
+const REQUIRED_MSG: Record<string, string> = {
+  time: "Elige la hora (o toca «Ahora»).",
+  timeRange: "Elige la hora en que abre y la hora en que cierra.",
+  folioTime: "Escribe el folio y elige la hora.",
+  days: "Elige al menos un día.",
+};
+
 /**
  * Valida un campo definido en la guía (datos del tester o «Anota» al cerrar una actividad).
  * `requireFilled: false` omite la regla de obligatorio (p. ej. si la actividad «No me tocó»).
  */
 export function validateField(f: FieldDef, raw: string | undefined, requireFilled = true): string | null {
   const v = (raw ?? "").trim();
-  if (!v) return f.required && requireFilled ? "Este dato es obligatorio." : null;
+  if (!v) return f.required && requireFilled ? (REQUIRED_MSG[f.type ?? ""] ?? "Este dato es obligatorio.") : null;
   const max = f.maxLength ?? (f.type === "email" ? LIMITS.email : LIMITS.field);
   if (v.length > max) return `Máximo ${max} caracteres (llevas ${v.length}).`;
   if (f.type === "number" && !/^-?\d+([.,]\d+)?$/.test(v)) return f.patternHint || "Escribe solo números, por ejemplo 12.";
-  if (f.type === "time" && !TIME_RE.test(v)) return f.patternHint || "Escribe la hora y los minutos, por ejemplo 2:15 p.m.";
+  // Horas y días vienen de selectores (14:35, «14:00 a 17:00», «261120-0004 · 14:35», «Lun, Vie»);
+  // también se aceptan los formatos escritos a mano en versiones anteriores (2:15 p.m.).
+  const typeErr =
+    f.type === "time" ? timeError(v) : f.type === "timeRange" ? timeRangeError(v) : f.type === "folioTime" ? folioTimeError(v) : f.type === "days" ? daysError(v) : null;
+  if (typeErr) return typeErr;
   if (f.type === "email" && !EMAIL_RE.test(v)) return "Revisa el correo: debe verse como nombre@ejemplo.com.";
   if (f.pattern) {
     let re: RegExp | null = null;

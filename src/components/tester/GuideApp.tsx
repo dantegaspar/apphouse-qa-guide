@@ -4,8 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import type { Guide } from "@/lib/types";
-import { ACTIVITY_RESULTS, TESTER_ROLES, type GuideVariant } from "@/lib/types";
+import { ACTIVITY_RESULTS, type GuideVariant } from "@/lib/types";
 import { confirm, Coachmark, toast } from "@/components/feedback";
+import { Confetti, CountUp, motion, Sparkles, staggerItem, staggerList, TickBadge, useReducedMotion } from "@/components/motion";
 import ActivityView from "./ActivityView";
 import BlockedPanel from "./BlockedPanel";
 import ReportSheet, { type ReportDraft } from "./ReportSheet";
@@ -63,6 +64,7 @@ export default function GuideApp({
   const { state, loaded, syncing, syncError, commit, update, flush, stateRef } = useRun(guide.id);
   const [view, setView] = useState<View>({ name: "home" });
   const [showRef, setShowRef] = useState(false);
+  const reduce = useReducedMotion();
   // Actividad recién guardada (festejo) y actividad recién desbloqueada (destello)
   const [saved, setSaved] = useState<{ id: string; next?: string; n: number } | null>(null);
   // Actividades recién abiertas (destello); se limpia cuando el destello termina
@@ -441,16 +443,16 @@ export default function GuideApp({
             <span>
               {doneActs} de {guide.activities.length} actividades
             </span>
-            <span>{Math.round((answered / totalSteps) * 100)}%</span>
+            <CountUp value={Math.round((answered / totalSteps) * 100)} suffix="%" className="text-base font-bold tabular-nums" />
           </div>
-          <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-white/30">
-            <div className="h-full rounded-full bg-white transition-all" style={{ width: `${(answered / totalSteps) * 100}%` }} />
-          </div>
+          <ProgressBar value={answered / totalSteps} className="mt-1.5" trackClassName="bg-white/30" barClassName="bg-white" />
           {failCount > 0 && <p className="mt-3 text-sm opacity-90">Has reportado {failCount} falla(s). ¡Gracias!</p>}
         </section>
 
         {!state.prepDone && (
-          <button
+          <motion.button
+            whileHover={reduce ? undefined : { y: -2 }}
+            whileTap={reduce ? { opacity: 0.85 } : { scale: 0.97 }}
             onClick={() => nav({ name: "prep" })}
             className={"attn attn-amber flex w-full items-center gap-3 rounded-2xl bg-amber-50 p-4 text-left ring-2 ring-amber-300 transition hover:bg-amber-100/70" + dk("lg:p-5")}
           >
@@ -463,10 +465,15 @@ export default function GuideApp({
                 {desktop ? "Revisa tus datos de acceso, el horario del día y las reglas." : "Instala la app, revisa las reglas y conoce la pantalla principal."}
               </span>
             </span>
-            <span className="text-xl text-amber-800" aria-hidden="true">
+            <motion.span
+              className="text-xl text-amber-800"
+              aria-hidden="true"
+              animate={reduce ? { opacity: [1, 0.4, 1] } : { x: [0, 6, 0] }}
+              transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+            >
               →
-            </span>
-          </button>
+            </motion.span>
+          </motion.button>
         )}
 
         {ended && (
@@ -530,7 +537,7 @@ export default function GuideApp({
                 ? `Las primeras actividades van en orden. Desde ${acc.firstFlexId ?? "la siguiente"} puedes abrirlas cuando te toque, y puedes corregir cualquiera hasta que toques Terminar.`
                 : "Se hacen en orden. Las que ya guardaste quedan cerradas y no se pueden cambiar."}
           </p>
-          <ul className={"space-y-2" + dk("lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0")}>
+          <motion.ul {...staggerList()} className={"space-y-2" + dk("lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0")}>
             {guide.activities.map((a) => {
               const st = state.activities[a.id];
               const n = a.steps.filter((s) => state.steps[stepKey(a.id, s.id)]).length;
@@ -574,17 +581,20 @@ export default function GuideApp({
                 </>
               );
               return (
-                <li key={a.id} data-activity={a.id} data-locked={open ? "false" : "true"} className={dk("lg:flex")}>
+                <motion.li key={a.id} {...staggerItem(reduce)} data-activity={a.id} data-locked={open ? "false" : "true"} className={dk("lg:flex")}>
                   {open ? (
-                    <button
+                    <motion.button
+                      whileHover={reduce ? undefined : { y: -2 }}
+                      whileTap={reduce ? { opacity: 0.85 } : { scale: 0.98 }}
                       onClick={() => nav({ name: "activity", id: a.id, step: firstPending(state, a.id, a.steps.map((s) => s.id)) })}
-                      onAnimationEnd={() => fresh.includes(a.id) && setFreshState((f) => f.filter((x) => x !== a.id))}
-                      className={`flex w-full items-start gap-3 rounded-2xl bg-white p-4 text-left shadow-sm active:scale-[0.99] ${
+                      onAnimationEnd={(e) => e.animationName.startsWith("shimmer") && fresh.includes(a.id) && setFreshState((f) => f.filter((x) => x !== a.id))}
+                      className={`relative flex w-full items-start gap-3 rounded-2xl bg-white p-4 text-left shadow-sm transition-shadow hover:shadow-md ${
                         st?.done ? "ring-1 ring-slate-300 hover:ring-brand-500" : a.id === currentAct?.id ? "ring-2 ring-brand-500" : "ring-1 ring-brand-500/50 hover:ring-brand-500"
                       } ${fresh.includes(a.id) ? "shimmer" : ""}`}
                     >
                       {inner}
-                    </button>
+                      {fresh.includes(a.id) && <Sparkles loop count={10} radius={34} className="!left-2 !right-auto !w-12" />}
+                    </motion.button>
                   ) : (
                     <div
                       aria-disabled="true"
@@ -595,10 +605,10 @@ export default function GuideApp({
                       {inner}
                     </div>
                   )}
-                </li>
+                </motion.li>
               );
             })}
-          </ul>
+          </motion.ul>
         </section>
 
         <div className={`grid gap-2 ${canFinish ? "grid-cols-2" : "grid-cols-1"}` + dk("lg:max-w-xl")}>
@@ -661,16 +671,30 @@ export default function GuideApp({
   );
 }
 
-/** Festejo breve al guardar una actividad: una palomita que «revienta» al centro (el texto va en el aviso). */
+/**
+ * Festejo breve al guardar una actividad: una palomita que «revienta» al centro con una onda,
+ * estrellitas y confeti (el texto va en el aviso). Con movimiento reducido: fundido y destellos.
+ */
 function SavedBurst() {
+  const reduce = useReducedMotion();
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-1/3 z-[60] flex justify-center" aria-hidden="true" data-testid="saved-burst">
-      <span className="animate-burst relative flex h-20 w-20 items-center justify-center rounded-full bg-emerald-600 shadow-xl ring-8 ring-emerald-200/70">
-        <svg viewBox="0 0 24 24" className="h-11 w-11" fill="none" stroke="white" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M5 12.5l4.5 4.5L19 7.5" strokeDasharray={24} className="animate-check" />
-        </svg>
-      </span>
-    </div>
+    <>
+      <Confetti count={28} />
+      <div className="pointer-events-none fixed inset-x-0 top-1/3 z-[60] flex justify-center" aria-hidden="true" data-testid="saved-burst">
+        <span className="animate-burst relative flex h-20 w-20 items-center justify-center rounded-full bg-emerald-600 shadow-xl ring-8 ring-emerald-200/70">
+          <motion.span
+            className="absolute inset-0 rounded-full ring-4 ring-emerald-400"
+            initial={{ opacity: 0.9, scale: 1 }}
+            animate={reduce ? { opacity: [0.9, 0] } : { opacity: 0, scale: 2.4 }}
+            transition={{ duration: 0.7, ease: "easeOut" }}
+          />
+          <svg viewBox="0 0 24 24" className="h-11 w-11" fill="none" stroke="white" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 12.5l4.5 4.5L19 7.5" strokeDasharray={24} className="animate-check" />
+          </svg>
+          <Sparkles count={12} radius={78} size={16} delay={0.1} />
+        </span>
+      </div>
+    </>
   );
 }
 
@@ -754,6 +778,7 @@ function Sidebar({
   onOpenRef: () => void;
 }) {
   const pct = Math.round((answered / totalSteps) * 100);
+  const reduce = useReducedMotion();
   const item = (active: boolean) =>
     `flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm transition ${
       active ? "bg-brand-50 font-semibold text-brand-700" : "text-slate-700 hover:bg-slate-100"
@@ -768,7 +793,7 @@ function Sidebar({
             <span>
               {doneActs} de {guide.activities.length} actividades
             </span>
-            <span className="font-semibold text-slate-700">{pct}%</span>
+            <CountUp value={pct} suffix="%" className="font-semibold tabular-nums text-slate-700" />
           </div>
           <ProgressBar value={answered / totalSteps} className="mt-1.5" />
         </div>
@@ -788,7 +813,7 @@ function Sidebar({
           </button>
 
           <div className="mt-3 px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Actividades</div>
-          <ul className="space-y-0.5">
+          <motion.ul {...staggerList()} className="space-y-0.5">
             {guide.activities.map((a) => {
               const st = state.activities[a.id];
               const done = !!st?.done;
@@ -826,24 +851,27 @@ function Sidebar({
                 </>
               );
               return (
-                <li key={a.id} data-nav-activity={a.id}>
+                <motion.li key={a.id} {...staggerItem(reduce)} data-nav-activity={a.id}>
                   {open ? (
-                    <button
+                    <motion.button
+                      whileHover={reduce ? undefined : { x: 3 }}
+                      whileTap={reduce ? { opacity: 0.8 } : { scale: 0.97 }}
                       onClick={() => nav({ name: "activity", id: a.id, step: firstPending(state, a.id, a.steps.map((x) => x.id)) })}
-                      onAnimationEnd={() => fresh.includes(a.id) && onFreshSeen?.(a.id)}
-                      className={`${item(active)} ${active || done ? "" : "ring-1 ring-brand-100"} ${fresh.includes(a.id) ? "shimmer" : ""}`}
+                      onAnimationEnd={(e) => e.animationName.startsWith("shimmer") && fresh.includes(a.id) && onFreshSeen?.(a.id)}
+                      className={`relative ${item(active)} ${active || done ? "" : "ring-1 ring-brand-100"} ${fresh.includes(a.id) ? "shimmer" : ""}`}
                     >
                       {inner}
-                    </button>
+                      {fresh.includes(a.id) && <Sparkles loop count={8} radius={24} size={10} className="!left-1 !right-auto !w-12" />}
+                    </motion.button>
                   ) : (
                     <div aria-disabled="true" className={`flex w-full cursor-not-allowed items-center gap-2.5 rounded-xl px-3 py-2 text-sm ${done ? "text-slate-600" : "text-slate-500"}`}>
                       {inner}
                     </div>
                   )}
-                </li>
+                </motion.li>
               );
             })}
-          </ul>
+          </motion.ul>
         </nav>
 
         <div className="space-y-0.5 border-t border-slate-100 p-2">
@@ -879,11 +907,11 @@ function Identify({
   variantCtl?: VariantCtl;
   onDone: (s: RunState) => void;
 }) {
-  const roles = Array.from(new Set([guide.role, ...TESTER_ROLES]));
   const d0 = variantCtl?.draft;
   const [name, setName] = useState(d0?.name ?? "");
   const [email, setEmail] = useState(d0?.email ?? "");
-  const [role, setRole] = useState(d0?.role && roles.includes(d0.role) ? d0.role : guide.role);
+  // El rol no se pregunta: lo da la liga (la guía) que abrió el tester
+  const role = guide.role;
   // Solo se llevan los datos con el mismo id en las dos guías (p. ej. la sucursal)
   const [fields, setFields] = useState<Record<string, string>>(() =>
     Object.fromEntries(guide.tester.fields.filter((f) => d0?.fields[f.id]).map((f) => [f.id, d0!.fields[f.id]]))
@@ -1054,15 +1082,6 @@ function Identify({
               />
             )}
           </FormField>
-          <FormField id="t-role" label="Rol en la prueba">
-            {(p) => (
-              <select {...p} value={role} onChange={(e) => setRole(e.target.value)}>
-                {roles.map((r) => (
-                  <option key={r}>{r}</option>
-                ))}
-              </select>
-            )}
-          </FormField>
           {guide.tester.fields.map((f) => (
             <FormField key={f.id} id={`t-${f.id}`} label={`${f.label}${f.required ? " *" : ""}`} error={shown[f.id]} hint={f.patternHint}>
               {(p) => (
@@ -1206,6 +1225,7 @@ function Prep({
 }) {
   const p = guide.prep;
   const allChecked = p.checklist.every((c) => state.prep[c.id]);
+  const reduce = useReducedMotion();
   const dk = (c: string) => (desktop ? " " + c : "");
   const card = "rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200" + dk("lg:p-6");
   return (
@@ -1230,8 +1250,12 @@ function Prep({
         <h2 className="mb-2 font-semibold">Confirma</h2>
         <ul className="space-y-2">
           {p.checklist.map((c) => (
-            <li key={c.id}>
-              <label className="flex items-start gap-3 rounded-xl bg-slate-50 p-3 text-sm">
+            <motion.li key={c.id} layout={!reduce} whileTap={reduce ? undefined : { scale: 0.98 }}>
+              <label
+                className={`flex items-start gap-3 rounded-xl p-3 text-sm ring-1 transition-colors duration-300 ${
+                  state.prep[c.id] ? "bg-emerald-50 ring-emerald-200" : "bg-slate-50 ring-transparent"
+                }`}
+              >
                 <input
                   type="checkbox"
                   className="mt-0.5 h-5 w-5 accent-[#2f5da8]"
@@ -1241,9 +1265,10 @@ function Prep({
                     update((s) => ({ ...s, prep }), [{ type: "run", payload: { prep } }]);
                   }}
                 />
-                <span>{c.label}</span>
+                <span className="flex-1">{c.label}</span>
+                <TickBadge on={!!state.prep[c.id]} />
               </label>
-            </li>
+            </motion.li>
           ))}
         </ul>
       </section>
@@ -1311,14 +1336,15 @@ function Summary({
   const pending = guide.activities.filter((a) => !state.activities[a.id]?.done);
   const issues = state.issues.filter((i) => i.kind === "issue");
   const dk = (c: string) => (desktop ? " " + c : "");
+  const reduce = useReducedMotion();
   return (
     <div className={"animate-pop space-y-5 pb-8" + dk("lg:max-w-5xl lg:space-y-6")}>
       <h1 className={"text-2xl font-bold" + dk("lg:text-3xl")}>Resumen de tu prueba</h1>
-      <div className={"grid grid-cols-3 gap-2 text-center" + dk("lg:gap-4")}>
+      <motion.div {...staggerList()} className={"grid grid-cols-3 gap-2 text-center" + dk("lg:gap-4")}>
         <Stat n={guide.activities.length - pending.length} label="Actividades listas" />
         <Stat n={Object.values(state.steps).filter((o) => o === "ok").length} label="Pasos logrados" />
         <Stat n={issues.length} label="Fallas reportadas" tone={issues.length ? "warn" : undefined} />
-      </div>
+      </motion.div>
       {state.ended && (
         <div className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-900 ring-1 ring-rose-200">
           <strong>El guía terminó la prueba por un bloqueo.</strong>
@@ -1327,14 +1353,14 @@ function Summary({
         </div>
       )}
       <div className={dk("lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start lg:gap-6")}>
-      <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+      <motion.ul {...staggerList()} className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
         {guide.activities.map((a) => {
           const st = state.activities[a.id] ?? emptyActivity();
           const ok = a.steps.filter((s) => state.steps[stepKey(a.id, s.id)] === "ok").length;
           const fail = a.steps.filter((s) => state.steps[stepKey(a.id, s.id)] === "fail").length;
           const nIssues = state.issues.filter((i) => i.activityId === a.id && i.kind === "issue").length;
           return (
-            <li key={a.id}>
+            <motion.li key={a.id} {...staggerItem(reduce)}>
               <div className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm">
                 <span className="w-9 font-bold text-teal-ink">{a.id}</span>
                 {desktop && <span className="hidden w-56 shrink-0 truncate text-slate-600 lg:block">{a.title}</span>}
@@ -1346,10 +1372,10 @@ function Summary({
                 </span>
                 <span className="text-slate-500" aria-label="Cerrada">🔒</span>
               </div>
-            </li>
+            </motion.li>
           );
         })}
-      </ul>
+      </motion.ul>
       <div className={"mt-5 space-y-5" + dk("lg:mt-0")}>
       {issues.length > 0 && (
         <section>
@@ -1402,11 +1428,12 @@ function Summary({
 }
 
 function Stat({ n, label, tone }: { n: number; label: string; tone?: "warn" }) {
+  const reduce = useReducedMotion();
   return (
-    <div className={`rounded-2xl p-3 shadow-sm ring-1 ${tone ? "bg-amber-50 ring-amber-200" : "bg-white ring-slate-200"}`}>
-      <div className="text-2xl font-bold">{n}</div>
+    <motion.div {...staggerItem(reduce)} className={`rounded-2xl p-3 shadow-sm ring-1 ${tone ? "bg-amber-50 ring-amber-200" : "bg-white ring-slate-200"}`}>
+      <CountUp value={n} className="block text-2xl font-bold tabular-nums" />
       <div className="text-xs text-slate-600">{label}</div>
-    </div>
+    </motion.div>
   );
 }
 

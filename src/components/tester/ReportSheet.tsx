@@ -140,8 +140,9 @@ export default function ReportSheet({
       open={open}
       onClose={busy ? () => {} : onClose}
       title={isIssue ? "Reportar una falla" : "Adjuntar captura"}
+      size="wide"
       footer={
-        <div className="pb-3">
+        <div className="pb-3 lg:flex lg:flex-wrap lg:items-center lg:justify-end lg:gap-x-4">
           {error && (
             <p className="mb-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800" role="alert">
               {error}
@@ -152,14 +153,15 @@ export default function ReportSheet({
               Revisa lo marcado en rojo.
             </p>
           )}
-          <Button size="lg" className="w-full" onClick={submit} disabled={busy} pulse={valid && !busy}>
+          <Button size="lg" className="w-full lg:w-auto lg:min-w-72" onClick={submit} disabled={busy} pulse={valid && !busy}>
             {busy ? "Enviando…" : isIssue ? "Enviar reporte" : "Guardar captura"}
           </Button>
         </div>
       }
     >
       <p className="mb-4 text-sm text-slate-600">{context}</p>
-      <div className="space-y-4" ref={formRef}>
+      <div className="space-y-4 lg:grid lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start lg:gap-6 lg:space-y-0" ref={formRef}>
+        <div className="space-y-4">
         {isIssue && (
           <>
             <FormField
@@ -228,7 +230,8 @@ export default function ReportSheet({
             {(p) => <input {...p} value={description} onChange={(e) => setDescription(e.target.value)} />}
           </FormField>
         )}
-        <div data-error={shown.files ? "true" : undefined}>
+        </div>
+        <div data-error={shown.files ? "true" : undefined} className="lg:sticky lg:top-0 lg:rounded-2xl lg:bg-slate-50 lg:p-3 lg:ring-1 lg:ring-slate-200">
           <span className="mb-1 block text-sm font-medium text-slate-800">
             Captura de pantalla o video {isIssue ? "(recomendado)" : "*"}
           </span>

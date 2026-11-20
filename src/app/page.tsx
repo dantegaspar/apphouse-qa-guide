@@ -13,11 +13,11 @@ export default function Home() {
         </p>
       </div>
       <ul className="mt-8 space-y-3">
-        {GUIDES.filter((g) => !g.hidden).map((g) => (
-          <li key={g.id}>
+        {GUIDES.filter((g) => !g.hidden).map((g, i) => (
+          <li key={g.id} className="animate-pop" style={{ animationDelay: `${60 + i * 60}ms` }}>
             <Link
               href={`/g/${g.id}`}
-              className="block rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 transition hover:ring-brand-500 active:scale-[0.99]"
+              className="block rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 transition hover:-translate-y-0.5 hover:shadow-md hover:ring-brand-500 active:scale-[0.98]"
             >
               <div className="text-xs font-semibold uppercase tracking-wide text-teal-ink">{g.role}</div>
               <div className="mt-1 text-lg font-semibold">{g.title}</div>
@@ -27,10 +27,10 @@ export default function Home() {
             </Link>
           </li>
         ))}
-        <li>
+        <li className="animate-pop" style={{ animationDelay: `${60 + GUIDES.filter((g) => !g.hidden).length * 60}ms` }}>
           <Link
             href="/repartidor"
-            className="block rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 transition hover:ring-brand-500 active:scale-[0.99]"
+            className="block rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 transition hover:-translate-y-0.5 hover:shadow-md hover:ring-brand-500 active:scale-[0.98]"
           >
             <div className="text-xs font-semibold uppercase tracking-wide text-teal-ink">Repartidor</div>
             <div className="mt-1 text-lg font-semibold">Encuesta para repartidores</div>

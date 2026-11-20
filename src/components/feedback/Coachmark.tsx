@@ -115,10 +115,26 @@ export function Coachmark({
   className,
 }: CoachmarkProps) {
   const { seen, dismiss } = useCoachmark(id);
-  const eligible = when && !seen;
+  const wrapRef = useRef<HTMLElement | null>(null);
+  // Solo cuenta si el ancla se ve en este diseño: en escritorio hay anclas dentro de bloques
+  // `lg:hidden` (y al revés en celular); sin esto la burbuja quedaba en la esquina de la pantalla.
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const anchor = targetRef?.current ?? wrapRef.current;
+    if (!anchor) return;
+    const check = () => setShown(anchor.getClientRects().length > 0 && (anchor.offsetWidth > 0 || anchor.offsetHeight > 0));
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(anchor);
+    window.addEventListener("resize", check);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", check);
+    };
+  }, [targetRef]);
+  const eligible = when && !seen && shown;
   const head = useSyncExternalStore(subscribeQueue, () => queue[0] ?? null, () => null);
   const [readyFor, setReadyFor] = useState<string | null>(null);
-  const wrapRef = useRef<HTMLElement | null>(null);
   const bubbleRef = useRef<HTMLDivElement>(null);
   const arrowRef = useRef<HTMLSpanElement>(null);
   const msgId = useId();
@@ -164,8 +180,10 @@ export function Coachmark({
       let side = placement;
       if (side === "bottom" && a.bottom + gap + bh > vh - m && a.top - gap - bh > m) side = "top";
       else if (side === "top" && a.top - gap - bh < m && a.bottom + gap + bh < vh - m) side = "bottom";
-      const cx = a.left + a.width / 2;
-      const left = Math.min(Math.max(cx - bw / 2, m), Math.max(m, vw - bw - m));
+      // Ancla muy ancha (un título a todo lo ancho en escritorio): apunta a su inicio, no al centro vacío
+      const wide = a.width > bw * 1.6;
+      const cx = wide ? a.left + Math.min(48, a.width / 2) : a.left + a.width / 2;
+      const left = Math.min(Math.max(wide ? a.left : cx - bw / 2, m), Math.max(m, vw - bw - m));
       const top = side === "bottom" ? a.bottom + gap : a.top - gap - bh;
       bubble.style.left = `${left}px`;
       bubble.style.top = `${top}px`;

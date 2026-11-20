@@ -1,6 +1,6 @@
 {
   "id": "establecimiento-app",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "role": "Establecimiento",
   "hidden": true,
   "title": "Manual del Establecimiento · App móvil",
@@ -374,7 +374,7 @@
           "type": "time",
           "required": true,
           "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d(\\s?[aApP]\\.?\\s?[mM]\\.?)?$",
-          "patternHint": "Escribe la hora y los minutos, por ejemplo 2:15 p.m.",
+          "patternHint": "Toca el campo para elegir la hora, o «Ahora» si es en este momento.",
           "maxLength": 11
         },
         {
@@ -464,10 +464,10 @@
         {
           "id": "fridaySchedule",
           "label": "Horario del viernes que quedó guardado",
-          "placeholder": "Ej. 2:00 p.m. a 5:00 p.m.",
+          "type": "timeRange",
           "required": true,
           "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d\\s?([aApP]\\.?\\s?[mM]\\.?)?\\s*(a|-|–|—)\\s*([01]?\\d|2[0-3]):[0-5]\\d\\s?([aApP]\\.?\\s?[mM]\\.?)?$",
-          "patternHint": "Escribe la hora en que abre y la hora en que cierra, por ejemplo 2:00 p.m. a 5:00 p.m.",
+          "patternHint": "Elige la hora en que abre y la hora en que cierra (en la prueba: 2:00 p.m. a 5:00 p.m.).",
           "maxLength": 40
         },
         {
@@ -476,7 +476,7 @@
           "type": "time",
           "required": true,
           "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d(\\s?[aApP]\\.?\\s?[mM]\\.?)?$",
-          "patternHint": "Escribe la hora y los minutos, por ejemplo 2:15 p.m.",
+          "patternHint": "Toca el campo para elegir la hora, o «Ahora» si es en este momento.",
           "maxLength": 11
         }
       ]
@@ -560,7 +560,7 @@
           "type": "time",
           "required": true,
           "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d(\\s?[aApP]\\.?\\s?[mM]\\.?)?$",
-          "patternHint": "Escribe la hora y los minutos, por ejemplo 2:15 p.m.",
+          "patternHint": "Toca el campo para elegir la hora, o «Ahora» si es en este momento.",
           "maxLength": 11
         }
       ]
@@ -870,7 +870,7 @@
           "type": "time",
           "required": true,
           "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d(\\s?[aApP]\\.?\\s?[mM]\\.?)?$",
-          "patternHint": "Escribe la hora y los minutos, por ejemplo 2:15 p.m.",
+          "patternHint": "Toca el campo para elegir la hora, o «Ahora» si es en este momento.",
           "maxLength": 11
         }
       ]
@@ -927,7 +927,7 @@
           "type": "time",
           "required": true,
           "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d(\\s?[aApP]\\.?\\s?[mM]\\.?)?$",
-          "patternHint": "Escribe la hora y los minutos, por ejemplo 2:15 p.m.",
+          "patternHint": "Toca el campo para elegir la hora, o «Ahora» si es en este momento.",
           "maxLength": 11
         },
         {
@@ -936,7 +936,7 @@
           "type": "time",
           "required": true,
           "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d(\\s?[aApP]\\.?\\s?[mM]\\.?)?$",
-          "patternHint": "Escribe la hora y los minutos, por ejemplo 2:15 p.m.",
+          "patternHint": "Toca el campo para elegir la hora, o «Ahora» si es en este momento.",
           "maxLength": 11
         }
       ]
@@ -1117,19 +1117,21 @@
         {
           "id": "rejectedFolio",
           "label": "Folio rechazado y hora",
-          "placeholder": "Ej. 261120-0004 · 3:25 p.m.",
+          "type": "folioTime",
+          "placeholder": "Ej. 261120-0004",
           "required": true,
           "pattern": "^#?\\d{6}-\\d{4}\\s*[·,\\-–—]?\\s*([01]?\\d|2[0-3]):[0-5]\\d(\\s?[aApP]\\.?\\s?[mM]\\.?)?$",
-          "patternHint": "Escribe el folio (6 números, guion y 4 números) y después la hora, por ejemplo 261120-0004 · 3:25 p.m.",
+          "patternHint": "Escribe el folio (6 números; el guion se pone solo) y elige la hora en que lo rechazaste.",
           "maxLength": 30
         },
         {
           "id": "cancelledFolio",
           "label": "Folio cancelado y hora",
-          "placeholder": "Ej. 261120-0004 · 3:25 p.m.",
+          "type": "folioTime",
+          "placeholder": "Ej. 261120-0004",
           "required": true,
           "pattern": "^#?\\d{6}-\\d{4}\\s*[·,\\-–—]?\\s*([01]?\\d|2[0-3]):[0-5]\\d(\\s?[aApP]\\.?\\s?[mM]\\.?)?$",
-          "patternHint": "Escribe el folio (6 números, guion y 4 números) y después la hora, por ejemplo 261120-0004 · 3:25 p.m.",
+          "patternHint": "Escribe el folio (6 números; el guion se pone solo) y elige la hora en que lo cancelaste.",
           "maxLength": 30
         }
       ]
@@ -1178,7 +1180,7 @@
           "type": "time",
           "required": true,
           "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d(\\s?[aApP]\\.?\\s?[mM]\\.?)?$",
-          "patternHint": "Escribe la hora y los minutos, por ejemplo 2:15 p.m.",
+          "patternHint": "Toca el campo para elegir la hora, o «Ahora» si es en este momento.",
           "maxLength": 11
         },
         {
@@ -1187,7 +1189,7 @@
           "type": "time",
           "required": true,
           "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d(\\s?[aApP]\\.?\\s?[mM]\\.?)?$",
-          "patternHint": "Escribe la hora y los minutos, por ejemplo 2:15 p.m.",
+          "patternHint": "Toca el campo para elegir la hora, o «Ahora» si es en este momento.",
           "maxLength": 11
         }
       ]

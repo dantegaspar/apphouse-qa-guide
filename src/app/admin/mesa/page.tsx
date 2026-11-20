@@ -2,14 +2,16 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { isAdmin } from "@/lib/auth";
 import { getGuide, GUIDES } from "@/lib/guides";
-import { ABANDON_MIN, fmtDate, loadMesa, MESA_STATE, STALL_MIN, timeAgo, type MesaRow, type MesaState } from "@/lib/admin-data";
+import { ABANDON_MIN, fmtDate, guideShortTitle, loadMesa, MESA_STATE, qaTiles, STALL_MIN, timeAgo, type MesaRow, type MesaState } from "@/lib/admin-data";
 import { AutoRefresh } from "@/components/admin/AutoRefresh";
 import { HelpRequestWatcher } from "@/components/admin/HelpRequestWatcher";
 import { LogoutButton } from "@/components/admin/LogoutButton";
+import { QaGrid } from "@/components/admin/QaGrid";
 
 export const dynamic = "force-dynamic";
 
-const REFRESH_S = 15;
+/** Monitoreo en tiempo real: el refresco (router.refresh) no recarga la página ni parpadea. */
+const REFRESH_S = 5;
 const done = (r: MesaRow) => r.state === "finished" || r.state === "ended_blocked";
 const late = (r: MesaRow) => !done(r) && r.minsSinceSave > STALL_MIN;
 
@@ -152,6 +154,16 @@ export default async function MesaPage({ searchParams }: { searchParams: Promise
           </div>
         ))}
       </section>
+
+      {rows.length > 0 && (
+        <QaGrid
+          tiles={qaTiles(rows)}
+          at={nowMs}
+          refreshS={REFRESH_S}
+          guides={GUIDES.map((g) => ({ id: g.id, title: guideShortTitle(g.id) }))}
+          grouped={!guideId}
+        />
+      )}
 
       {rows.length === 0 ? (
         <p className="rounded-xl bg-white p-8 text-center text-sm text-slate-500 ring-1 ring-slate-200">Todavía no hay testers.</p>

@@ -4,8 +4,10 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Activity, FieldDef } from "@/lib/types";
 import { ACTIVITY_RESULTS, type ActivityResult } from "@/lib/types";
 import { Coachmark, confirm, useToastOffset } from "@/components/feedback";
+import { Bump, motion, Sparkles, StepFrame, TickBadge, useReducedMotion } from "@/components/motion";
 import { expectedConditional, expectedText, NOT_APPLICABLE } from "@/lib/guide-utils";
 import OrdersField, { ordersError } from "./OrdersField";
+import { DaysPicker, FolioTimePicker, TimePicker, TimeRangePicker } from "./pickers";
 import { Button, Callout, FieldError, FormField, ProgressBar, Rich, StepImage } from "./ui";
 import { emptyActivity, stepKey, type ActivityState, type Issue, type Outcome, type RunState } from "./store";
 import { focusFirstError, LIMITS, trimAll, validateFields, type Errors } from "./validation";
@@ -77,6 +79,7 @@ export default function ActivityView({
 
   // Dirección del último cambio de paso (para deslizar desde la derecha o la izquierda)
   const [dir, setDir] = useState<"next" | "prev">("next");
+  const reduce = useReducedMotion();
   // Pasos en los que ya se abrió «Datos» (el botón deja de pulsar)
   const [dataSeen, setDataSeen] = useState<Record<string, boolean>>({});
   // Errores del cierre (se muestran después del primer intento de guardar)
@@ -238,8 +241,10 @@ export default function ActivityView({
       onSave({ ...draft, fields: trimAll(draft.fields), notes: draft.notes.trim(), done: true });
     };
     return (
-      <div className={dir === "prev" ? "animate-step-prev" : "animate-step-next"} ref={closingRef}>
-        {header}
+      <>
+      {header}
+      <StepFrame id="__cierre" dir={dir}>
+      <div ref={closingRef}>
         <section className={"mt-2 space-y-5" + dk("lg:mt-5")}>
           {blocked && blockedPanel}
           {reopened && (
@@ -273,12 +278,15 @@ export default function ActivityView({
                             ...(cond ? [[NOT_APPLICABLE, "No aplica"]] : []),
                           ] as [boolean | "na", string][]
                         ).map(([val, label]) => (
-                          <button
+                          <motion.button
                             key={label as string}
                             type="button"
                             aria-pressed={v === val}
                             onClick={() => setDraft({ ...draft, checks: { ...draft.checks, [String(i)]: val } })}
-                            className={`min-h-11 rounded-lg px-1 py-2 text-sm font-medium ring-1 transition ${
+                            whileTap={reduce ? { opacity: 0.8 } : { scale: 0.92 }}
+                            animate={v === val && !reduce ? { scale: [1, 1.08, 1] } : { scale: 1 }}
+                            transition={{ duration: 0.25 }}
+                            className={`min-h-11 rounded-lg px-1 py-2 text-sm font-medium ring-1 transition-colors ${
                               v === val
                                 ? val === NOT_APPLICABLE
                                   ? "bg-slate-600 text-white ring-slate-600"
@@ -289,7 +297,7 @@ export default function ActivityView({
                             }`}
                           >
                             {label as string}
-                          </button>
+                          </motion.button>
                         ))}
                       </div>
                     </li>
@@ -325,13 +333,23 @@ export default function ActivityView({
                       <FormField
                         key={f.id}
                         id={`f-${activity.id}-${f.id}`}
+                        className={f.type === "timeRange" || f.type === "folioTime" ? dk("lg:col-span-2") : ""}
                         label={`${f.label}${f.required && requireFilled ? " *" : ""}`}
                         labelClassName="mb-1 block text-sm text-slate-800"
                         error={shown[f.id]}
                         hint={f.patternHint && !shown[f.id] ? f.patternHint : undefined}
                       >
                         {(p) =>
-                          (f.maxLength ?? 0) > 200 ? (
+                          isPickerType(f.type) ? (
+                            <FieldPicker
+                              f={f}
+                              id={p.id}
+                              invalid={p["aria-invalid"]}
+                              describedBy={p["aria-describedby"]}
+                              value={draft.fields[f.id] ?? ""}
+                              onChange={(v) => setDraft({ ...draft, fields: { ...draft.fields, [f.id]: v } })}
+                            />
+                          ) : (f.maxLength ?? 0) > 200 ? (
                             <textarea
                               {...p}
                               className={p.className + " min-h-24"}
@@ -368,17 +386,21 @@ export default function ActivityView({
                   aria-describedby={shown._result ? `res-${activity.id}-err` : undefined}
                 >
                   {(Object.keys(ACTIVITY_RESULTS) as ActivityResult[]).map((r) => (
-                    <button
+                    <motion.button
                       key={r}
                       type="button"
                       aria-pressed={draft.result === r}
                       onClick={() => setDraft({ ...draft, result: r })}
-                      className={`min-h-12 rounded-xl px-4 py-3 text-left font-medium ring-1 transition ${
+                      whileHover={reduce ? undefined : { x: 2 }}
+                      whileTap={reduce ? { opacity: 0.8 } : { scale: 0.96 }}
+                      animate={draft.result === r && !reduce ? { scale: [1, 1.04, 1] } : { scale: 1 }}
+                      transition={{ duration: 0.25 }}
+                      className={`min-h-12 rounded-xl px-4 py-3 text-left font-medium ring-1 transition-colors ${
                         draft.result === r ? RESULT_STYLE[r] : shown._result ? "bg-white ring-2 ring-rose-400" : "bg-white ring-slate-300 hover:bg-slate-50"
                       }`}
                     >
                       {ACTIVITY_RESULTS[r]}
-                    </button>
+                    </motion.button>
                   ))}
                 </div>
                 {shown._result && <FieldError id={`res-${activity.id}-err`}>{shown._result}</FieldError>}
@@ -432,6 +454,8 @@ export default function ActivityView({
           </div>
         </section>
       </div>
+      </StepFrame>
+      </>
     );
   }
 
@@ -453,14 +477,17 @@ export default function ActivityView({
                 <legend className="sr-only">{step.checkpoint.title}</legend>
                 <div className="flex items-start justify-between gap-3">
                   <h2 className="font-semibold leading-snug text-slate-900" aria-hidden="true">
-                    {cpComplete ? "✅ " : "☑️ "}
+                    <Bump k={cpComplete ? "si" : "no"} className="relative mr-1">
+                      {cpComplete ? "✅" : "☑️"}
+                      {cpComplete && <Sparkles count={10} radius={30} size={11} />}
+                    </Bump>
                     {step.checkpoint.title}
                   </h2>
                   <span
-                    className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${cpComplete ? "bg-emerald-700 text-white" : "bg-slate-100 text-slate-700"}`}
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold transition-colors duration-300 ${cpComplete ? "bg-emerald-700 text-white" : "bg-slate-100 text-slate-700"}`}
                     aria-live="polite"
                   >
-                    {cpDone} de {cpTotal}
+                    <Bump k={cpDone}>{cpDone}</Bump> de {cpTotal}
                   </span>
                 </div>
                 <p className="mt-1 text-sm text-slate-600">Marca cada punto que ya quedó listo. Al marcar todos podrás seguir.</p>
@@ -468,12 +495,21 @@ export default function ActivityView({
                   {step.checkpoint.items.map((it, i) => {
                     const on = !!ticks[String(i)];
                     return (
-                      <li key={i}>
+                      <motion.li key={i} layout={!reduce} whileTap={reduce || blocked ? undefined : { scale: 0.98 }}>
                         <label
-                          className={`flex min-h-12 cursor-pointer items-start gap-3 rounded-xl p-3 text-[15px] ring-1 transition ${
+                          className={`relative flex min-h-12 cursor-pointer items-start gap-3 rounded-xl p-3 text-[15px] ring-1 transition-colors duration-300 ${
                             on ? "bg-white ring-emerald-300" : "bg-slate-50 ring-slate-200 hover:bg-slate-100"
                           }`}
                         >
+                          {on && (
+                            <motion.span
+                              aria-hidden="true"
+                              className="pointer-events-none absolute inset-0 rounded-xl ring-4 ring-emerald-400/70"
+                              initial={{ opacity: 1, scale: 1 }}
+                              animate={{ opacity: 0, scale: reduce ? 1 : 1.05 }}
+                              transition={{ duration: 0.55, ease: "easeOut" }}
+                            />
+                          )}
                           <input
                             type="checkbox"
                             className="mt-0.5 h-6 w-6 shrink-0 accent-emerald-600"
@@ -481,11 +517,12 @@ export default function ActivityView({
                             disabled={blocked}
                             onChange={(e) => onCheckpoint?.(step.id, { ...ticks, [String(i)]: e.target.checked })}
                           />
-                          <span className={on ? "text-slate-900" : "text-slate-800"}>
+                          <span className={"flex-1 " + (on ? "text-slate-900" : "text-slate-800")}>
                             <Rich text={it} />
                           </span>
+                          <TickBadge on={on} />
                         </label>
-                      </li>
+                      </motion.li>
                     );
                   })}
                 </ul>
@@ -497,8 +534,9 @@ export default function ActivityView({
   };
 
   return (
-    <div className={dir === "prev" ? "animate-step-prev" : "animate-step-next"} key={step.id}>
-      {header}
+    <>
+    {header}
+    <StepFrame id={step.id} dir={dir}>
       <section className={"mt-1 space-y-4" + dk("lg:mt-4 lg:space-y-5")}>
         {blocked && !desktop && blockedPanel}
         {pos === 0 && info()}
@@ -509,9 +547,15 @@ export default function ActivityView({
             {blocked && desktop && blockedPanel}
             <div className={"rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200" + dk("lg:p-6")}>
               <div className={"mb-2 flex items-center gap-3" + dk("lg:mb-3")}>
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-gradient text-sm font-bold text-white" aria-hidden="true">
+                <motion.div
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-gradient text-sm font-bold text-white shadow-sm"
+                  aria-hidden="true"
+                  initial={reduce ? { opacity: 0 } : { scale: 0.3, rotate: -90, opacity: 0 }}
+                  animate={{ scale: 1, rotate: 0, opacity: 1 }}
+                  transition={reduce ? { duration: 0.25 } : { type: "spring", stiffness: 420, damping: 15, delay: 0.12 }}
+                >
                   {pos + 1}
-                </div>
+                </motion.div>
                 <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">
                   Paso {pos + 1} de {steps.length}
                 </span>
@@ -532,18 +576,28 @@ export default function ActivityView({
                   id="tester-datos-sucursal"
                   title={dataLabel}
                   message="Aquí están los nombres, precios y datos exactos que debes escribir en este paso."
-                  placement="bottom"
+                  placement="top"
                 >
-                <button
+                <motion.button
                   type="button"
                   onClick={openData}
                   data-testid="data-button"
-                  className={`mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-amber-50 px-4 py-3 text-base font-semibold text-amber-950 ring-2 ring-amber-300 transition hover:bg-amber-100 ${
+                  whileHover={reduce ? undefined : { y: -2 }}
+                  whileTap={reduce ? { opacity: 0.8 } : { scale: 0.96 }}
+                  className={`mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-amber-50 px-4 py-3 text-base font-semibold text-amber-950 ring-2 ring-amber-300 transition-colors hover:bg-amber-100 ${
                     dataSeen[step.id] ? "" : "attn attn-amber"
                   }`}
                 >
-                  <span aria-hidden="true">📊</span> {dataLabel}
-                </button>
+                  <motion.span
+                    aria-hidden="true"
+                    className="inline-block"
+                    animate={dataSeen[step.id] ? undefined : reduce ? { opacity: [1, 0.45, 1] } : { rotate: [0, -12, 10, -6, 0], scale: [1, 1.2, 1] }}
+                    transition={{ duration: 0.9, repeat: Infinity, repeatDelay: 0.7 }}
+                  >
+                    📊
+                  </motion.span>{" "}
+                  {dataLabel}
+                </motion.button>
                 </Coachmark>
               )}
               {desktop && legend && (
@@ -705,7 +759,8 @@ export default function ActivityView({
           )}
         </div>
       </section>
-    </div>
+    </StepFrame>
+    </>
   );
 }
 
@@ -735,13 +790,43 @@ function fieldInputProps(f: FieldDef) {
   switch (f.type) {
     case "number":
       return { type: "text", inputMode: "numeric" as const, placeholder: f.placeholder ?? "Ej. 3", maxLength: max + 5 };
-    case "time":
-      // Texto libre: aceptamos 14:35 o 2:35 p.m. (el selector nativo no deja escribir «p.m.»)
-      return { type: "text", placeholder: f.placeholder ?? "Ej. 2:15 p.m.", maxLength: max + 5, autoComplete: "off" };
     case "email":
       return { type: "email", inputMode: "email" as const, autoComplete: "email", placeholder: f.placeholder, maxLength: max };
     default:
+      // Las horas y los días no llegan aquí: usan FieldPicker
       return { type: "text", placeholder: f.placeholder, maxLength: max + 20 };
+  }
+}
+
+const PICKER_TYPES = ["time", "timeRange", "folioTime", "days"] as const;
+const isPickerType = (t: FieldDef["type"]): t is (typeof PICKER_TYPES)[number] => (PICKER_TYPES as readonly string[]).includes(t ?? "");
+
+/** Selector de hora, rango de horas, folio + hora o días, según el tipo del campo de la guía. */
+function FieldPicker({
+  f,
+  id,
+  value,
+  invalid,
+  describedBy,
+  onChange,
+}: {
+  f: FieldDef;
+  id: string;
+  value: string;
+  invalid: boolean;
+  describedBy?: string;
+  onChange: (v: string) => void;
+}) {
+  const common = { id, value, onChange, invalid, describedBy, ariaLabel: f.label };
+  switch (f.type) {
+    case "timeRange":
+      return <TimeRangePicker {...common} />;
+    case "folioTime":
+      return <FolioTimePicker {...common} folioPlaceholder={f.placeholder} />;
+    case "days":
+      return <DaysPicker {...common} />;
+    default:
+      return <TimePicker {...common} />;
   }
 }
 

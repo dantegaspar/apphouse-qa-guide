@@ -75,11 +75,27 @@ body {
 }
 
 /*
- * Pulso de atención en la acción principal: un anillo que sale del borde (pseudo-elemento con
- * box-shadow: no mueve el diseño). Color en --attn. 600 ms de pulso y una pausa, para no cansar.
+ * Pulso de atención en la acción principal: doble anillo que sale del borde más un brillo
+ * (::after con box-shadow) y un destello que cruza el botón (::before). Nada cambia el tamaño ni
+ * la posición del botón (así sigue «estable» para tocarlo y para las pruebas automáticas).
+ * Color en --attn. Ciclo de 1.6 s y siempre hay algo visible: el segundo anillo va detrás del
+ * primero y el brillo nunca se apaga.
  */
 .attn {
+  --attn: #2f5da8;
   position: relative;
+}
+.attn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 35%, rgb(255 255 255 / 0.55) 50%, transparent 65%);
+  background-size: 250% 100%;
+  background-repeat: no-repeat;
+  background-position: 160% 0;
+  animation: attn-glint 3.2s ease-in-out 0.4s infinite;
 }
 .attn::after {
   content: "";
@@ -87,24 +103,62 @@ body {
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  animation: attn-ring 2.4s ease-out infinite;
+  animation: attn-ring 1.6s cubic-bezier(0.25, 0.6, 0.35, 1) infinite;
 }
 .attn-success {
-  --attn: rgb(5 150 105 / 0.6);
+  --attn: #059669;
 }
 .attn-amber {
-  --attn: rgb(217 119 6 / 0.65);
+  --attn: #d97706;
 }
 @keyframes attn-ring {
-  0% { box-shadow: 0 0 0 0 var(--attn, rgb(47 93 168 / 0.6)); }
-  25% { box-shadow: 0 0 0 12px transparent; }
-  100% { box-shadow: 0 0 0 12px transparent; }
+  0% {
+    box-shadow:
+      0 0 0 0 color-mix(in srgb, var(--attn) 80%, transparent),
+      0 0 0 0 color-mix(in srgb, var(--attn) 55%, transparent),
+      0 0 10px 2px color-mix(in srgb, var(--attn) 45%, transparent);
+  }
+  45% {
+    box-shadow:
+      0 0 0 12px color-mix(in srgb, var(--attn) 12%, transparent),
+      0 0 0 5px color-mix(in srgb, var(--attn) 45%, transparent),
+      0 0 24px 6px color-mix(in srgb, var(--attn) 40%, transparent);
+  }
+  100% {
+    box-shadow:
+      0 0 0 18px transparent,
+      0 0 0 14px transparent,
+      0 0 10px 2px color-mix(in srgb, var(--attn) 45%, transparent);
+  }
+}
+@keyframes attn-glint {
+  0% { background-position: 160% 0; }
+  35%, 100% { background-position: -60% 0; }
+}
+/* Con movimiento reducido: el anillo no crece, solo se enciende y se apaga (sigue visible) */
+@keyframes attn-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, var(--attn) 35%, transparent),
+      0 0 6px 1px color-mix(in srgb, var(--attn) 25%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 4px color-mix(in srgb, var(--attn) 75%, transparent),
+      0 0 24px 6px color-mix(in srgb, var(--attn) 55%, transparent);
+  }
 }
 
-/* Destello que recorre una tarjeta recién desbloqueada (dos pasadas de 600 ms) */
+/*
+ * Destello en una tarjeta recién desbloqueada: un brillo que la recorre tres veces y un contorno
+ * verde azulado que se enciende. Al terminar se avisa con animationend (la tarjeta lo quita).
+ */
 .shimmer {
   position: relative;
   overflow: hidden;
+  outline: 3px solid transparent;
+  outline-offset: 2px;
+  animation: shimmer-glow 2.9s ease-out both;
 }
 .shimmer::before {
   content: "";
@@ -112,28 +166,142 @@ body {
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  background: linear-gradient(110deg, transparent 35%, rgb(255 255 255 / 0.9) 50%, transparent 65%);
+  background: linear-gradient(110deg, transparent 30%, rgb(255 255 255 / 0.95) 47%, rgb(165 243 252 / 0.75) 53%, transparent 70%);
   background-size: 250% 100%;
   background-repeat: no-repeat;
-  animation: shimmer-sweep 0.6s ease-out 0.2s 2 both;
+  animation: shimmer-sweep 0.9s ease-in-out 0.2s 3 both;
 }
 @keyframes shimmer-sweep {
   from { background-position: 130% 0; }
   to { background-position: -30% 0; }
 }
+@keyframes shimmer-glow {
+  0% { outline-color: transparent; }
+  12%, 70% { outline-color: rgb(59 163 168 / 0.7); }
+  100% { outline-color: transparent; }
+}
+/* Movimiento reducido: el brillo no recorre, se enciende y se apaga en su lugar */
+@keyframes shimmer-fade {
+  0%, 100% { opacity: 0; background-position: 50% 0; }
+  50% { opacity: 1; background-position: 50% 0; }
+}
 
+/* Brillo que recorre las barras de avance cada pocos segundos */
+.bar-shine {
+  position: relative;
+  overflow: hidden;
+}
+.bar-shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 20%, rgb(255 255 255 / 0.65) 50%, transparent 80%);
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: bar-shine 2.6s ease-in-out 0.6s infinite;
+}
+@keyframes bar-shine {
+  0% { background-position: 160% 0; }
+  45%, 100% { background-position: -60% 0; }
+}
+
+@keyframes rm-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes rm-flash-red {
+  0% { box-shadow: 0 0 0 3px rgb(244 63 94 / 0.7); }
+  100% { box-shadow: 0 0 0 3px transparent; }
+}
+@keyframes rm-glow-pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+@keyframes rm-shine {
+  0%, 100% { opacity: 0; background-position: 50% 0; }
+  50% { opacity: 0.8; background-position: 50% 0; }
+}
+
+/*
+ * «Reducir movimiento» del sistema: no se apaga todo (antes así se perdían los pulsos y destellos).
+ * Solo se quita lo que se desliza, crece o rebota; los brillos, pulsos de color y fundidos siguen.
+ */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  ::before,
-  ::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    animation-delay: 0ms !important;
-    transition-duration: 0.01ms !important;
+  html {
     scroll-behavior: auto !important;
   }
-  .attn::after,
+  .animate-pop,
+  .animate-step-next,
+  .animate-step-prev,
+  .animate-toast,
+  .animate-burst {
+    animation-name: rm-fade-in !important;
+  }
+  .animate-shake {
+    animation-name: rm-flash-red !important;
+  }
+  .animate-ping {
+    animation: rm-glow-pulse 1.6s ease-in-out infinite !important;
+  }
+  .attn::before {
+    animation-name: rm-shine;
+  }
+  .attn::after {
+    animation: attn-glow 1.6s ease-in-out infinite;
+  }
   .shimmer::before {
-    animation: none !important;
+    animation-name: shimmer-fade;
+  }
+  .bar-shine::after {
+    animation-name: rm-shine;
+  }
+}
+
+/* ── Mapa de testers (Mesa de control · QaGrid): pulso rojo de «bloqueado» y destello al cambiar de estado ── */
+@keyframes qa-grid-pulse {
+  0% { box-shadow: 0 0 0 0 rgb(220 38 38 / 0.6), 0 0 0 0 rgb(220 38 38 / 0.35); }
+  70% { box-shadow: 0 0 0 9px rgb(220 38 38 / 0), 0 0 22px 4px rgb(220 38 38 / 0.25); }
+  100% { box-shadow: 0 0 0 0 rgb(220 38 38 / 0), 0 0 0 0 rgb(220 38 38 / 0); }
+}
+@keyframes qa-grid-pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+@keyframes qa-grid-dot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.35); opacity: 0.6; }
+}
+@keyframes qa-grid-flash {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.qa-pulse::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: qa-grid-pulse 1.6s ease-out infinite;
+}
+.qa-pulse-dot {
+  animation: qa-grid-dot 1.6s ease-in-out infinite;
+}
+.qa-flash {
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: rgb(250 204 21 / 0.35);
+  box-shadow: inset 0 0 0 2px rgb(234 179 8 / 0.9);
+  animation: qa-grid-flash 1.4s ease-out forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .qa-pulse::after {
+    box-shadow: 0 0 0 3px rgb(220 38 38 / 0.45);
+    animation: qa-grid-pulse-soft 1.6s ease-in-out infinite;
+  }
+  .qa-pulse-dot {
+    animation: qa-grid-pulse-soft 1.6s ease-in-out infinite;
   }
 }

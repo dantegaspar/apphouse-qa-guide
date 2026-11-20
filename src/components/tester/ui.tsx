@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { motion, useReducedMotion, type HTMLMotionProps } from "motion/react";
 
 /**
  * Texto con **negritas** (único formato que usan las guías). Con `links`, las direcciones
@@ -83,8 +84,10 @@ type BtnProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   pulse?: boolean;
 };
 export function Button({ variant = "primary", size = "md", pulse = false, className = "", ...rest }: BtnProps) {
+  const reduce = useReducedMotion();
+  // La transición CSS no incluye transform: el empuje al tocar y al pasar el mouse lo hace motion
   const base =
-    "inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-500/40 disabled:opacity-50 disabled:pointer-events-none";
+    "inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-[color,background-color,box-shadow,opacity] duration-150 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-500/40 disabled:opacity-50 disabled:pointer-events-none";
   const sizes = { md: "min-h-11 px-4 py-2.5 text-sm", lg: "min-h-12 px-5 py-3.5 text-base" };
   const variants = {
     primary: "bg-brand-500 text-white hover:bg-brand-600",
@@ -94,7 +97,16 @@ export function Button({ variant = "primary", size = "md", pulse = false, classN
     ghost: "text-brand-600 hover:bg-brand-50",
   };
   const attn = pulse && !rest.disabled ? ` attn${variant === "success" ? " attn-success" : ""}` : "";
-  return <button className={`${base} ${sizes[size]} ${variants[variant]}${attn} ${className}`} {...rest} />;
+  const lift = variant === "primary" || variant === "success";
+  return (
+    <motion.button
+      className={`${base} ${sizes[size]} ${variants[variant]}${attn} ${className}`}
+      whileHover={rest.disabled ? undefined : reduce ? { opacity: 0.92 } : { y: lift ? -2 : -1, scale: 1.015 }}
+      whileTap={rest.disabled ? undefined : reduce ? { opacity: 0.8 } : { scale: 0.95, y: 0 }}
+      transition={{ type: "spring", stiffness: 600, damping: 30 }}
+      {...(rest as HTMLMotionProps<"button">)}
+    />
+  );
 }
 
 /**
@@ -393,10 +405,28 @@ export function Lightbox({
   );
 }
 
-export function ProgressBar({ value, className = "" }: { value: number; className?: string }) {
+/** Barra de avance: crece con un resorte (desde 0 al aparecer) y un brillo la recorre de vez en cuando. */
+export function ProgressBar({
+  value,
+  className = "",
+  trackClassName = "bg-slate-200",
+  barClassName = "bg-brand-gradient",
+}: {
+  value: number;
+  className?: string;
+  trackClassName?: string;
+  barClassName?: string;
+}) {
+  const reduce = useReducedMotion();
+  const pct = Math.max(0, Math.min(100, Math.round(value * 100)));
   return (
-    <div className={`h-2 w-full overflow-hidden rounded-full bg-slate-200 ${className}`}>
-      <div className="bg-brand-gradient h-full rounded-full transition-all duration-500" style={{ width: `${Math.round(value * 100)}%` }} />
+    <div className={`h-2 w-full overflow-hidden rounded-full ${trackClassName} ${className}`}>
+      <motion.div
+        className={`h-full rounded-full ${pct > 0 ? "bar-shine" : ""} ${barClassName}`}
+        initial={{ width: "0%" }}
+        animate={{ width: `${pct}%` }}
+        transition={reduce ? { duration: 0.3, ease: "easeOut" } : { type: "spring", stiffness: 90, damping: 18, mass: 0.8 }}
+      />
     </div>
   );
 }

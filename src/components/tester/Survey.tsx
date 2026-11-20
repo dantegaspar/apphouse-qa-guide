@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Guide } from "@/lib/types";
+import { Confetti, motion, Sparkles, useReducedMotion } from "@/components/motion";
 import { Button, FieldError, inputCls, inputErrCls } from "./ui";
 import { focusFirstError, LIMITS } from "./validation";
 
@@ -34,6 +35,9 @@ export default function Survey({
   const [tried, setTried] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const reduce = useReducedMotion();
+  // Festejo solo cuando se acaba de enviar (no al volver a ver la encuesta ya terminada)
+  const [justSent, setJustSent] = useState(false);
 
   // Envío diferido del borrador al servidor
   const pending = useRef<Record<string, string | number> | null>(null);
@@ -75,8 +79,23 @@ export default function Survey({
 
   if (sent) {
     return (
-      <div className="animate-pop flex flex-col items-center py-12 text-center">
-        <div className="text-6xl">🎉</div>
+      <div className="animate-pop flex flex-col items-center py-12 text-center" data-testid="survey-done">
+        {justSent && <Confetti count={44} />}
+        <motion.div
+          className="relative text-6xl"
+          initial={reduce ? { opacity: 0 } : { scale: 0.2, rotate: -30, opacity: 0 }}
+          animate={reduce ? { opacity: 1 } : { scale: [0.2, 1.3, 1], rotate: [-30, 12, 0], opacity: 1 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+        >
+          <motion.span
+            className="inline-block"
+            animate={reduce ? { opacity: [1, 0.7, 1] } : { y: [0, -8, 0], rotate: [0, -6, 6, 0] }}
+            transition={{ duration: 1.6, repeat: Infinity, repeatDelay: 1, delay: 0.7 }}
+          >
+            🎉
+          </motion.span>
+          <Sparkles count={12} radius={70} size={14} delay={0.2} loop={justSent} />
+        </motion.div>
         <h1 className="mt-4 text-2xl font-bold">¡Prueba terminada!</h1>
         <p className="mt-2 max-w-sm text-slate-600">
           Gracias por tu ayuda. Tus resultados, reportes y respuestas ya están guardados. Avisa en el grupo que terminaste.
@@ -128,17 +147,20 @@ export default function Survey({
                 {Array.from({ length: (q.type === "nps" ? 10 : (q.max ?? 5)) - (q.type === "nps" ? 0 : (q.min ?? 1)) + 1 }, (_, i) =>
                   (q.type === "nps" ? 0 : (q.min ?? 1)) + i
                 ).map((v) => (
-                  <button
+                  <motion.button
                     key={v}
                     type="button"
                     onClick={() => set(q.id, v)}
                     aria-pressed={answers[q.id] === v}
-                    className={`min-h-11 rounded-lg py-2.5 text-sm font-semibold ring-1 ${
+                    whileTap={reduce ? { opacity: 0.8 } : { scale: 0.88 }}
+                    animate={answers[q.id] === v && !reduce ? { scale: [1, 1.18, 1] } : { scale: 1 }}
+                    transition={{ duration: 0.3 }}
+                    className={`min-h-11 rounded-lg py-2.5 text-sm font-semibold ring-1 transition-colors ${
                       answers[q.id] === v ? "bg-brand-500 text-white ring-brand-500" : "bg-white ring-slate-300"
                     }`}
                   >
                     {v}
-                  </button>
+                  </motion.button>
                 ))}
               </div>
               <div className="mt-1 flex justify-between text-xs text-slate-600">
@@ -150,17 +172,20 @@ export default function Survey({
           {q.type === "choice" && (
             <div className="space-y-2">
               {q.options?.map((o) => (
-                <button
+                <motion.button
                   key={o}
                   type="button"
                   onClick={() => set(q.id, o)}
                   aria-pressed={answers[q.id] === o}
-                  className={`block min-h-11 w-full rounded-xl px-4 py-3 text-left text-sm ring-1 ${
+                  whileTap={reduce ? { opacity: 0.8 } : { scale: 0.97 }}
+                  animate={answers[q.id] === o && !reduce ? { scale: [1, 1.03, 1] } : { scale: 1 }}
+                  transition={{ duration: 0.25 }}
+                  className={`block min-h-11 w-full rounded-xl px-4 py-3 text-left text-sm ring-1 transition-colors ${
                     answers[q.id] === o ? "bg-brand-500 font-medium text-white ring-brand-500" : "bg-white ring-slate-300"
                   }`}
                 >
                   {o}
-                </button>
+                </motion.button>
               ))}
             </div>
           )}
@@ -198,6 +223,7 @@ export default function Survey({
           pending.current = null;
           onSubmit(clean);
           setSent(true);
+          setJustSent(true);
           window.scrollTo({ top: 0 });
         }}
       >

@@ -7,6 +7,7 @@
  * (ver `invalid` en ./http).
  */
 import type { FieldDef, SurveyQuestion } from "./types";
+import { daysError, folioTimeError, timeError, timeRangeError } from "./time-fields";
 
 export type FieldErrors = Record<string, string>;
 
@@ -19,7 +20,7 @@ export const PHONE_RE = /^[0-9+\- ]{8,20}$/;
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Ids que genera el navegador (uuid o el respaldo de `uid()`), o derivados como `<uuid>-f`. */
 export const SAFE_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
-/** Hora de un <input type="time"> (HH:MM o HH:MM:SS). */
+/** Hora de un <input type="time"> (HH:MM o HH:MM:SS). Los campos de la guía usan time-fields.ts. */
 export const TIME_RE = /^([01]?\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
 export const NUMBER_RE = /^-?\d+([.,]\d+)?$/;
 const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?(Z|[+-]\d{2}:\d{2})$/;
@@ -179,8 +180,21 @@ export function fieldDefError(def: FieldDef, v: unknown, { enforceRequired = tru
   const t = String(v).trim();
   const max = def.maxLength ?? DEFAULT_FIELD_MAX;
   if (t.length > max) return `${label} es muy largo: máximo ${plural(max, "carácter", "caracteres")}.`;
-  // Si la guía define un pattern, ese manda sobre el formato del tipo (p. ej. horas de 12 h
-  // «2:15 p.m.» en campos type "time"); email siempre se revisa como correo.
+  // Horas y días (selectores): se revisan siempre, aunque haya pattern. Aceptan los formatos de
+  // 24 h que guardan los selectores y los de 12 h («2:15 p.m.») escritos en versiones anteriores.
+  const pickerErr =
+    def.type === "time"
+      ? timeError(t)
+      : def.type === "timeRange"
+        ? timeRangeError(t)
+        : def.type === "folioTime"
+          ? folioTimeError(t)
+          : def.type === "days"
+            ? daysError(t)
+            : null;
+  if (pickerErr) return `${label}: ${pickerErr.charAt(0).toLowerCase()}${pickerErr.slice(1)}`;
+  // Si la guía define un pattern, ese manda sobre el formato de los demás tipos; email siempre se
+  // revisa como correo.
   if (def.pattern) {
     const re = compile(def.pattern);
     if (re && !re.test(t)) return def.patternHint || `${label} no tiene el formato esperado.`;
@@ -189,9 +203,6 @@ export function fieldDefError(def: FieldDef, v: unknown, { enforceRequired = tru
   switch (def.type) {
     case "number":
       if (!NUMBER_RE.test(t)) return `${label} debe ser un número (por ejemplo 12).`;
-      break;
-    case "time":
-      if (!TIME_RE.test(t)) return `${label} debe ser una hora como 14:30.`;
       break;
     case "email":
       if (t.length > 200 || !EMAIL_RE.test(t)) return `Revisa ${label}: debe verse como nombre@correo.com.`;

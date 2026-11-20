@@ -3,8 +3,7 @@ import { getDb, now } from "@/lib/db";
 import { getGuide } from "@/lib/guides";
 import { sha256 } from "@/lib/auth";
 import { cleanRecord, hasErrors, invalid, json, readJsonObject } from "@/lib/http";
-import { TESTER_ROLES } from "@/lib/types";
-import { collect, emailError, enumError, fieldsCheck, objectError, text, textError } from "@/lib/validate";
+import { collect, emailError, fieldsCheck, objectError, text, textError } from "@/lib/validate";
 
 /**
  * Registra al tester y abre una corrida de la guía. Devuelve el token que el navegador guarda.
@@ -23,14 +22,13 @@ export async function POST(req: Request) {
   const guide = getGuide(guideId);
   if (!guide) return invalid({ guideId: "La guía no existe." }, 404, "Guía no encontrada");
 
-  const roles = Array.from(new Set([guide.role, ...TESTER_ROLES]));
-  const role = text(body.role);
+  // El rol lo define la guía (la liga que abrió el tester); se ignora cualquier valor enviado
+  const role = guide.role;
   const tester = fieldsCheck(body.fields, guide.tester.fields, "fields");
   const errors = {
     ...collect([
       ["name", textError(body.name, { min: 2, max: 120, required: true, label: "tu nombre y apellido" })],
       ["email", emailError(body.email, { required: true })],
-      ["role", body.role === undefined || body.role === null || body.role === "" ? null : enumError(role, roles, { label: "tu rol" })],
       ["device", objectError(body.device, { maxKeys: 30, maxString: 500, maxBytes: 8 * 1024, label: "los datos del dispositivo" })],
     ]),
     ...tester.errors,
@@ -47,7 +45,7 @@ export async function POST(req: Request) {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
-      id, sha256(token), guide.id, guide.version, text(body.name), text(body.email).toLowerCase(), role || guide.role,
+      id, sha256(token), guide.id, guide.version, text(body.name), text(body.email).toLowerCase(), role,
       JSON.stringify(tester.values), JSON.stringify(device), ts, ts
     );
   return json({ runId: id, token });

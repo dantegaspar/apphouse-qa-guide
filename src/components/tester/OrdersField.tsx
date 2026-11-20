@@ -1,28 +1,39 @@
 "use client";
 
 import type { OrderRow } from "@/lib/types";
+import { FOLIO_RE, formatFolioInput, timeMinutes, toHHMM } from "@/lib/time-fields";
+import { TimePicker } from "./pickers";
 import { FieldError, inputCls, inputErrCls } from "./ui";
 
 const STATUSES: OrderRow["status"][] = ["Entregado", "Rechazado", "Cancelado", "Otro"];
-const FOLIO_RE = /^#?\d{6}-\d{4}$/;
-const TIME_RE = /^([01]?\d|2[0-3]):[0-5]\d(\s?[aApP]\.?\s?[mM]\.?)?$/;
 
 const COLS: { key: keyof OrderRow; label: string; placeholder?: string; time?: boolean }[] = [
   { key: "folio", label: "Folio", placeholder: "261120-0004" },
-  { key: "arrived", label: "Llegó (hora)", placeholder: "3:14 p.m.", time: true },
-  { key: "confirmed", label: "Confirmé (hora)", placeholder: "3:17 p.m.", time: true },
-  { key: "ready", label: "Listo para salir (hora)", placeholder: "3:31 p.m.", time: true },
+  { key: "arrived", label: "Llegó (hora)", time: true },
+  { key: "confirmed", label: "Confirmé (hora)", time: true },
+  { key: "ready", label: "Listo para salir (hora)", time: true },
   { key: "rider", label: "Repartidor", placeholder: "Nombre" },
 ];
 
 const emptyRow = (): OrderRow => ({ folio: "", arrived: "", confirmed: "", ready: "", rider: "", status: "", notes: "" });
 
-/** Lee la hoja guardada (JSON). Un texto viejo que no es JSON se conserva como nota de un renglón. */
+/** Horas escritas a mano en versiones anteriores («3:14 p.m.») pasan a "15:14" para el selector. */
+const TIME_KEYS = ["arrived", "confirmed", "ready"] as const;
+const normalizeTimes = (r: OrderRow): OrderRow => {
+  const out = { ...r };
+  for (const k of TIME_KEYS) if (typeof out[k] === "string" && out[k].trim()) out[k] = toHHMM(out[k]) || out[k];
+  return out;
+};
+
+/**
+ * Lee la hoja guardada (JSON). Un texto viejo que no es JSON se conserva como nota de un renglón.
+ * Las horas viejas de 12 h se convierten a 24 h (si no se pueden leer, se dejan igual).
+ */
 export function parseOrders(value: string | undefined): OrderRow[] {
   if (!value) return [];
   try {
     const v = JSON.parse(value);
-    if (Array.isArray(v)) return v.map((r) => ({ ...emptyRow(), ...(r && typeof r === "object" ? r : {}) }));
+    if (Array.isArray(v)) return v.map((r) => normalizeTimes({ ...emptyRow(), ...(r && typeof r === "object" ? r : {}) }));
   } catch {
     /* texto libre de una versión anterior */
   }
@@ -42,7 +53,7 @@ export function ordersError(value: string | undefined, required: boolean): strin
     if (!FOLIO_RE.test(r.folio.trim())) return `${n}: el folio debe verse como 261120-0004.`;
     for (const c of COLS.filter((c) => c.time)) {
       const t = String(r[c.key] ?? "").trim();
-      if (t && !TIME_RE.test(t)) return `${n}: escribe «${c.label.replace(" (hora)", "")}» como 3:14 p.m.`;
+      if (t && timeMinutes(t) === null) return `${n}: elige de nuevo la hora de «${c.label.replace(" (hora)", "")}» (o toca «Ahora»).`;
     }
     if (r.notes.length > 300) return `${n}: las notas pueden tener hasta 300 caracteres.`;
   }
@@ -72,7 +83,8 @@ export default function OrdersField({
 }) {
   const rows = parseOrders(value);
   const set = (next: OrderRow[]) => onChange(next.length ? JSON.stringify(next) : "");
-  const edit = (i: number, k: keyof OrderRow, v: string) => set(rows.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
+  const edit = (i: number, k: keyof OrderRow, v: string) =>
+    set(rows.map((r, j) => (j === i ? { ...r, [k]: k === "folio" ? formatFolioInput(v, r.folio) : v } : r)));
   const remove = (i: number) => set(rows.filter((_, j) => j !== i));
   const add = () => {
     set([...rows, emptyRow()]);
@@ -118,15 +130,28 @@ export default function OrdersField({
               {COLS.map((c) => (
                 <label key={c.key} className={c.key === "folio" || c.key === "rider" ? "col-span-2 block" : "block"}>
                   <span className="mb-0.5 block text-xs font-medium text-slate-700">{c.label}</span>
-                  <input
-                    id={`${id}-${i}-${c.key}-m`}
-                    className={cls + small}
-                    value={String(r[c.key] ?? "")}
-                    placeholder={ph(c)}
-                    inputMode={c.key === "folio" ? "numeric" : undefined}
-                    aria-invalid={!!error}
-                    onChange={(e) => edit(i, c.key, e.target.value)}
-                  />
+                  {c.time ? (
+                    <TimePicker
+                      id={`${id}-${i}-${c.key}-m`}
+                      compact
+                      value={String(r[c.key] ?? "")}
+                      onChange={(v) => edit(i, c.key, v)}
+                      invalid={!!error}
+                      ariaLabel={`${c.label}, pedido ${i + 1}`}
+                      inputClassName={small}
+                    />
+                  ) : (
+                    <input
+                      id={`${id}-${i}-${c.key}-m`}
+                      className={cls + small}
+                      value={String(r[c.key] ?? "")}
+                      placeholder={ph(c)}
+                      inputMode={c.key === "folio" ? "numeric" : undefined}
+                      maxLength={c.key === "folio" ? 12 : 120}
+                      aria-invalid={!!error}
+                      onChange={(e) => edit(i, c.key, e.target.value)}
+                    />
+                  )}
                 </label>
               ))}
               <label className="col-span-2 block">
@@ -172,15 +197,29 @@ export default function OrdersField({
                   <td className="px-2 py-2 pt-4 text-slate-600">{i + 1}</td>
                   {COLS.map((c) => (
                     <td key={c.key} className="px-1 py-1.5">
-                      <input
-                        id={`${id}-${i}-${c.key}`}
-                        className={cls + small}
-                        value={String(r[c.key] ?? "")}
-                        placeholder={ph(c)}
-                        aria-label={`${c.label}, pedido ${i + 1}`}
-                        aria-invalid={!!error}
-                        onChange={(e) => edit(i, c.key, e.target.value)}
-                      />
+                      {c.time ? (
+                        <TimePicker
+                          id={`${id}-${i}-${c.key}`}
+                          compact
+                          value={String(r[c.key] ?? "")}
+                          onChange={(v) => edit(i, c.key, v)}
+                          invalid={!!error}
+                          ariaLabel={`${c.label}, pedido ${i + 1}`}
+                          inputClassName={small}
+                        />
+                      ) : (
+                        <input
+                          id={`${id}-${i}-${c.key}`}
+                          className={cls + small}
+                          value={String(r[c.key] ?? "")}
+                          placeholder={ph(c)}
+                          inputMode={c.key === "folio" ? "numeric" : undefined}
+                          maxLength={c.key === "folio" ? 12 : 120}
+                          aria-label={`${c.label}, pedido ${i + 1}`}
+                          aria-invalid={!!error}
+                          onChange={(e) => edit(i, c.key, e.target.value)}
+                        />
+                      )}
                     </td>
                   ))}
                   <td className="px-1 py-1.5">

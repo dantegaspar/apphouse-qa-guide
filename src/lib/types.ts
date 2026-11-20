@@ -1,8 +1,17 @@
 export type FieldDef = {
   id: string;
   label: string;
-  /** "orders": tabla de pedidos (Hoja de pedidos, E07) con botón «Agregar pedido»; el valor se guarda como JSON (OrderRow[]). */
-  type?: "text" | "number" | "time" | "email" | "orders";
+  /**
+   * Tipo de entrada (por omisión "text"). Las horas y días se eligen con selectores, no se escriben:
+   * - "time": selector de hora con botón «Ahora»; se guarda "14:35" (24 h). Se aceptan valores
+   *   viejos como «2:15 p.m.».
+   * - "timeRange": dos selectores «De … a …»; se guarda "14:00 a 17:00" (cierre después de apertura).
+   * - "folioTime": folio del pedido + selector de hora; se guarda "261120-0004 · 14:35".
+   * - "days": botones Lun … Dom; se guarda "Lun, Mar, Vie" (de lunes a domingo).
+   * - "orders": tabla de pedidos (Hoja de pedidos, E07) con botón «Agregar pedido»; el valor se
+   *   guarda como JSON (OrderRow[]), con las horas como "14:35".
+   */
+  type?: "text" | "number" | "time" | "timeRange" | "folioTime" | "days" | "email" | "orders";
   placeholder?: string;
   required?: boolean;
   /** Regex (sin delimitadores) que debe cumplir el valor, p. ej. un folio "^\\d{6}-\\d{4}$". */
@@ -38,6 +47,7 @@ export type ExpectedItem = string | { text: string; conditional?: boolean };
 /** Renglón de la Hoja de pedidos (FieldDef type "orders"). */
 export type OrderRow = {
   folio: string;
+  /** Horas "14:35" (24 h); hojas guardadas antes pueden traer «3:14 p.m.». */
   arrived: string;
   confirmed: string;
   ready: string;

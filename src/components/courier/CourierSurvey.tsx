@@ -15,6 +15,7 @@ import {
 } from "@/lib/validate";
 import { compressImage, detectDevice, uid } from "@/components/tester/store";
 import { toast, useConfirm } from "@/components/feedback";
+import { Confetti, motion, Sparkles, staggerItem, staggerList, useReducedMotion } from "@/components/motion";
 import { clearPhotos, deletePhoto, getPhoto, putPhoto } from "./photos";
 
 /**
@@ -122,6 +123,7 @@ async function uploadPhoto(feedbackId: string, token: string, issueId: string, p
 
 export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) {
   const [draft, setDraft] = useState<Draft | null>(null);
+  const reduce = useReducedMotion();
   const [restored, setRestored] = useState(false);
   const [device, setDevice] = useState<Record<string, string | number>>({});
   const [editing, setEditing] = useState(false);
@@ -343,13 +345,14 @@ export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) 
 
       {/* 2. Preguntas */}
       <h2 className="mt-7 px-1 text-xl font-bold">¿Cómo te fue?</h2>
-      <div className="mt-3 space-y-4">
+      <motion.div {...staggerList()} className="mt-3 space-y-4">
         {COURIER_QUESTIONS.map((q, i) => {
           const value = draft.answers[q.id];
           const bad = !!shown(`answers.${q.id}`);
           return (
-            <section
+            <motion.section
               key={q.id}
+              {...staggerItem(reduce)}
               id={`q-${q.id}`}
               data-testid={`q-${q.id}`}
               className={`rounded-3xl bg-white p-4 shadow-sm ring-1 ${bad ? "ring-2 ring-rose-500" : "ring-slate-200"}`}
@@ -368,24 +371,34 @@ export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) 
                   const on = value === f.value;
                   const faceLabel = q.faces[fi] ?? f.label;
                   return (
-                    <button
+                    <motion.button
                       key={f.value}
                       type="button"
                       role="radio"
                       aria-checked={on}
                       aria-label={faceLabel}
                       onClick={() => update((d) => ({ ...d, answers: { ...d.answers, [q.id]: f.value } }))}
-                      className={`flex min-h-[84px] flex-col items-center justify-center rounded-2xl px-0.5 py-2 transition active:scale-95 ${
-                        on ? "scale-[1.04] bg-brand-50 ring-[3px] ring-brand-500" : "bg-slate-50 ring-1 ring-slate-200"
+                      whileHover={reduce ? undefined : { y: -3 }}
+                      whileTap={reduce ? { opacity: 0.8 } : { scale: 0.88 }}
+                      animate={on && !reduce ? { scale: [1, 1.14, 1.05] } : { scale: 1 }}
+                      transition={{ duration: 0.35, ease: "easeOut" }}
+                      className={`relative flex min-h-[84px] flex-col items-center justify-center rounded-2xl px-0.5 py-2 transition-[background-color,box-shadow,opacity] duration-200 ${
+                        on ? "bg-brand-50 ring-[3px] ring-brand-500" : "bg-slate-50 ring-1 ring-slate-200"
                       } ${value && !on ? "opacity-45" : ""}`}
                     >
-                      <span className="text-[2.6rem] leading-none" aria-hidden>
+                      <motion.span
+                        className="relative inline-block text-[2.6rem] leading-none"
+                        aria-hidden
+                        animate={on ? (reduce ? { opacity: [0.4, 1] } : { y: [0, -14, 0, -5, 0], rotate: [0, -14, 12, -6, 0], scale: [1, 1.3, 1, 1.08, 1] }) : undefined}
+                        transition={{ duration: 0.65, ease: "easeOut" }}
+                      >
                         {f.emoji}
-                      </span>
+                        {on && <Sparkles count={8} radius={34} size={11} />}
+                      </motion.span>
                       <span className={`mt-1.5 text-xs leading-tight ${on ? "font-bold text-brand-700" : "font-medium text-slate-600"}`}>
                         {faceLabel}
                       </span>
-                    </button>
+                    </motion.button>
                   );
                 })}
               </div>
@@ -394,10 +407,10 @@ export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) 
                   Toca una carita.
                 </p>
               )}
-            </section>
+            </motion.section>
           );
         })}
-      </div>
+      </motion.div>
 
       {/* 3. Comentario */}
       <section className="mt-5 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
@@ -519,14 +532,18 @@ export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) 
             )}
           </div>
         )}
-        <button
+        <motion.button
           type="button"
           onClick={send}
           disabled={sending}
-          className="flex min-h-[68px] w-full items-center justify-center rounded-2xl bg-emerald-600 px-4 text-xl font-bold text-white shadow-md active:scale-[0.98] disabled:opacity-60"
+          whileHover={reduce || sending ? undefined : { y: -2 }}
+          whileTap={reduce || sending ? { opacity: 0.85 } : { scale: 0.96 }}
+          className={`flex min-h-[68px] w-full items-center justify-center rounded-2xl bg-emerald-600 px-4 text-xl font-bold text-white shadow-md disabled:opacity-60 ${
+            !sending && COURIER_QUESTIONS.every((q) => draft.answers[q.id]) ? "attn attn-success" : ""
+          }`}
         >
           {sending ? "Enviando…" : sendError ? "Intentar de nuevo" : "Enviar"}
-        </button>
+        </motion.button>
       </div>
     </main>
   );
@@ -779,12 +796,27 @@ function ThankYou({
 }) {
   const [editing, setEditing] = useState(false);
   const [lastOk, setLastOk] = useState(false);
+  const reduce = useReducedMotion();
   return (
     <main className="mx-auto w-full max-w-xl flex-1 px-4 pb-10 pt-10">
-      <div className="rounded-3xl bg-white p-6 text-center shadow-sm ring-1 ring-slate-200" data-testid="thanks">
-        <div className="text-7xl" aria-hidden>
-          🎉
-        </div>
+      <Confetti count={44} />
+      <div className="animate-pop rounded-3xl bg-white p-6 text-center shadow-sm ring-1 ring-slate-200" data-testid="thanks">
+        <motion.div
+          className="relative inline-block text-7xl"
+          aria-hidden
+          initial={reduce ? { opacity: 0 } : { scale: 0.2, rotate: -30, opacity: 0 }}
+          animate={reduce ? { opacity: 1 } : { scale: [0.2, 1.3, 1], rotate: [-30, 12, 0], opacity: 1 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+        >
+          <motion.span
+            className="inline-block"
+            animate={reduce ? { opacity: [1, 0.7, 1] } : { y: [0, -10, 0], rotate: [0, -6, 6, 0] }}
+            transition={{ duration: 1.6, repeat: Infinity, repeatDelay: 1, delay: 0.7 }}
+          >
+            🎉
+          </motion.span>
+          <Sparkles count={12} radius={76} size={15} delay={0.2} />
+        </motion.div>
         <h1 className="mt-3 text-3xl font-bold">¡Gracias, {sent.name.split(/\s+/)[0]}!</h1>
         <p className="mt-2 text-lg text-slate-700">Tus respuestas se enviaron. Nos ayudan a mejorar la app.</p>
         {sent.issues > 0 && (
