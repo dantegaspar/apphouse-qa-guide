@@ -686,7 +686,8 @@ function access(guide: Guide, state: RunState) {
     return seqDone;
   };
   const currentAct = finalized ? undefined : acts.find((a) => !done(a.id) && (state.prepDone ? isOpen(a.id) : true));
-  const canFinish = !!state.ended || (flexible ? seqDone : acts.every((a) => done(a.id)));
+  // La encuesta final solo se abre con el 100 % de las actividades guardadas (o si el guía terminó la prueba)
+  const canFinish = !!state.ended || acts.every((a) => done(a.id));
   return { flexible, seqDone, isOpen, currentAct, canFinish, finalized, firstFlexId: flexible ? acts[seqIdx + 1]?.id : undefined };
 }
 
