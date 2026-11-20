@@ -4,6 +4,11 @@ export type FieldDef = {
   type?: "text" | "number" | "time" | "email";
   placeholder?: string;
   required?: boolean;
+  /** Regex (sin delimitadores) que debe cumplir el valor, p. ej. un folio "^\\d{6}-\\d{4}$". */
+  pattern?: string;
+  /** Mensaje en lenguaje simple si no cumple el pattern. */
+  patternHint?: string;
+  maxLength?: number;
 };
 
 export type Step = {
