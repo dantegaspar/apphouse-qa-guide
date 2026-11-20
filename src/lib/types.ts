@@ -13,6 +13,13 @@ export type Step = {
   caption?: string;
   /** El manual pide una captura como evidencia en este paso. */
   evidence?: boolean;
+  /** Muestra en el paso un botón con pulso que abre "Datos para tu sucursal" (hoja de referencia). */
+  dataButton?: boolean;
+  /**
+   * Paso de confirmación: el tester debe marcar todas las casillas antes de poder avanzar
+   * (p. ej. al cerrar cada Parte A–E de E04).
+   */
+  checkpoint?: { title: string; items: string[] };
 };
 
 export type Activity = {
