@@ -8,6 +8,7 @@ import {
 } from "@/lib/admin-data";
 import { LogoutButton } from "@/components/admin/LogoutButton";
 import { AutoRefresh } from "@/components/admin/AutoRefresh";
+import { CourierAdminSection } from "@/components/admin/CourierSection";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +57,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs text-slate-400">Se actualiza solo cada 20 s · {fmtDate(new Date(nowMs).toISOString())}</span>
+          <a href="#repartidores" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-[#2F5DA8] hover:bg-slate-50">Repartidores</a>
           <Link href={`/admin/graficas${qs}`} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-[#2F5DA8] hover:bg-slate-50">Gráficas</Link>
         <LogoutButton />
         </div>
@@ -288,6 +290,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           })}
         </ul>
       </section>
+      <CourierAdminSection />
       <p className="text-xs text-slate-400">{guideId ? guideTitle(guideId) : "Todas las guías"}</p>
     </main>
   );

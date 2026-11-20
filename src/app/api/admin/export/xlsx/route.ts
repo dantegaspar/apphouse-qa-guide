@@ -14,6 +14,8 @@ const SHEETS: { kind: ExportKind; name: string }[] = [
   { kind: "issues", name: "Fallas" },
   { kind: "survey", name: "Encuesta" },
   { kind: "help", name: "Ayuda" },
+  { kind: "courier", name: "Repartidores" },
+  { kind: "courier_issues", name: "Repartidores - fallas" },
 ];
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;

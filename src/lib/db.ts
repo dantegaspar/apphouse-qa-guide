@@ -103,6 +103,42 @@ const MIGRATIONS: string[] = [
   ALTER TABLE runs ADD COLUMN ended_reason TEXT NOT NULL DEFAULT '';
   ALTER TABLE runs ADD COLUMN ended_at TEXT;
   `,
+  // 3: encuesta de repartidores (caritas + problemas con foto). Sus fotos van en su propia tabla
+  // porque attachments exige una corrida (runs).
+  `
+  CREATE TABLE courier_feedback (
+    id TEXT PRIMARY KEY,
+    token_hash TEXT NOT NULL,
+    name TEXT NOT NULL,
+    phone TEXT NOT NULL DEFAULT '',
+    device TEXT NOT NULL DEFAULT '{}',
+    answers TEXT NOT NULL DEFAULT '{}',
+    comment TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX courier_feedback_created ON courier_feedback(created_at);
+
+  CREATE TABLE courier_issues (
+    id TEXT PRIMARY KEY,
+    feedback_id TEXT NOT NULL REFERENCES courier_feedback(id) ON DELETE CASCADE,
+    description TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX courier_issues_feedback ON courier_issues(feedback_id);
+
+  CREATE TABLE courier_attachments (
+    id TEXT PRIMARY KEY,
+    feedback_id TEXT NOT NULL REFERENCES courier_feedback(id) ON DELETE CASCADE,
+    issue_id TEXT NOT NULL REFERENCES courier_issues(id) ON DELETE CASCADE,
+    original_name TEXT NOT NULL,
+    mime TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    path TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX courier_attachments_issue ON courier_attachments(issue_id);
+  `,
 ];
 
 function migrate(db: Database.Database) {

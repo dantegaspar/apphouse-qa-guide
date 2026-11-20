@@ -2,15 +2,56 @@ import { getGuide, GUIDES } from "@/lib/guides";
 import {
   checkValue, deviceSummary, flatten, guideTitle, HELP_STATUS, loadAll, parseRec, resultLabel, runStatusLabel,
 } from "@/lib/admin-data";
+import { COURIER_QUESTIONS, faceOf } from "@/lib/courier";
+import { answerOf, loadCourier } from "@/lib/courier-data";
 
 export type Cell = string | number | null | undefined;
-export type ExportKind = "runs" | "steps" | "activities" | "issues" | "survey" | "help";
-export const EXPORT_KINDS: ExportKind[] = ["runs", "steps", "activities", "issues", "survey", "help"];
+export type ExportKind = "runs" | "steps" | "activities" | "issues" | "survey" | "help" | "courier" | "courier_issues";
+export const EXPORT_KINDS: ExportKind[] = ["runs", "steps", "activities", "issues", "survey", "help", "courier", "courier_issues"];
 
 /** Encabezados que contienen fechas ISO (para exportaciones que soportan fechas reales). */
 export const DATE_HEADERS = new Set(["terminada por bloqueo", "creada", "actualizada", "terminada", "creado", "pedida", "cerrada"]);
 
+/** Encuesta de repartidores (no depende del filtro de guía). Respuestas como número 1–5 y carita. */
+function buildCourierExport(kind: "courier" | "courier_issues", origin: string): { headers: string[]; rows: Cell[][] } {
+  const { feedback, issues, attachments } = loadCourier();
+  const fileUrls = (pred: (a: (typeof attachments)[number]) => boolean) =>
+    attachments.filter(pred).map((a) => `${origin}/api/admin/courier-files/${a.id}`).join("\n");
+  if (kind === "courier") {
+    const headers = [
+      "encuesta", "nombre", "teléfono", "dispositivo", "ip",
+      ...COURIER_QUESTIONS.flatMap((q) => [q.label, `${q.short} (carita)`]),
+      "promedio", "comentario", "problemas", "fotos", "creado", "actualizada",
+    ];
+    const rows = feedback.map((f) => {
+      const ans = parseRec(f.answers);
+      const dev = parseRec(f.device);
+      const vals = COURIER_QUESTIONS.map((q) => answerOf(ans, q.id));
+      const nums = vals.filter((v): v is number => v !== null);
+      return [
+        f.id, f.name, f.phone, flatten({ ...dev, ip: "" }), String(dev.ip ?? ""),
+        ...vals.flatMap((v) => [v, v ? `${faceOf(v)?.emoji} ${faceOf(v)?.label}` : ""]),
+        nums.length ? Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 10) / 10 : null,
+        f.comment, issues.filter((i) => i.feedback_id === f.id).length, fileUrls((a) => a.feedback_id === f.id),
+        f.created_at, f.updated_at,
+      ];
+    });
+    return { headers, rows };
+  }
+  const byId = new Map(feedback.map((f) => [f.id, f]));
+  const headers = ["encuesta", "repartidor", "teléfono", "dispositivo", "qué pasó", "fotos", "creado"];
+  const rows = issues.map((i) => {
+    const f = byId.get(i.feedback_id);
+    return [
+      i.feedback_id, f?.name, f?.phone, f ? deviceSummary(parseRec(f.device)) : "", i.description,
+      fileUrls((a) => a.issue_id === i.id), i.created_at,
+    ];
+  });
+  return { headers, rows };
+}
+
 export function buildExport(kind: ExportKind, origin: string, guideId: string | null): { headers: string[]; rows: Cell[][] } {
+  if (kind === "courier" || kind === "courier_issues") return buildCourierExport(kind, origin);
   const d = loadAll(guideId);
   const runById = new Map(d.runs.map((r) => [r.id, r]));
   const runLabel = (id: string) => `${id.slice(0, 8)}`;

@@ -27,8 +27,15 @@ export default function Home() {
             </Link>
           </li>
         ))}
-        <li className="rounded-2xl border border-dashed border-slate-300 p-5 text-sm text-slate-500">
-          Repartidor: encuesta próximamente.
+        <li>
+          <Link
+            href="/repartidor"
+            className="block rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 transition hover:ring-brand-500 active:scale-[0.99]"
+          >
+            <div className="text-xs font-semibold uppercase tracking-wide text-teal-brand">Repartidor</div>
+            <div className="mt-1 text-lg font-semibold">Encuesta para repartidores</div>
+            <div className="mt-1 text-sm text-slate-600">6 preguntas con caritas · reporta fallas con una foto</div>
+          </Link>
         </li>
       </ul>
     </main>

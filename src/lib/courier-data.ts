@@ -1,0 +1,58 @@
+import crypto from "node:crypto";
+import { getDb } from "./db";
+import { sha256 } from "./auth";
+import { parseRec } from "./admin-data";
+import { COURIER_QUESTIONS } from "./courier";
+
+export type CourierFeedbackRow = {
+  id: string;
+  name: string;
+  phone: string;
+  device: string;
+  answers: string;
+  comment: string;
+  created_at: string;
+  updated_at: string;
+};
+export type CourierIssueRow = { id: string; feedback_id: string; description: string; created_at: string };
+export type CourierAttachmentRow = { id: string; feedback_id: string; issue_id: string; original_name: string; mime: string; size: number };
+
+/** Valida el token de la encuesta (cabecera x-courier-token). */
+export function checkCourierToken(feedbackId: string, token: string | null) {
+  if (!token) return false;
+  const row = getDb().prepare("SELECT token_hash FROM courier_feedback WHERE id = ?").get(feedbackId) as { token_hash: string } | undefined;
+  if (!row) return false;
+  const a = Buffer.from(row.token_hash);
+  const b = Buffer.from(sha256(token));
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+/** Respuesta 1–5 de una pregunta, o null. */
+export function answerOf(answers: Record<string, unknown>, id: string): number | null {
+  const v = Number(answers[id]);
+  return Number.isInteger(v) && v >= 1 && v <= 5 ? v : null;
+}
+
+export function loadCourier() {
+  const db = getDb();
+  const feedback = db.prepare("SELECT id, name, phone, device, answers, comment, created_at, updated_at FROM courier_feedback ORDER BY created_at DESC").all() as CourierFeedbackRow[];
+  const issues = db.prepare("SELECT * FROM courier_issues ORDER BY created_at").all() as CourierIssueRow[];
+  const attachments = db
+    .prepare("SELECT id, feedback_id, issue_id, original_name, mime, size FROM courier_attachments ORDER BY created_at")
+    .all() as CourierAttachmentRow[];
+  return { feedback, issues, attachments };
+}
+
+export type CourierQuestionStats = { id: string; label: string; short: string; counts: number[]; n: number; avg: number | null };
+
+/** Distribución (1–5) y promedio por pregunta. */
+export function courierStats(feedback: CourierFeedbackRow[]) {
+  const answers = feedback.map((f) => parseRec(f.answers));
+  const questions: CourierQuestionStats[] = COURIER_QUESTIONS.map((q) => {
+    const vals = answers.map((a) => answerOf(a, q.id)).filter((v): v is number => v !== null);
+    const counts = [1, 2, 3, 4, 5].map((v) => vals.filter((x) => x === v).length);
+    return { ...q, counts, n: vals.length, avg: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null };
+  });
+  const all = questions.flatMap((q) => q.counts.flatMap((c, i) => Array<number>(c).fill(i + 1)));
+  return { responses: feedback.length, questions, avg: all.length ? all.reduce((a, b) => a + b, 0) / all.length : null };
+}

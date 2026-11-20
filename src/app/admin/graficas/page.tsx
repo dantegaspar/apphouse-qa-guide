@@ -5,6 +5,7 @@ import { getGuide, GUIDES } from "@/lib/guides";
 import { ACTIVITY_RESULTS } from "@/lib/types";
 import { loadStats, RESULT_ORDER, type NpsDist } from "@/lib/admin-stats";
 import { LogoutButton } from "@/components/admin/LogoutButton";
+import { CourierChartsSection } from "@/components/admin/CourierSection";
 import { Bars, ChartCard, COLORS, Columns, Empty, fmt, Kpi, SegmentedBar, StackedBars, type Series } from "@/components/admin/charts/Charts";
 
 export const dynamic = "force-dynamic";
@@ -287,6 +288,9 @@ export default async function ChartsPage({ searchParams }: { searchParams: Promi
           </div>
         )}
       </section>
+
+      {/* Repartidores (encuesta aparte, no depende del filtro de guía) */}
+      <CourierChartsSection />
 
       {/* 6. Dispositivos y tiempo */}
       <section>
