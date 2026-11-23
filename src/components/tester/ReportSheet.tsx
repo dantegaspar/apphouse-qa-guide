@@ -4,14 +4,23 @@ import { useEffect, useRef, useState } from "react";
 import { Button, FieldError, FormField, Sheet } from "./ui";
 import { compressImage } from "./store";
 import { focusFirstError, LIMITS, validateFile } from "./validation";
+import type { Severity } from "@/lib/types";
 
 export type ReportDraft = {
   kind: "issue" | "evidence";
   description: string;
   expected: string;
   blocking: boolean;
+  severity?: Severity;
   orderNumber: string;
 };
+
+/** Opciones de «¿Qué tanto te afecta?» en palabras simples (gravedad tipo IEEE 1044). */
+const SEVERITY_OPTIONS: { v: Severity; label: string; hint: string }[] = [
+  { v: "bloqueante", label: "No puedo seguir", hint: "La actividad se detiene hasta que el guía te ayude." },
+  { v: "mayor", label: "Sigo, pero salió mal", hint: "Un dato, un precio o un aviso no es el correcto." },
+  { v: "menor", label: "Es un detalle", hint: "Texto, apariencia o algo que no cambia el resultado." },
+];
 
 /** «Ej. 261120-0004» con la fecha de hoy (formato de folio AAMMDD-NNNN). */
 function todayOrderExample() {
@@ -48,7 +57,7 @@ export default function ReportSheet({
 }) {
   const [description, setDescription] = useState("");
   const [expected, setExpected] = useState("");
-  const [blocking, setBlocking] = useState<boolean | null>(null);
+  const [severity, setSeverity] = useState<Severity | null>(null);
   const [orderNumber, setOrderNumber] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +72,7 @@ export default function ReportSheet({
       /* eslint-disable react-hooks/set-state-in-effect -- reinicia el formulario al abrir */
       setDescription("");
       setExpected("");
-      setBlocking(null);
+      setSeverity(null);
       setOrderNumber("");
       setFiles([]);
       setFileErrors([]);
@@ -109,7 +118,7 @@ export default function ReportSheet({
     else if (d.length < 5) errors.description = "Escribe un poco más (al menos 5 letras) para que el equipo entienda la falla.";
     else if (d.length > LIMITS.description) errors.description = `Máximo ${LIMITS.description} caracteres (llevas ${d.length}).`;
     if (expected.trim().length > LIMITS.expected) errors.expected = `Máximo ${LIMITS.expected} caracteres.`;
-    if (blocking === null) errors.blocking = "Elige Sí o No.";
+    if (severity === null) errors.blocking = "Elige una opción.";
     if (orderNumber.trim().length > LIMITS.orderNumber) errors.orderNumber = `Máximo ${LIMITS.orderNumber} caracteres.`;
   } else {
     if (files.length === 0) errors.files = "Agrega al menos una captura o video.";
@@ -127,7 +136,7 @@ export default function ReportSheet({
     setBusy(true);
     setError(null);
     const msg = await onSubmit(
-      { kind, description: description.trim(), expected: expected.trim(), blocking: !!blocking, orderNumber: orderNumber.trim() },
+      { kind, description: description.trim(), expected: expected.trim(), blocking: severity === "bloqueante", severity: severity ?? undefined, orderNumber: orderNumber.trim() },
       files
     );
     setBusy(false);
@@ -193,28 +202,26 @@ export default function ReportSheet({
             </FormField>
             <div data-error={shown.blocking ? "true" : undefined}>
               <span className="mb-1 block text-sm font-medium text-slate-800" id="r-block-label">
-                ¿Te impide seguir? *
+                ¿Qué tanto te afecta? *
               </span>
-              <div className={`grid grid-cols-2 gap-2 ${shown.blocking ? "animate-shake" : ""}`} role="group" aria-labelledby="r-block-label">
-                {[
-                  [true, "Sí"],
-                  [false, "No"],
-                ].map(([v, l]) => (
+              <div className={`grid gap-2 sm:grid-cols-3 ${shown.blocking ? "animate-shake" : ""}`} role="group" aria-labelledby="r-block-label" data-testid="severity">
+                {SEVERITY_OPTIONS.map((o) => (
                   <button
-                    key={String(v)}
+                    key={o.v}
                     type="button"
-                    aria-pressed={blocking === v}
-                    onClick={() => setBlocking(v as boolean)}
-                    className={`min-h-12 rounded-xl py-3 font-medium ring-1 ${
-                      blocking === v ? "bg-brand-500 text-white ring-brand-500" : shown.blocking ? "bg-white ring-2 ring-rose-400" : "bg-white ring-slate-300"
+                    aria-pressed={severity === o.v}
+                    onClick={() => setSeverity(o.v)}
+                    className={`min-h-12 rounded-xl px-3 py-2 text-left ring-1 ${
+                      severity === o.v ? "bg-brand-500 text-white ring-brand-500" : shown.blocking ? "bg-white ring-2 ring-rose-400" : "bg-white ring-slate-300"
                     }`}
                   >
-                    {l as string}
+                    <span className="block font-medium">{o.label}</span>
+                    <span className={`block text-xs ${severity === o.v ? "text-white/90" : "text-slate-600"}`}>{o.hint}</span>
                   </button>
                 ))}
               </div>
               {shown.blocking && <FieldError>{shown.blocking}</FieldError>}
-              {blocking && (
+              {severity === "bloqueante" && (
                 <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-800">
                   La actividad quedará en pausa y tendrás que pedir ayuda al guía de la prueba para continuar.
                 </p>

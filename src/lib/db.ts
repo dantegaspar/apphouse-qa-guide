@@ -163,6 +163,15 @@ const MIGRATIONS: string[] = [
   DROP TABLE step_results;
   ALTER TABLE step_results_new RENAME TO step_results;
   `,
+  // 6: gravedad de la falla (bloqueante / mayor / menor) y revisión de Mesa de control (triage).
+  // Las fallas viejas toman la gravedad de «¿Te impide seguir?».
+  `
+  ALTER TABLE issues ADD COLUMN severity TEXT NOT NULL DEFAULT '';
+  ALTER TABLE issues ADD COLUMN triage TEXT NOT NULL DEFAULT 'pendiente';
+  ALTER TABLE issues ADD COLUMN triage_note TEXT NOT NULL DEFAULT '';
+  ALTER TABLE issues ADD COLUMN triage_at TEXT;
+  UPDATE issues SET severity = CASE WHEN blocking = 1 THEN 'bloqueante' ELSE 'mayor' END WHERE kind = 'issue';
+  `,
 ];
 
 function migrate(db: Database.Database) {

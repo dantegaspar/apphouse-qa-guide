@@ -6,10 +6,12 @@ import {
 import { COURIER_QUESTIONS, faceOf } from "@/lib/courier";
 import { answerOf, loadCourier } from "@/lib/courier-data";
 import { insightsExport } from "@/lib/insights";
+import { computeVerdict } from "@/lib/verdict";
+import { PRIORITIES, SEVERITIES, TRIAGE } from "@/lib/types";
 
 export type Cell = string | number | null | undefined;
-export type ExportKind = "insights" | "runs" | "steps" | "activities" | "issues" | "survey" | "help" | "courier" | "courier_issues";
-export const EXPORT_KINDS: ExportKind[] = ["insights", "runs", "steps", "activities", "issues", "survey", "help", "courier", "courier_issues"];
+export type ExportKind = "verdict" | "cases" | "insights" | "runs" | "steps" | "activities" | "issues" | "survey" | "help" | "courier" | "courier_issues";
+export const EXPORT_KINDS: ExportKind[] = ["verdict", "cases", "insights", "runs", "steps", "activities", "issues", "survey", "help", "courier", "courier_issues"];
 
 /** Encabezados que contienen fechas ISO (para exportaciones que soportan fechas reales). */
 export const DATE_HEADERS = new Set(["terminada por bloqueo", "creada", "actualizada", "terminada", "creado", "pedida", "cerrada"]);
@@ -54,6 +56,7 @@ function buildCourierExport(kind: "courier" | "courier_issues", origin: string):
 
 export function buildExport(kind: ExportKind, origin: string, guideId: string | null): { headers: string[]; rows: Cell[][] } {
   if (kind === "courier" || kind === "courier_issues") return buildCourierExport(kind, origin);
+  if (kind === "verdict" || kind === "cases") return verdictExport(kind);
   if (kind === "insights") return insightsExport(guideId);
   const d = loadAll(guideId);
   const runById = new Map(d.runs.map((r) => [r.id, r]));
@@ -103,14 +106,14 @@ export function buildExport(kind: ExportKind, origin: string, guideId: string | 
       return [runLabel(r.id), r.name, a.activity_id, act?.title, resultLabel(a.result), summary, fields, a.notes];
     });
   } else if (kind === "issues") {
-    headers = ["run", "tester", "correo", "dispositivo", "actividad", "paso", "tipo", "descripción", "esperado", "bloqueante", "número de pedido", "archivos", "creado"];
+    headers = ["run", "tester", "correo", "dispositivo", "actividad", "paso", "tipo", "descripción", "esperado", "bloqueante", "gravedad", "revisión", "número de pedido", "archivos", "creado"];
     rows = d.issues.map((i) => {
       const r = runById.get(i.run_id)!;
       const files = d.attachments.filter((a) => a.issue_id === i.id).map((a) => `${origin}/api/admin/files/${a.id}`).join("\n");
       return [
         runLabel(r.id), r.name, r.email, deviceSummary(parseRec(r.device), parseRec(r.tester_fields)),
         `${i.activity_id} ${actTitle(r.guide_id, i.activity_id)}`.trim(), i.step_id, i.kind === "evidence" ? "evidencia" : "falla",
-        i.description, i.expected, i.blocking ? "sí" : "no", i.order_number, files, i.created_at,
+        i.description, i.expected, i.blocking ? "sí" : "no", i.severity ?? "", TRIAGE[i.triage as keyof typeof TRIAGE] ?? i.triage ?? "", i.order_number, files, i.created_at,
       ];
     });
   } else if (kind === "help") {
@@ -143,4 +146,30 @@ export function requestOrigin(req: Request) {
   return `${(req.headers.get("x-forwarded-proto") || url.protocol.replace(":", "")).split(",")[0]}://${
     req.headers.get("x-forwarded-host") || req.headers.get("host") || url.host
   }`;
+}
+
+/** Hojas «Veredicto» (criterios y fallas vigentes) y «Casos» (métricas por caso de prueba). */
+function verdictExport(kind: "verdict" | "cases"): { headers: string[]; rows: Cell[][] } {
+  const v = computeVerdict();
+  if (kind === "cases") {
+    return {
+      headers: ["guía", "caso", "título", "prioridad", "calidad ISO/IEC 25010:2023", "ejecuciones", "pasa", "pasa con observaciones", "falla", "bloqueada", "aprobación %", "IC 95 % inferior", "IC 95 % superior", "min reales (mediana)", "min estimados"],
+      rows: v.guides.flatMap((g) =>
+        g.cases.map((c) => [
+          g.guide.title, c.id, c.title, PRIORITIES[c.priority], c.quality, c.executed, c.passed, c.passedWithNotes, c.failed, c.blocked,
+          c.passRate === null ? null : Math.round(c.passRate * 100), c.ci ? Math.round(c.ci[0] * 100) : null, c.ci ? Math.round(c.ci[1] * 100) : null,
+          c.medianMin === null ? null : Math.round(c.medianMin * 10) / 10, c.estMin,
+        ])
+      ),
+    };
+  }
+  const crit = [...v.guides.flatMap((g) => g.criteria), ...(v.courier.criterion ? [v.courier.criterion] : [])];
+  return {
+    headers: ["sección", "concepto", "medición", "umbral", "cumple", "fundamento"],
+    rows: [
+      ["Veredicto", "¿Listo para producción?", v.ready ? "Sí" : "No", "Todos los criterios", v.ready ? "sí" : "no", v.reasons.join(" | ")],
+      ...crit.map((c) => ["Criterio", c.label, c.measured, c.threshold, c.pass ? "sí" : "no", c.basis] as Cell[]),
+      ...v.defects.map((d) => ["Falla vigente", `${d.activityId} ${d.activityTitle}`, d.description, `${SEVERITIES[d.severity]} · ${PRIORITIES[d.priority]}`, TRIAGE[d.triage as keyof typeof TRIAGE] ?? d.triage, d.tester] as Cell[]),
+    ],
+  };
 }

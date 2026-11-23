@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ActivityResult } from "@/lib/types";
+import type { ActivityResult, Severity } from "@/lib/types";
 
 /** Resultado de un paso: lo logré, no pude o «No me apareció» (pasos condicionales: terminado sin falla). */
 export type Outcome = "ok" | "fail" | "na";
@@ -15,6 +15,8 @@ export type Issue = {
   description: string;
   expected: string;
   blocking: boolean;
+  /** Gravedad (bloqueante / mayor / menor); reportes viejos no la traen. */
+  severity?: Severity;
   orderNumber: string;
   attachments: IssueAttachment[];
   createdAt: string;

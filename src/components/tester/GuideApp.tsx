@@ -1249,7 +1249,7 @@ function Summary({
               <li key={i.id} className="rounded-xl bg-white p-3 text-sm shadow-sm ring-1 ring-slate-200">
                 <div className="text-xs font-semibold text-rose-700">
                   {i.activityId}
-                  {i.stepId ? ` · paso ${i.stepId}` : ""} {i.blocking ? "· impide seguir" : ""}
+                  {i.stepId ? ` · paso ${i.stepId}` : ""} {i.blocking ? "· impide seguir" : i.severity === "menor" ? "· detalle" : ""}
                 </div>
                 <p className="mt-0.5">{i.description}</p>
                 {i.attachments.length > 0 && <p className="mt-1 text-xs text-slate-600">📎 {i.attachments.length} archivo(s)</p>}

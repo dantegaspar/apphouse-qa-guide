@@ -14,6 +14,7 @@ import { HelpRequestWatcher } from "@/components/admin/HelpRequestWatcher";
 import { InsightsPanel } from "@/components/admin/InsightsPanel";
 import { Coachmark } from "@/components/feedback";
 import { computeInsights } from "@/lib/insights";
+import IssueTriage from "@/components/admin/IssueTriage";
 
 export const dynamic = "force-dynamic";
 
@@ -65,6 +66,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <Link href={`/admin/mesa${qs}`} className="rounded-lg bg-[#2F5DA8] px-3 py-2 text-sm font-semibold text-white hover:bg-[#274f8f]">Mesa de control</Link>
           <a href="#repartidores" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-[#2F5DA8] hover:bg-slate-50">Repartidores</a>
           <Link href={`/admin/graficas${qs}`} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-[#2F5DA8] hover:bg-slate-50">Gráficas</Link>
+          <Link href="/admin/veredicto" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-[#2F5DA8] hover:bg-slate-50">¿Listo para producción?</Link>
           <LogoutButton />
         </div>
       </header>
@@ -284,7 +286,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                   <span>· {i.activity_id} {act?.title}{i.step_id ? ` · paso ${i.step_id}` : ""}</span>
                   <span>· {fmtDate(i.created_at)}</span>
                   {i.kind === "evidence" && <span className="rounded bg-sky-100 px-1.5 py-0.5 text-sky-800">evidencia</span>}
-                  {i.blocking ? <span className="rounded bg-red-100 px-1.5 py-0.5 font-medium text-red-800">bloqueante</span> : null}
+                  {i.kind === "issue" && <IssueTriage id={i.id} severity={i.severity} triage={i.triage} />}
                   {i.order_number && <span>· pedido {i.order_number}</span>}
                 </div>
                 {i.description && <p className="mt-2 whitespace-pre-wrap text-sm text-slate-800">{i.description}</p>}

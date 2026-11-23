@@ -71,7 +71,49 @@ export type Activity = {
   steps: Step[];
   expected: ExpectedItem[];
   fields?: FieldDef[];
+  /**
+   * Caso de prueba (metodología: pruebas de aceptación basadas en riesgo, ISO/IEC/IEEE 29119-2:2021).
+   * critica = flujos de pedido y dinero; alta = lo que ve el cliente; media; baja = consulta.
+   * Decide los criterios de salida del veredicto (src/lib/verdict.ts).
+   */
+  priority?: Priority;
+  /** Característica de calidad ISO/IEC 25010:2023 que evalúa principalmente el caso. */
+  quality?: string;
+  /** Minutos estimados para hacer el caso (eficiencia: se compara con la mediana real). */
+  estMin?: number;
+  /** Con quién se hace en pareja (p. ej. «Cliente: C06»). */
+  pairWith?: string;
 };
+
+export const PRIORITIES = {
+  critica: "Crítica",
+  alta: "Alta",
+  media: "Media",
+  baja: "Baja",
+} as const;
+export type Priority = keyof typeof PRIORITIES;
+
+/**
+ * Gravedad de una falla (clasificación de defectos tipo IEEE 1044-2009):
+ * bloqueante = no se puede seguir con el flujo; mayor = el flujo sigue pero el resultado está mal;
+ * menor = texto, apariencia o detalle que no cambia el resultado.
+ */
+export const SEVERITIES = {
+  bloqueante: "Bloqueante",
+  mayor: "Mayor",
+  menor: "Menor",
+} as const;
+export type Severity = keyof typeof SEVERITIES;
+
+/** Revisión de Mesa de control sobre una falla reportada. */
+export const TRIAGE = {
+  pendiente: "Sin revisar",
+  confirmada: "Confirmada",
+  no_es_falla: "No es falla",
+  duplicada: "Duplicada",
+  corregida: "Corregida",
+} as const;
+export type Triage = keyof typeof TRIAGE;
 
 export type SurveyQuestion = {
   id: string;
