@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Activity, FieldDef } from "@/lib/types";
 import { ACTIVITY_RESULTS, type ActivityResult } from "@/lib/types";
 import { Coachmark, confirm, useToastOffset } from "@/components/feedback";
-import { Bump, motion, Sparkles, StepFrame, TickBadge, useReducedMotion } from "@/components/motion";
+import { motion, StepFrame, useReducedMotion } from "@/components/motion";
 import { expectedConditional, expectedText, NOT_APPLICABLE, screensOf } from "@/lib/guide-utils";
 import OrdersField, { ordersError } from "./OrdersField";
 import { DaysPicker, FolioTimePicker, TimePicker, TimeRangePicker } from "./pickers";
@@ -88,9 +88,8 @@ export default function ActivityView({
   // Errores del cierre (se muestran después del primer intento de guardar)
   const [tried, setTried] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
-  // Captura a la vista en la pantalla actual y si el tester está eligiendo en qué paso tuvo el problema
+  // Paso abierto para revisarlo (si es null, se muestra el paso activo)
   const [shot, setShot] = useState<string | null>(null);
-  const [problem, setProblem] = useState(false);
   const closingRef = useRef<HTMLDivElement>(null);
   // Los avisos flotantes van arriba de la barra fija de botones
   useToastOffset(desktop ? 96 : 150);
@@ -99,7 +98,6 @@ export default function ActivityView({
     setDir(p >= pos ? "next" : "prev");
     setPos(p);
     setShot(null);
-    setProblem(false);
     window.scrollTo({ top: 0 });
   };
   const parts = partsOf(activity);
@@ -234,7 +232,7 @@ export default function ActivityView({
     if (draft.notes.trim().length > LIMITS.notes) errors._notes = `Máximo ${LIMITS.notes} caracteres.`;
     const shown: Errors = tried ? errors : {};
     const complete = Object.keys(errors).length === 0 && (allChecked || skipped);
-    const card = "rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200" + dk("lg:p-6");
+    const card = "p-4" + dk("lg:p-6");
     const save = async () => {
       if (Object.keys(errors).length) {
         setTried(true);
@@ -266,7 +264,7 @@ export default function ActivityView({
               Ya guardaste {activity.id}. Puedes corregirla y volver a guardarla hasta que toques <strong>Terminar</strong>.
             </Callout>
           )}
-          <div className={dk(hasOrders ? "lg:space-y-6" : "lg:grid lg:grid-cols-2 lg:items-start lg:gap-6")}>
+          <div className={"overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200" + dk(hasOrders ? "" : "lg:max-w-3xl")}>
             <div className={card}>
               <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
                 <div>
@@ -274,13 +272,13 @@ export default function ActivityView({
                   <p className="text-sm text-slate-600">¿Pasó lo que dice cada punto?</p>
                 </div>
               </div>
-              <ul className="space-y-3">
+              <ul className="divide-y divide-slate-100">
                 {activity.expected.map((item, i) => {
                   const v = draft.checks[String(i)];
                   const e = expectedText(item);
                   const cond = expectedConditional(item);
                   return (
-                    <li key={i} className={"rounded-xl bg-slate-50 p-3" + dk("lg:flex lg:items-center lg:gap-4 lg:px-4")}>
+                    <li key={i} className={"py-3 first:pt-0 last:pb-0" + dk("lg:flex lg:items-center lg:gap-4")}>
                       <p className={"text-sm" + dk("lg:flex-1")} id={`exp-${activity.id}-${i}`}>
                         {e}
                       </p>
@@ -324,7 +322,7 @@ export default function ActivityView({
               </ul>
             </div>
 
-            <div className={"mt-5 space-y-5" + dk(hasOrders ? "" : "lg:mt-0")}>
+            <div className="divide-y divide-slate-100 border-t border-slate-100">
               {activity.fields && activity.fields.length > 0 && (
                 <div className={"space-y-3 " + card}>
                   <div>
@@ -455,15 +453,19 @@ export default function ActivityView({
                 )}
               </div>
 
-              <IssueList issues={issuesFor()} />
-              <p className={"px-1 text-xs text-slate-600" + dk("lg:hidden")}>✓ Tus respuestas se guardan solas en este navegador mientras llenas.</p>
+              {issuesFor().length > 0 && (
+                <div className={card}>
+                  <IssueList issues={issuesFor()} />
+                </div>
+              )}
             </div>
           </div>
+          <p className={"px-1 text-xs text-slate-600" + dk("lg:hidden")}>✓ Tus respuestas se guardan solas en este navegador mientras llenas.</p>
 
           <div
             className={
               "pb-safe sticky bottom-0 z-10 -mx-4 space-y-2 bg-[#f4f6fa]/95 px-4 pt-2 backdrop-blur" +
-              dk("lg:mx-0 lg:flex lg:items-center lg:justify-end lg:gap-4 lg:space-y-0 lg:rounded-2xl lg:bg-white/95 lg:px-5 lg:py-3 lg:shadow-md lg:ring-1 lg:ring-slate-200 lg:bottom-4")
+              dk((hasOrders ? "" : "lg:max-w-3xl ") + "lg:mx-0 lg:flex lg:items-center lg:justify-end lg:gap-4 lg:space-y-0 lg:rounded-2xl lg:bg-white/95 lg:px-5 lg:py-3 lg:shadow-md lg:ring-1 lg:ring-slate-200 lg:bottom-4")
             }
           >
             {tried && Object.keys(errors).length > 0 ? (
@@ -493,327 +495,292 @@ export default function ActivityView({
 
   const screen = screens[pos];
   const screenSteps = screen.steps;
-  const doSteps = screenSteps.filter((s) => !s.checkpoint);
-  const cpSteps = screenSteps.filter((s) => s.checkpoint);
-  const condSteps = doSteps.filter((s) => s.conditional);
-  const imgSteps = screenSteps.filter((s) => s.image);
   const num = (s: Activity["steps"][number]) => screen.start + screenSteps.indexOf(s) + 1;
   const outcomeOf = (s: Activity["steps"][number]) => state.steps[stepKey(activity.id, s.id)];
-  const failedSteps = doSteps.filter((s) => outcomeOf(s) === "fail");
-  const marked = screenDone(screen);
-  const cpAllDone = cpSteps.every(checkpointDone);
   const screenIssues = state.issues.filter((i) => i.activityId === activity.id && screenSteps.some((s) => s.id === i.stepId));
-  const dataStep = screenSteps.find((s) => s.dataButton);
-  const evidenceSteps = doSteps.filter((s) => s.evidence);
-  const shotStep = imgSteps.find((s) => s.id === shot) ?? imgSteps[0];
-  const legend = shotStep?.caption ? captionLegend(shotStep.caption) : null;
 
-  /** «Sí, siguiente»: los pasos sin marcar quedan como logrados (los de falla o «No me apareció» se quedan así). */
-  const next = () => {
-    for (const s of screenSteps) if (!outcomeOf(s)) onStep(s.id, "ok");
-    setProblem(false);
-    go(pos + 1);
-  };
-  const checkpointCard = (s: Activity["steps"][number]) => {
-    const cp = s.checkpoint!;
-    const ticks = ticksFor(s.id);
-    const done = cp.items.filter((_, i) => ticks[String(i)]).length;
-    const complete = done === cp.items.length;
-    return (
-      <fieldset
-        key={s.id}
-        className={`rounded-2xl p-4 shadow-sm ring-2 transition-colors ${complete ? "bg-emerald-50 ring-emerald-300" : "bg-white ring-brand-500/40"}` + dk("lg:p-5")}
-        data-testid="checkpoint"
-      >
-        <legend className="sr-only">{cp.title}</legend>
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="font-semibold leading-snug text-slate-900" aria-hidden="true">
-            <Bump k={complete ? "si" : "no"} className="relative mr-1">
-              {complete ? "✅" : "☑️"}
-              {complete && <Sparkles count={10} radius={30} size={11} />}
-            </Bump>
-            {cp.title}
-          </h3>
-          <span
-            className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold transition-colors duration-300 ${complete ? "bg-emerald-700 text-white" : "bg-slate-100 text-slate-700"}`}
-            aria-live="polite"
-          >
-            <Bump k={done}>{done}</Bump> de {cp.items.length}
-          </span>
-        </div>
-        <ul className="mt-3 space-y-2">
-          {cp.items.map((it, i) => {
-            const on = !!ticks[String(i)];
-            return (
-              <motion.li key={i} layout={!reduce} whileTap={reduce || blocked ? undefined : { scale: 0.98 }}>
-                <label
-                  className={`relative flex min-h-12 cursor-pointer items-start gap-3 rounded-xl p-3 text-[15px] ring-1 transition-colors duration-300 ${
-                    on ? "bg-white ring-emerald-300" : "bg-slate-50 ring-slate-200 hover:bg-slate-100"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    className="mt-0.5 h-6 w-6 shrink-0 accent-emerald-600"
-                    checked={on}
-                    disabled={blocked}
-                    onChange={(e) => onCheckpoint?.(s.id, { ...ticks, [String(i)]: e.target.checked })}
-                  />
-                  <span className={"flex-1 " + (on ? "text-slate-900" : "text-slate-800")}>
-                    <Rich text={it} />
-                  </span>
-                  <TickBadge on={on} />
-                </label>
-              </motion.li>
-            );
-          })}
-        </ul>
-      </fieldset>
-    );
+  // Un paso a la vez: el paso activo es el primero sin marcar; los anteriores quedan resumidos con ✓
+  // y los siguientes se ven atenuados (para saber cuántos faltan) pero no se pueden saltar.
+  const activeIdx = screenSteps.findIndex((s) => !outcomeOf(s));
+  const openIdx = shot ? screenSteps.findIndex((s) => s.id === shot) : -1;
+  const current = openIdx >= 0 && (openIdx <= activeIdx || activeIdx < 0) ? openIdx : activeIdx >= 0 ? activeIdx : screenSteps.length - 1;
+  const cur = screenSteps[current];
+  const isActive = current === activeIdx;
+  const lastOfScreen = activeIdx === screenSteps.length - 1 || activeIdx < 0;
+  const curLegend = cur?.caption ? captionLegend(cur.caption) : null;
+
+  /** «Listo»: marca el paso activo; en el último paso de la pantalla, pasa a la siguiente. */
+  const done = (outcome: Outcome = "ok") => {
+    if (activeIdx < 0) return go(pos + 1);
+    onStep(screenSteps[activeIdx].id, outcome);
+    setShot(null);
+    if (activeIdx === screenSteps.length - 1) go(pos + 1);
+    else window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
   };
   const openData = () => {
     setDataSeen((m) => ({ ...m, [screen.start]: true }));
     onOpenData?.();
   };
 
-  // Bloque 1: instrucciones de la pantalla
-  const instructions = (
-    <div className={"rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200" + dk("lg:p-6")} data-testid="instructions">
-      <h2 className={"mb-3 text-xs font-semibold uppercase tracking-wide text-slate-600" + dk("lg:text-sm")}>
-        Instrucciones{doSteps.length > 1 ? ` · ${doSteps.length} pasos` : ""}
-      </h2>
-      <ol className="space-y-3">
-        {doSteps.map((s) => {
-          const o = outcomeOf(s);
-          return (
-            <li key={s.id} className="flex gap-3" data-testid="instruction">
-              <span
-                className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white shadow-sm ${
-                  o === "fail" ? "bg-rose-600" : "bg-brand-gradient"
-                }`}
-                aria-hidden="true"
-              >
-                {o === "fail" ? "!" : num(s)}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className={"text-[16px] leading-relaxed text-slate-800" + dk("lg:text-base lg:leading-7")}>
-                  <span className="sr-only">Paso {num(s)}. </span>
-                  <Rich text={s.text} links />
-                </p>
-                {s.warning && (
-                  <div className="mt-2 flex gap-2 rounded-xl bg-amber-50 px-3 py-2 text-[15px] text-amber-950 ring-1 ring-amber-300" role="note" data-testid="step-warning">
-                    <span aria-hidden="true">⚠️</span>
-                    <span>
-                      <Rich text={s.warning} links />
+  const checklist = (s: Activity["steps"][number]) => {
+    const cp = s.checkpoint!;
+    const ticks = ticksFor(s.id);
+    const n = cp.items.filter((_, i) => ticks[String(i)]).length;
+    return (
+      <fieldset className="mt-3" data-testid="checkpoint">
+        <legend className="mb-2 flex w-full items-center justify-between gap-3 text-[15px] font-semibold text-slate-900">
+          <span>{cp.title}</span>
+          <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700" aria-live="polite">
+            {n} de {cp.items.length}
+          </span>
+        </legend>
+        <ul className="divide-y divide-slate-100 rounded-xl ring-1 ring-slate-200">
+          {cp.items.map((it, i) => {
+            const on = !!ticks[String(i)];
+            return (
+              <li key={i}>
+                <label className="flex min-h-12 cursor-pointer items-start gap-3 px-3 py-3 text-[15px] hover:bg-slate-50">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-6 w-6 shrink-0 accent-emerald-600"
+                    checked={on}
+                    disabled={blocked || !isActive}
+                    onChange={(e) => onCheckpoint?.(s.id, { ...ticks, [String(i)]: e.target.checked })}
+                  />
+                  <span className="flex-1 text-slate-800">
+                    <Rich text={it} />
+                  </span>
+                </label>
+              </li>
+            );
+          })}
+        </ul>
+      </fieldset>
+    );
+  };
+
+  /** Captura del paso abierto (en celular va dentro del paso; en escritorio, a la derecha). */
+  const shotOf = (s: Activity["steps"][number], aside: boolean) =>
+    s.image ? (
+      <div className={aside ? "" : "mt-3"} data-testid="screenshots">
+        <Coachmark id="tester-captura-zoom" message="Toca la captura para verla en grande y con zoom." placement="top">
+          <StepImage key={s.image} src={s.image} caption={s.caption} desktop={desktop} captionAside={aside && !!curLegend} flash={!!curLegend?.numbered} />
+        </Coachmark>
+        {aside && curLegend && (
+          <div className="mt-3 rounded-xl bg-white p-3 ring-1 ring-slate-200" data-testid="caption-legend">
+            {curLegend.numbered ? (
+              <ul className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm text-slate-700">
+                {curLegend.items.map(([k, t], i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="mt-px flex h-5 min-w-5 shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-rose-600 px-1.5 text-[11px] font-bold text-white">
+                      {k}
                     </span>
-                  </div>
-                )}
-                {(s.image && imgSteps.length > 1) || o === "fail" ? (
-                  <div className="mt-1 flex flex-wrap gap-x-3 text-sm">
-                    {s.image && imgSteps.length > 1 && (
+                    <span>{t}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-slate-700">{s.caption}</p>
+            )}
+            {curLegend.numbered && curLegend.note && <p className="mt-2 text-xs text-slate-600">{curLegend.note}</p>}
+          </div>
+        )}
+      </div>
+    ) : null;
+
+  const wideShots = desktop && screenSteps.some((s) => s.image);
+
+  // Una sola tarjeta: datos de la actividad (solo en la primera pantalla) y la lista de pasos
+  const stepsCard = (
+    <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200" data-testid="instructions">
+      {pos === 0 && (
+        <div className={"space-y-3 border-b border-slate-100 p-4 text-sm" + dk("lg:p-5")}>
+          <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div>
+              <dt className="text-xs font-semibold uppercase text-slate-600">Cuándo</dt>
+              <dd>
+                <Rich text={activity.when} />
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase text-slate-600">Dónde</dt>
+              <dd>
+                <Rich text={activity.where} links />
+              </dd>
+            </div>
+          </dl>
+          {activity.warnings?.map((w, i) => (
+            <p key={i} className="rounded-lg bg-amber-50 px-3 py-2 text-amber-950">
+              ⚠️ <Rich text={w} />
+            </p>
+          ))}
+          {activity.notes && (
+            <p className="rounded-lg bg-sky-50 px-3 py-2 text-sky-950">
+              <Rich text={activity.notes} />
+            </p>
+          )}
+        </div>
+      )}
+      <ol className="divide-y divide-slate-100">
+        {screenSteps.map((s, i) => {
+          const o = outcomeOf(s);
+          const isOpen = i === current;
+          const future = activeIdx >= 0 && i > activeIdx;
+          const canOpen = !future && !isOpen;
+          const badge =
+            o === "fail" ? "bg-rose-600 text-white" : o === "na" ? "bg-slate-500 text-white" : o ? "bg-emerald-600 text-white" : isOpen ? "bg-brand-gradient text-white" : "bg-slate-200 text-slate-600";
+          const head = (
+            <>
+              <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold ${badge}`} aria-hidden="true">
+                {o === "fail" ? "!" : o === "na" ? "–" : o ? "✓" : num(s)}
+              </span>
+              <span className="sr-only">
+                Paso {num(s)}
+                {o === "fail" ? ", con falla" : o === "na" ? ", no apareció" : o ? ", hecho" : ""}.{" "}
+              </span>
+            </>
+          );
+          if (!isOpen)
+            return (
+              <li key={s.id} data-testid="instruction" className={future ? "opacity-45" : ""}>
+                <button
+                  type="button"
+                  disabled={!canOpen}
+                  onClick={() => setShot(s.id)}
+                  className={"flex w-full items-start gap-3 px-4 py-3 text-left disabled:cursor-default" + (canOpen ? " hover:bg-slate-50" : "") + dk("lg:px-5")}
+                >
+                  {head}
+                  <span className="line-clamp-1 min-w-0 flex-1 pt-0.5 text-[15px] text-slate-600">
+                    {s.checkpoint ? s.checkpoint.title : <Rich text={s.text} />}
+                  </span>
+                </button>
+              </li>
+            );
+          return (
+            <li key={s.id} data-testid="instruction" data-current="true" className={"bg-brand-50/40 px-4 py-4" + dk("lg:px-5 lg:py-5")}>
+              <div className="flex items-start gap-3">
+                {head}
+                <div className="min-w-0 flex-1">
+                  {!s.checkpoint && (
+                    <p className={"text-[16px] leading-relaxed text-slate-900" + dk("lg:text-[17px] lg:leading-7")}>
+                      <Rich text={s.text} links />
+                    </p>
+                  )}
+                  {s.warning && (
+                    <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[15px] text-amber-950" role="note" data-testid="step-warning">
+                      ⚠️ <Rich text={s.warning} links />
+                    </p>
+                  )}
+                  {s.checkpoint && checklist(s)}
+                  {s.dataButton && (
+                    <Coachmark id="tester-datos-sucursal" title={dataLabel} message="Aquí están los nombres, precios y datos exactos que debes escribir." placement="top">
                       <button
                         type="button"
-                        onClick={() => {
-                          setShot(s.id);
-                          // En celular la captura va debajo de las instrucciones: se baja hasta ella
-                          if (!window.matchMedia("(min-width: 1024px)").matches || !desktop)
-                            document.getElementById("screen-shots")?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
-                        }}
-                        className={`min-h-9 font-medium ${shotStep?.id === s.id ? "text-slate-500" : "text-brand-700 hover:underline"}`}
-                        aria-pressed={shotStep?.id === s.id}
+                        onClick={openData}
+                        data-testid="data-button"
+                        className={`mt-3 inline-flex min-h-11 items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-[15px] font-semibold text-amber-950 ring-1 ring-amber-300 hover:bg-amber-100 ${
+                          dataSeen[screen.start] ? "" : "attn attn-amber"
+                        }`}
                       >
-                        📷 {shotStep?.id === s.id ? "Captura a la vista" : "Ver su captura"}
+                        <span aria-hidden="true">📊</span> Ver {dataLabel}
                       </button>
-                    )}
-                    {o === "fail" && <span className="min-h-9 py-2 font-medium text-rose-700">Falla reportada</span>}
-                  </div>
-                ) : null}
+                    </Coachmark>
+                  )}
+                  {s.evidence && (
+                    <button
+                      type="button"
+                      onClick={() => onReport("evidence", s.id)}
+                      className="mt-3 ml-0 inline-flex min-h-11 items-center gap-2 rounded-lg bg-white px-3 py-2 text-[15px] font-medium text-brand-700 ring-1 ring-brand-200 hover:bg-brand-50"
+                    >
+                      📷 Adjuntar la captura que pide este paso
+                    </button>
+                  )}
+                  {o === "fail" && <p className="mt-2 text-sm font-medium text-rose-700">Reportaste una falla en este paso.</p>}
+                  <div className={desktop ? "lg:hidden" : ""}>{shotOf(s, false)}</div>
+                </div>
               </div>
             </li>
           );
         })}
       </ol>
-      {dataStep && (
-        <Coachmark
-          id="tester-datos-sucursal"
-          title={dataLabel}
-          message="Aquí están los nombres, precios y datos exactos que debes escribir en estos pasos."
-          placement="top"
-        >
-          <motion.button
-            type="button"
-            onClick={openData}
-            data-testid="data-button"
-            whileHover={reduce ? undefined : { y: -2 }}
-            whileTap={reduce ? { opacity: 0.8 } : { scale: 0.96 }}
-            className={`mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-amber-50 px-4 py-3 text-base font-semibold text-amber-950 ring-2 ring-amber-300 transition-colors hover:bg-amber-100 ${
-              dataSeen[screen.start] ? "" : "attn attn-amber"
-            }`}
-          >
-            <span aria-hidden="true">📊</span> {dataLabel}
-          </motion.button>
-        </Coachmark>
+      {screenIssues.length > 0 && (
+        <div className="border-t border-slate-100 p-4">
+          <IssueList issues={screenIssues} />
+        </div>
       )}
-      {evidenceSteps.map((s) => (
-        <button
-          key={s.id}
-          type="button"
-          onClick={() => onReport("evidence", s.id)}
-          className="mt-3 flex min-h-11 w-full items-center gap-2 rounded-lg bg-brand-50 px-3 py-2 text-left text-sm font-medium text-brand-700 hover:bg-brand-100"
-        >
-          📷 Adjuntar la captura que pide el paso {num(s)}
-        </button>
-      ))}
     </div>
   );
 
-  // Bloque 2: capturas de la pantalla (una a la vista; se cambia con las pestañas o «Ver su captura»)
-  const shots = imgSteps.length > 0 && shotStep && (
-    <div data-testid="screenshots">
-      {imgSteps.length > 1 && (
-        <div className="mb-2 flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Capturas de esta pantalla">
-          {imgSteps.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              role="tab"
-              aria-selected={shotStep.id === s.id}
-              onClick={() => setShot(s.id)}
-              className={`min-h-9 rounded-full px-3 py-1 text-sm font-medium ring-1 transition-colors ${
-                shotStep.id === s.id ? "bg-brand-600 text-white ring-brand-600" : "bg-white text-slate-700 ring-slate-300 hover:bg-slate-50"
-              }`}
-            >
-              Paso {num(s)}
-            </button>
-          ))}
-        </div>
+  const cpPending = !!cur?.checkpoint && isActive && !checkpointDone(cur);
+  const actions = (
+    <div
+      className={
+        "pb-safe sticky bottom-0 z-10 -mx-4 bg-[#f4f6fa]/95 px-4 pt-2 backdrop-blur" +
+        dk("lg:bottom-4 lg:mx-0 lg:rounded-2xl lg:bg-white/95 lg:p-4 lg:shadow-md lg:ring-1 lg:ring-slate-200")
+      }
+    >
+      {blocked ? (
+        <p className="mb-2 text-center text-xs font-medium text-rose-700">Actividad en pausa: pide ayuda al guía para continuar.</p>
+      ) : activeIdx < 0 ? (
+        <p className="mb-2 text-center text-sm text-slate-700">Ya marcaste los pasos de esta pantalla.</p>
+      ) : !isActive ? (
+        <p className="mb-2 text-center text-sm text-slate-700">Estás viendo un paso que ya marcaste.</p>
+      ) : cpPending ? (
+        <p className="mb-2 text-center text-xs font-medium text-slate-700" id={`cp-hint-${activity.id}-${pos}`}>
+          Marca todas las casillas para poder seguir.
+        </p>
+      ) : (
+        <p className="mb-2 text-center text-sm font-medium text-slate-700">
+          Paso {num(cur)} de {steps.length} · ¿Lo pudiste hacer?
+        </p>
       )}
-      <Coachmark id="tester-captura-zoom" message="Toca la captura para verla en grande y con zoom." placement="top">
-        <StepImage key={shotStep.image} src={shotStep.image!} caption={shotStep.caption} desktop={desktop} captionAside={desktop && !!legend} flash={!!legend?.numbered} />
-      </Coachmark>
-      {desktop && legend && (
-        <div className="mt-3 hidden rounded-xl bg-white p-3 ring-1 ring-slate-200 lg:block" data-testid="caption-legend">
-          <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-600">En la captura del paso {num(shotStep)}</div>
-          {legend.numbered ? (
-            <ul className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm text-slate-700">
-              {legend.items.map(([n, t], i) => (
-                <li key={i} className="flex items-start gap-2">
-                  <span className="mt-px flex h-5 min-w-5 shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-rose-600 px-1.5 text-[11px] font-bold text-white">
-                    {n}
-                  </span>
-                  <span>{t}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-slate-700">{shotStep.caption}</p>
+      {activeIdx >= 0 && !isActive ? (
+        <Button size="lg" className="w-full" onClick={() => setShot(null)}>
+          Volver al paso {num(screenSteps[activeIdx])}
+        </Button>
+      ) : activeIdx < 0 ? (
+        <Button variant="success" size="lg" className="w-full" disabled={blocked} onClick={() => go(pos + 1)} data-testid="screen-next">
+          Siguiente →
+        </Button>
+      ) : (
+        <div className={`grid gap-2 ${cur.conditional ? "grid-cols-3" : "grid-cols-2"}`}>
+          <Button variant="danger" size="lg" disabled={blocked} onClick={() => onReport("issue", cur.id, true)}>
+            ✗ No pude
+          </Button>
+          {cur.conditional && (
+            <Button variant="outline" size="lg" disabled={blocked} onClick={() => done("na")} data-testid="step-na">
+              No me apareció
+            </Button>
           )}
-          {legend.numbered && legend.note && <p className="mt-2 text-xs text-slate-600">{legend.note}</p>}
+          <Button
+            variant="success"
+            size="lg"
+            disabled={blocked || cpPending}
+            aria-describedby={cpPending ? `cp-hint-${activity.id}-${pos}` : undefined}
+            pulse={!blocked && !cpPending}
+            onClick={() => done()}
+            data-testid="screen-next"
+          >
+            {lastOfScreen ? "✓ Listo, siguiente" : "✓ Listo"}
+          </Button>
         </div>
       )}
-    </div>
-  );
-
-  // Bloque 3: formulario breve + Siguiente
-  const form = (
-    <div className="space-y-3" data-testid="screen-form">
-      {cpSteps.map(checkpointCard)}
-      {condSteps.length > 0 && (
-        <div className="rounded-2xl bg-white p-4 text-sm shadow-sm ring-1 ring-slate-200">
-          <p className="text-slate-700">¿No te salió lo que dice algún paso «Si…»? Márcalo (cuenta como terminado):</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {condSteps.map((s) => {
-              const na = outcomeOf(s) === "na";
-              return (
-                <button
-                  key={s.id}
-                  type="button"
-                  disabled={blocked || outcomeOf(s) === "fail"}
-                  aria-pressed={na}
-                  onClick={() => onStep(s.id, na ? null : "na")}
-                  className={`min-h-10 rounded-lg px-3 py-1.5 font-medium ring-1 transition-colors disabled:opacity-40 ${
-                    na ? "bg-slate-600 text-white ring-slate-600" : "bg-white text-slate-700 ring-slate-300 hover:bg-slate-50"
-                  }`}
-                >
-                  {na ? "✓ " : ""}Paso {num(s)}: no me apareció
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-      <IssueList issues={screenIssues} />
-      <div
-        className={
-          "pb-safe sticky bottom-0 z-10 -mx-4 bg-[#f4f6fa]/95 px-4 pt-2 backdrop-blur" +
-          dk("lg:static lg:mx-0 lg:rounded-2xl lg:bg-white lg:p-4 lg:shadow-sm lg:ring-1 lg:ring-slate-200 lg:backdrop-blur-none")
-        }
-      >
-        {blocked ? (
-          <p className="mb-2 text-center text-xs font-medium text-rose-700">Actividad en pausa: pide ayuda al guía para continuar.</p>
-        ) : !cpAllDone ? (
-          <p className="mb-2 text-center text-xs font-medium text-slate-700" id={`cp-hint-${activity.id}-${pos}`}>
-            Marca todas las casillas de arriba para poder seguir.
-          </p>
-        ) : problem && doSteps.length > 1 ? (
-          <p className="mb-2 text-center text-sm font-medium text-slate-800">¿En qué paso tuviste el problema?</p>
-        ) : failedSteps.length ? (
-          <p className="mb-2 text-center text-xs text-slate-600">Reportaste una falla. Si puedes seguir, toca «Siguiente».</p>
-        ) : (
-          <p className={"mb-2 text-center text-sm font-medium text-slate-700" + dk("lg:text-left")}>
-            ¿Pudiste hacer {doSteps.length > 1 ? "todos estos pasos" : "este paso"}?
-          </p>
-        )}
-        {problem && doSteps.length > 1 && !blocked ? (
-          <div className="grid grid-cols-4 gap-2" data-testid="problem-steps">
-            {doSteps.map((s) => (
-              <Button key={s.id} variant="danger" size="lg" onClick={() => { setProblem(false); onReport("issue", s.id, true); }}>
-                {num(s)}
-              </Button>
-            ))}
-            <Button variant="outline" size="lg" className="col-span-4" onClick={() => setProblem(false)}>
-              Cancelar
-            </Button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              variant="danger"
-              size="lg"
-              disabled={blocked}
-              onClick={() => (doSteps.length > 1 ? setProblem(true) : onReport("issue", doSteps[0]?.id ?? screenSteps[0].id, true))}
-            >
-              ✗ Tuve un problema
-            </Button>
-            <Button
-              variant="success"
-              size="lg"
-              disabled={blocked || !cpAllDone}
-              aria-describedby={!cpAllDone ? `cp-hint-${activity.id}-${pos}` : undefined}
-              pulse={!marked && !blocked && cpAllDone}
-              onClick={next}
-              data-testid="screen-next"
-            >
-              {failedSteps.length || marked ? "Siguiente →" : "✓ Sí, siguiente"}
-            </Button>
-          </div>
-        )}
-        <div className={"mt-1 flex items-center justify-between text-sm" + dk("lg:mt-2")}>
-          <button
-            type="button"
-            disabled={pos === 0}
-            onClick={() => go(pos - 1)}
-            className={"min-h-11 px-2 py-2 text-slate-600 disabled:opacity-30" + dk("lg:rounded-lg lg:hover:bg-slate-100 lg:hover:text-slate-800")}
-          >
-            ← Anterior
-          </button>
-          <button
-            type="button"
-            onClick={() => onReport("issue", (doSteps[doSteps.length - 1] ?? screenSteps[0]).id)}
-            className={"min-h-11 px-2 py-2 font-medium text-rose-700" + dk("lg:rounded-lg lg:hover:bg-rose-50")}
-          >
-            Reportar otra falla
-          </button>
-        </div>
+      <div className={"mt-1 flex items-center justify-between text-sm" + dk("lg:mt-2")}>
+        <button
+          type="button"
+          disabled={pos === 0}
+          onClick={() => go(pos - 1)}
+          className={"min-h-11 px-2 py-2 text-slate-600 disabled:opacity-30" + dk("lg:rounded-lg lg:hover:bg-slate-100 lg:hover:text-slate-800")}
+        >
+          ← Pantalla anterior
+        </button>
+        <button
+          type="button"
+          onClick={() => onReport("issue", cur.id)}
+          className={"min-h-11 px-2 py-2 font-medium text-rose-700" + dk("lg:rounded-lg lg:hover:bg-rose-50")}
+        >
+          Reportar otra falla
+        </button>
       </div>
     </div>
   );
@@ -822,16 +789,14 @@ export default function ActivityView({
     <>
     {header}
     <StepFrame id={`${activity.id}-p${pos}`} dir={dir}>
-      <section className={"mt-1 space-y-4" + dk("lg:mt-4 lg:space-y-5")}>
+      <section className={"mt-1 space-y-4" + dk("lg:mt-4")}>
         {blocked && blockedPanel}
-        {pos === 0 && info()}
-        <div className={dk(shots ? "lg:grid lg:grid-cols-[minmax(360px,440px)_minmax(0,1fr)] lg:items-start lg:gap-6" : "lg:max-w-3xl")}>
+        <div className={dk(wideShots ? "lg:grid lg:grid-cols-[minmax(380px,460px)_minmax(0,1fr)] lg:items-start lg:gap-6" : "lg:max-w-3xl")}>
           <div className="space-y-4">
-            {instructions}
-            {shots && <div id="screen-shots" className={"scroll-mt-28" + (desktop ? " lg:hidden" : "")}>{shots}</div>}
-            {form}
+            {stepsCard}
+            {actions}
           </div>
-          {desktop && shots && <div className="hidden lg:sticky lg:top-4 lg:block">{shots}</div>}
+          {wideShots && <div className="hidden lg:sticky lg:top-4 lg:block">{cur && shotOf(cur, true)}</div>}
         </div>
       </section>
     </StepFrame>
