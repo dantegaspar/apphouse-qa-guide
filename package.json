@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "limpiar": "node scripts/limpiar-registros.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^13.2.0",
