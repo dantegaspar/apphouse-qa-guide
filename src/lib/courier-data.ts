@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { getDb } from "./db";
 import { sha256 } from "./auth";
 import { parseRec } from "./admin-data";
-import { COURIER_QUESTIONS } from "./courier";
+import { COURIER_NA, COURIER_QUESTIONS, type CourierQuestion } from "./courier";
 
 export type CourierFeedbackRow = {
   id: string;
@@ -27,11 +27,14 @@ export function checkCourierToken(feedbackId: string, token: string | null) {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
-/** Respuesta 1–5 de una pregunta, o null. */
+/** Respuesta 1–5 de una pregunta, o null (sin respuesta o «no aplica», que no cuenta en promedios). */
 export function answerOf(answers: Record<string, unknown>, id: string): number | null {
   const v = Number(answers[id]);
   return Number.isInteger(v) && v >= 1 && v <= 5 ? v : null;
 }
+
+/** El repartidor eligió «No me tocó / No llegué a esta parte». */
+export const isCourierNa = (answers: Record<string, unknown>, id: string) => answers[id] === COURIER_NA;
 
 export function loadCourier() {
   const db = getDb();
@@ -43,15 +46,17 @@ export function loadCourier() {
   return { feedback, issues, attachments };
 }
 
-export type CourierQuestionStats = { id: string; label: string; short: string; counts: number[]; n: number; avg: number | null };
+/** `n` y `avg` solo cuentan caritas 1–5; `naCount` = cuántos eligieron «No me tocó». */
+export type CourierQuestionStats = CourierQuestion & { counts: number[]; n: number; naCount: number; avg: number | null };
 
-/** Distribución (1–5) y promedio por pregunta. */
+/** Distribución (1–5) y promedio por pregunta; «no aplica» queda fuera del promedio. */
 export function courierStats(feedback: CourierFeedbackRow[]) {
   const answers = feedback.map((f) => parseRec(f.answers));
   const questions: CourierQuestionStats[] = COURIER_QUESTIONS.map((q) => {
     const vals = answers.map((a) => answerOf(a, q.id)).filter((v): v is number => v !== null);
     const counts = [1, 2, 3, 4, 5].map((v) => vals.filter((x) => x === v).length);
-    return { ...q, counts, n: vals.length, avg: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null };
+    const naCount = answers.filter((a) => isCourierNa(a, q.id)).length;
+    return { ...q, counts, n: vals.length, naCount, avg: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null };
   });
   const all = questions.flatMap((q) => q.counts.flatMap((c, i) => Array<number>(c).fill(i + 1)));
   return { responses: feedback.length, questions, avg: all.length ? all.reduce((a, b) => a + b, 0) / all.length : null };

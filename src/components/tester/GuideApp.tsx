@@ -91,7 +91,7 @@ export default function GuideApp({
     const t = setTimeout(() => setSaved(null), 900);
     return () => clearTimeout(t);
   }, [saved]);
-  const [report, setReport] = useState<{ kind: "issue" | "evidence"; activityId: string; stepId?: string; markFail?: boolean } | null>(null);
+  const [report, setReport] = useState<{ kind: "issue" | "evidence"; activityId: string; stepId?: string; markFail?: boolean; choices?: string[] } | null>(null);
 
   const totalSteps = useMemo(() => guide.activities.reduce((n, a) => n + a.steps.length, 0), [guide]);
   // Guía de escritorio: en pantallas ≥1024 px (lg) usa barra lateral y vistas anchas
@@ -106,11 +106,15 @@ export default function GuideApp({
   const submitReport = useCallback(
     async (draft: ReportDraft, files: File[]): Promise<string | null> => {
       if (!report) return null;
+      // Con varios pasos en la pantalla, el paso lo elige el tester en el formulario
+      const stepId = report.choices ? draft.stepId : report.stepId;
+      const { stepId: _picked, ...fields } = draft;
+      void _picked;
       const issue: Issue = {
         id: uid(),
         activityId: report.activityId,
-        stepId: report.stepId,
-        ...draft,
+        stepId,
+        ...fields,
         attachments: [],
         createdAt: new Date().toISOString(),
       };
@@ -120,12 +124,12 @@ export default function GuideApp({
           ? { activityId: issue.activityId, stepId: issue.stepId, issueId: issue.id, reason: issue.description }
           : undefined;
       // «No pude»: el paso queda como fallido solo al enviar el reporte (si se cierra sin enviar, no se marca)
-      const markFail = report.markFail && issue.kind === "issue" && report.stepId;
-      const stepEvents = markFail ? [{ type: "step", payload: stepPayload(stateRef.current, report.activityId, report.stepId!, "fail") }] : [];
+      const markFail = report.markFail && issue.kind === "issue" && stepId;
+      const stepEvents = markFail ? [{ type: "step", payload: stepPayload(stateRef.current, report.activityId, stepId!, "fail") }] : [];
       update(
         (s) => ({
           ...s,
-          steps: markFail ? { ...s.steps, [stepKey(report.activityId, report.stepId!)]: "fail" } : s.steps,
+          steps: markFail ? { ...s.steps, [stepKey(report.activityId, stepId!)]: "fail" } : s.steps,
           issues: [...s.issues, issue],
           blocked: s.blocked ?? block,
         }),
@@ -320,7 +324,7 @@ export default function GuideApp({
         }}
         onDraft={(a) => update((s) => (s.activities[act.id]?.done ? s : { ...s, activities: { ...s.activities, [act.id]: { ...a, done: false } } }))}
         reopened={!!state.activities[act.id]?.done}
-        onReport={(kind, stepId, markFail) => setReport({ kind, activityId: act.id, stepId, markFail })}
+        onReport={(kind, stepId, markFail, choices) => setReport({ kind, activityId: act.id, stepId, markFail, choices })}
         onSave={(a) => {
           const wasDone = !!stateRef.current?.activities[act.id]?.done;
           update((s) => ({ ...s, activities: { ...s.activities, [act.id]: a } }), [
@@ -330,7 +334,7 @@ export default function GuideApp({
           const after = access(guide, stateRef.current!);
           const next = guide.activities.find((x) => !stateRef.current?.activities[x.id]?.done);
           if (wasDone) {
-            toast.success("Puedes corregirla otra vez hasta que toques Terminar.", { title: `Cambios en ${act.id} guardados ✓` });
+            toast.success("Puedes corregirla otra vez hasta que envíes la encuesta final.", { title: `Cambios en ${act.id} guardados ✓` });
             nav({ name: "home" });
           } else if (flexible && after.seqDone && !seqDone) {
             // Se terminó la parte en orden: se abren todas las demás a la vez
@@ -341,7 +345,7 @@ export default function GuideApp({
             });
             nav({ name: "home" });
           } else if (flexible && after.seqDone) {
-            toast.success(next ? `Sigue con la que te toque. Puedes corregir ${act.id} hasta que toques Terminar.` : "Ya puedes contestar la encuesta y terminar.", {
+            toast.success(next ? `Sigue con la que te toque. Puedes corregir ${act.id} hasta que envíes la encuesta final.` : "Ya puedes contestar la encuesta y terminar.", {
               title: `Actividad ${act.id} guardada ✓`,
             });
             nav({ name: "home" });
@@ -393,9 +397,22 @@ export default function GuideApp({
             tone: pending.length ? "danger" : "default",
           });
         }}
-        onSubmit={(answers) => {
-          update((s) => ({ ...s, survey: answers, finished: true }), [{ type: "survey", payload: { answers } }]);
+        onSubmit={async (answers) => {
+          // La casilla «Contesté la encuesta…» del cierre se marca sola al enviarla
+          const cur = stateRef.current;
+          const markSurvey = guide.finish.checklist.some((c) => c.id === SURVEY_DONE_ID) && !cur?.finish[SURVEY_DONE_ID];
+          const finish = markSurvey && cur ? { ...cur.finish, [SURVEY_DONE_ID]: true } : undefined;
+          update((s) => ({ ...s, survey: answers, finished: true, ...(finish ? { finish } : {}) }), [
+            { type: "survey", payload: { answers } },
+            ...(finish ? [{ type: "run", payload: { finish } }] : []),
+          ]);
+          // Se espera el envío real (máx. 20 s); si no llega, la encuesta avisa que falta internet
+          return flushWithin(flush, 20000);
         }}
+        pendingSend={state.finished && state.outbox.length > 0}
+        onRetry={() => flushWithin(flush, 20000)}
+        deviceLabel={desktop ? "esta computadora" : "este teléfono"}
+        wide={desktop}
         onBack={() => nav({ name: "summary" })}
       />
       </div>
@@ -469,10 +486,28 @@ export default function GuideApp({
           </Button>
         )}
 
+        {!ended && !canFinish && !state.finished && flexible && seqDone && (() => {
+          const pendingIds = guide.activities.filter((a) => !state.activities[a.id]?.done).map((a) => a.id);
+          return (
+            <div className="rounded-2xl bg-brand-50 px-4 py-3 text-sm text-brand-700 ring-1 ring-brand-100" data-testid="survey-locked-hint">
+              <p className="font-semibold">¿Y la encuesta final?</p>
+              <p className="mt-1">
+                Se abre cuando todas las actividades tengan su resultado guardado. Te {pendingIds.length === 1 ? "falta" : "faltan"}:{" "}
+                <strong>{pendingIds.join(", ")}</strong>.
+              </p>
+              <p className="mt-1">
+                Cuando Mesa de control dé por terminada la prueba, entra a cada actividad que no te tocó, marca <strong>«No me tocó»</strong> y guárdala.
+                Así aparece el botón para contestar la encuesta.
+              </p>
+            </div>
+          );
+        })()}
+
         {nextAct && state.prepDone && state.blocked?.activityId === nextAct.id && (
           <Callout>
             <strong>{nextAct.id} está en pausa</strong> por una falla que te impide seguir.{" "}
-            {state.blocked.helpId ? "Ya pediste ayuda: espera al guía." : "Ábrela y pide ayuda al guía."}
+            {state.blocked.helpId ? "Ya pediste ayuda: espera al guía." : "Ábrela y pide ayuda al guía."}{" "}
+            Si no se puede resolver, el guía puede terminar la prueba y entonces se abre la encuesta final.
           </Callout>
         )}
 
@@ -504,7 +539,7 @@ export default function GuideApp({
             {state.finished || ended
               ? "La prueba terminó: tus actividades quedaron cerradas."
               : flexible
-                ? `Las primeras actividades van en orden. Desde ${acc.firstFlexId ?? "la siguiente"} puedes abrirlas cuando te toque, y puedes corregir cualquiera hasta que toques Terminar.`
+                ? `Las primeras actividades van en orden. Desde ${acc.firstFlexId ?? "la siguiente"} puedes abrirlas cuando te toque, y puedes corregir cualquiera hasta que envíes la encuesta final.`
                 : "Se hacen en orden. Las que ya guardaste quedan cerradas y no se pueden cambiar."}
           </p>
           <motion.ul {...staggerList()} className={"space-y-2" + dk("lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0")}>
@@ -639,7 +674,16 @@ export default function GuideApp({
         allowedMime={allowedMime}
         reportExample={guide.reportExample}
         orderExample={guide.orderExample}
-        context={reportActivity ? `${reportActivity.id} · ${reportActivity.title}${report?.stepId ? ` · Paso ${report.stepId}` : ""}` : ""}
+        context={reportActivity ? `${reportActivity.id} · ${reportActivity.title}${report?.stepId && !report.choices ? ` · Paso ${report.stepId}` : ""}` : ""}
+        steps={
+          reportActivity && report?.choices
+            ? report.choices.map((id) => {
+                const i = reportActivity.steps.findIndex((x) => x.id === id);
+                const t = (reportActivity.steps[i]?.text ?? "").replace(/\*\*/g, "").replace(/\s+/g, " ").trim();
+                return { id, label: `Paso ${i + 1} · ${t.length > 70 ? t.slice(0, 68) + "…" : t}` };
+              })
+            : undefined
+        }
         onSubmit={submitReport}
       />
       {saved && <SavedBurst key={saved.n} />}
@@ -674,11 +718,19 @@ function SavedBurst() {
   );
 }
 
+/** Casilla del cierre («Contesté la encuesta…») que se marca sola al enviar la encuesta. */
+const SURVEY_DONE_ID = "surveyDone";
+
+/** Espera el envío de lo pendiente, pero no más de `ms` (con mala señal la petición puede tardar mucho). */
+function flushWithin(flush: () => Promise<boolean>, ms: number): Promise<boolean> {
+  return Promise.race([flush().catch(() => false), new Promise<boolean>((r) => setTimeout(() => r(false), ms))]);
+}
+
 /**
  * Qué actividades se pueden abrir.
  * - Sin `sequentialUntil`: orden estricto; solo la primera sin guardar, y las guardadas quedan cerradas.
  * - Con `sequentialUntil`: hasta esa actividad van en orden; al guardarla se abren todas las demás, y
- *   cualquier actividad guardada se puede reabrir y corregir hasta que el tester toque «Terminar».
+ *   cualquier actividad guardada se puede reabrir y corregir hasta que el tester envíe la encuesta final («Enviar encuesta y terminar»).
  * Al terminar (encuesta enviada) o si el guía terminó la prueba, todo queda cerrado.
  */
 function access(guide: Guide, state: RunState) {
@@ -1278,7 +1330,19 @@ function Summary({
               <Rich text={guide.finish.text} links />
             </p>
           )}
-          {guide.finish.checklist.map((c) => (
+          {guide.finish.checklist.map((c) =>
+            c.id === SURVEY_DONE_ID ? (
+              // Se marca sola al enviar la encuesta (no se puede marcar antes de contestarla)
+              <div key={c.id} className="mb-2 flex items-start gap-3 rounded-xl bg-slate-50 p-3 text-sm" data-testid="finish-survey-auto">
+                <input type="checkbox" className="mt-0.5 h-5 w-5 accent-[#2f5da8]" checked={state.finished} disabled readOnly aria-describedby={`finish-${c.id}-hint`} aria-label={c.label} />
+                <span>
+                  {c.label}
+                  <span id={`finish-${c.id}-hint`} className="block text-xs text-slate-600">
+                    {state.finished ? "Listo: se marcó sola al enviar la encuesta." : "Se marca sola cuando envías la encuesta final (botón de abajo)."}
+                  </span>
+                </span>
+              </div>
+            ) : (
             <label key={c.id} className="mb-2 flex items-start gap-3 rounded-xl bg-slate-50 p-3 text-sm">
               <input
                 type="checkbox"
@@ -1291,7 +1355,8 @@ function Summary({
               />
               <span>{c.label}</span>
             </label>
-          ))}
+            )
+          )}
         </section>
       )}
       </div>

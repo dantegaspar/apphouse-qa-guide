@@ -2,6 +2,7 @@ import { getDb } from "./db";
 import { getGuide, GUIDES } from "./guides";
 import { loadRuns, parseRec, type RunRow } from "./admin-data";
 import type { Guide } from "./types";
+import { umuxLite } from "./verdict";
 
 /** Agregados para la página de gráficas del panel (/admin/graficas). */
 
@@ -31,6 +32,11 @@ export type GuideStats = {
   survey: { responses: number; scales: ScaleDist[]; choices: ChoiceDist[]; nps: NpsDist[] };
 };
 export type Count = { label: string; count: number };
+/** Comentario abierto (pregunta de texto) no vacío de una encuesta enviada. */
+export type OpenComment = { runId: string; guideId: string; guideTitle: string; tester: string; questionId: string; questionLabel: string; text: string; at: string };
+
+/** Máximo de comentarios abiertos que se muestran en /admin/graficas. */
+export const OPEN_COMMENTS_LIMIT = 50;
 
 const num = (v: unknown): number | null => {
   if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -109,7 +115,7 @@ export function loadStats(guideId?: string | null) {
   const steps = keep(safeAll<{ run_id: string; activity_id: string; step_id: string; outcome: string }>("SELECT run_id, activity_id, step_id, outcome FROM step_results"));
   const acts = keep(safeAll<{ run_id: string; activity_id: string; result: string | null }>("SELECT run_id, activity_id, result FROM activity_results"));
   const issues = keep(safeAll<{ run_id: string; activity_id: string; step_id: string | null; kind: string; blocking: number }>("SELECT run_id, activity_id, step_id, kind, blocking FROM issues"));
-  const surveys = keep(safeAll<{ run_id: string; answers: string }>("SELECT run_id, answers FROM survey_responses WHERE is_draft = 0"));
+  const surveys = keep(safeAll<{ run_id: string; answers: string; updated_at: string }>("SELECT run_id, answers, updated_at FROM survey_responses WHERE is_draft = 0"));
   const runById = new Map<string, RunRow>(runs.map((r) => [r.id, r]));
 
   // Guías presentes, en el orden del registro
@@ -119,19 +125,43 @@ export function loadStats(guideId?: string | null) {
   // ---- KPIs
   const failures = issues.filter((i) => i.kind !== "evidence");
   const allNps: number[] = [];
-  const allScales: number[] = [];
+  // SUS equivalente de UMUX-Lite (umux1 y umux2, escala 1–7), mismo criterio que verdict.ts
+  const allSus: number[] = [];
+  const comments: OpenComment[] = [];
   for (const s of surveys) {
-    const g = getGuide(runById.get(s.run_id)?.guide_id ?? "");
+    const run = runById.get(s.run_id);
+    const g = getGuide(run?.guide_id ?? "");
     if (!g) continue;
     const ans = parseRec(s.answers);
     for (const q of g.survey.questions) {
+      if (q.type === "text") {
+        const t = ans[q.id];
+        if (typeof t === "string" && t.trim() !== "")
+          comments.push({
+            runId: s.run_id,
+            guideId: g.id,
+            guideTitle: g.title,
+            tester: (run?.name || run?.email || "").trim() || "Sin nombre",
+            questionId: q.id,
+            questionLabel: q.label,
+            text: t.trim(),
+            at: s.updated_at,
+          });
+        continue;
+      }
       const v = num(ans[q.id]);
       if (v === null) continue;
       if (q.type === "nps") allNps.push(v);
-      if (q.type === "scale") allScales.push(v);
     }
+    const u1 = num(ans.umux1);
+    const u2 = num(ans.umux2);
+    if (u1 !== null && u2 !== null && u1 >= 1 && u1 <= 7 && u2 >= 1 && u2 <= 7) allSus.push(umuxLite(u1, u2).sus);
   }
+  comments.sort((a, b) => b.at.localeCompare(a.at));
   const npsAll = npsOf("all", "", allNps);
+  // El KPI de NPS sólo tiene sentido si alguna guía (en el filtro actual) pregunta NPS
+  const scope = guideId ? GUIDES.filter((g) => g.id === guideId) : GUIDES;
+  const hasNpsQuestion = scope.some((g) => g.survey.questions.some((q) => q.type === "nps"));
   const kpis = {
     testers: new Set(runs.map((r) => (r.email || r.name || r.id).trim().toLowerCase())).size,
     runs: runs.length,
@@ -143,8 +173,11 @@ export function loadStats(guideId?: string | null) {
     nps: npsAll.score,
     npsAvg: npsAll.avg,
     npsN: npsAll.n,
-    scaleAvg: mean(allScales),
+    hasNps: hasNpsQuestion || npsAll.n > 0,
+    susAvg: mean(allSus),
+    susN: allSus.length,
   };
+  const openComments = { total: comments.length, items: comments.slice(0, OPEN_COMMENTS_LIMIT) };
 
   // ---- Por guía: resultados por actividad y encuesta
   const perGuide: GuideStats[] = guides.map((g) => {
@@ -234,7 +267,7 @@ export function loadStats(guideId?: string | null) {
     if (runsByDay.length === 60) runsByDay.splice(0, runsByDay.length, ...days.slice(-60).map((k) => ({ label: k, count: byDay.get(k)! })));
   }
 
-  return { kpis, perGuide, topBlockedSteps, failuresByActivity, devices, runsByDay };
+  return { kpis, perGuide, openComments, topBlockedSteps, failuresByActivity, devices, runsByDay };
 }
 
 export type Stats = ReturnType<typeof loadStats>;

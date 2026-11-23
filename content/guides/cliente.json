@@ -850,7 +850,7 @@
     }
   ],
   "finish": {
-    "text": "Cuando Mesa de control dé por terminada la prueba, revisa esta lista y toca Terminar.",
+    "text": "Cuando Mesa de control dé por terminada la prueba, revisa esta lista y toca «Contestar la encuesta final». La casilla de la encuesta se marca sola cuando la envías.",
     "checklist": [
       {
         "id": "resultsMarked",
@@ -911,7 +911,8 @@
       {
         "id": "improve",
         "type": "text",
-        "label": "¿Qué fue lo más difícil o confuso, y qué mejorarías primero? (opcional)"
+        "label": "¿Qué fue lo más difícil o confuso, y qué mejorarías primero? (opcional)",
+        "placeholder": "Lo más difícil o confuso fue…\nPrimero mejoraría…"
       }
     ]
   },

@@ -3,7 +3,7 @@ import path from "node:path";
 import { getDb, now, UPLOAD_DIR } from "@/lib/db";
 import { sha256 } from "@/lib/auth";
 import { checkCourierToken } from "@/lib/courier-data";
-import { COURIER_QUESTIONS } from "@/lib/courier";
+import { COURIER_QUESTIONS, type CourierAnswer } from "@/lib/courier";
 import { cleanRecord, err, hasErrors, invalid, json, readJsonObject } from "@/lib/http";
 import {
   collect,
@@ -29,7 +29,7 @@ const TOKEN_RE = /^[A-Za-z0-9_-]{20,200}$/;
  *
  * Reglas: id (8–64, letras/números/-/_) y token (20–200) del navegador; nombre 2–80; teléfono
  * opcional (números, espacios, + o -, 8–20); answers: cada pregunta conocida con un entero 1–5
- * y sin llaves desconocidas; comment ≤2000; issues ≤30, cada uno con id válido (sin repetir) y
+ * (o "na" = «No me tocó» en las preguntas que dependen de un pedido) y sin llaves desconocidas; comment ≤2000; issues ≤30, cada uno con id válido (sin repetir) y
  * descripción 3–1000; device objeto plano ≤30 datos, ≤8 KB.
  */
 export async function POST(req: Request) {
@@ -44,15 +44,15 @@ export async function POST(req: Request) {
     ["device", objectError(body.device, { maxKeys: 30, maxString: 500, maxBytes: 8 * 1024, label: "los datos del celular" })],
   ]);
 
-  const answers: Record<string, number> = {};
+  const answers: Record<string, CourierAnswer> = {};
   if (!isPlainObject(body.answers)) errors.answers = "Faltan las respuestas.";
   else {
     const known = new Set(COURIER_QUESTIONS.map((q) => q.id));
     for (const k of Object.keys(body.answers)) if (!known.has(k)) errors[`answers.${k.slice(0, 64)}`] = "Esta pregunta no existe.";
     for (const q of COURIER_QUESTIONS) {
       const v = body.answers[q.id];
-      if (courierAnswerError(v)) errors[`answers.${q.id}`] = `Toca una carita en «${q.label}».`;
-      else answers[q.id] = v as number;
+      if (courierAnswerError(v, q.na)) errors[`answers.${q.id}`] = `Toca una carita en «${q.label}».`;
+      else answers[q.id] = v as CourierAnswer;
     }
   }
 

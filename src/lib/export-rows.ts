@@ -4,7 +4,7 @@ import {
   checkValue, deviceSummary, flatten, guideTitle, HELP_STATUS, loadAll, parseRec, resultLabel, runStatusLabel,
 } from "@/lib/admin-data";
 import { COURIER_QUESTIONS, faceOf } from "@/lib/courier";
-import { answerOf, loadCourier } from "@/lib/courier-data";
+import { answerOf, isCourierNa, loadCourier } from "@/lib/courier-data";
 import { insightsExport } from "@/lib/insights";
 import { computeVerdict } from "@/lib/verdict";
 import { PRIORITIES, SEVERITIES, TRIAGE } from "@/lib/types";
@@ -34,7 +34,11 @@ function buildCourierExport(kind: "courier" | "courier_issues", origin: string):
       const nums = vals.filter((v): v is number => v !== null);
       return [
         f.id, f.name, f.phone, flatten({ ...dev, ip: "" }), String(dev.ip ?? ""),
-        ...vals.flatMap((v) => [v, v ? `${faceOf(v)?.emoji} ${faceOf(v)?.label}` : ""]),
+        ...COURIER_QUESTIONS.flatMap((q, i) => {
+          const v = vals[i];
+          if (isCourierNa(ans, q.id)) return [null, "No aplica"];
+          return [v, v ? `${faceOf(v)?.emoji} ${q.faces[v - 1]}` : ""];
+        }),
         nums.length ? Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 10) / 10 : null,
         f.comment, issues.filter((i) => i.feedback_id === f.id).length, fileUrls((a) => a.feedback_id === f.id),
         f.created_at, f.updated_at,

@@ -45,7 +45,7 @@ export default function ActivityView({
   initialStep: number;
   onStep: (stepId: string, outcome: Outcome | null) => void;
   /** Abre el reporte. `markFail`: al enviarlo, el paso queda como «No pude» (si se cierra sin enviar, no se marca). */
-  onReport: (kind: "issue" | "evidence", stepId?: string, markFail?: boolean) => void;
+  onReport: (kind: "issue" | "evidence", stepId?: string, markFail?: boolean, choices?: string[]) => void;
   onSave: (a: ActivityState) => void;
   onExit: () => void;
   /** La actividad está detenida por una falla bloqueante: no se puede avanzar. */
@@ -112,21 +112,6 @@ export default function ActivityView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pos, desktop, activity.id]);
 
-  /**
-   * «Ver siguiente paso»: baja al primer paso pendiente que todavía no está a la vista (los de arriba
-   * cuentan como leídos). Si ya se ven todos, baja al final del último.
-   */
-  const showNextStep = (pendingIds: string[]) => {
-    const root = stepsList();
-    if (!root) return;
-    const els = pendingIds.map((id) => root.querySelector<HTMLElement>(`[data-step-id="${CSS.escape(id)}"]`)).filter((e): e is HTMLElement => !!e);
-    const target = els.find((e) => e.getBoundingClientRect().top > window.innerHeight * 0.45);
-    const read = target ? els.slice(0, els.indexOf(target)) : els;
-    if (read.length) setSeen((m) => ({ ...m, ...Object.fromEntries(read.map((e) => [e.dataset.stepId!, true])) }));
-    const behavior = reduce ? "auto" : "smooth";
-    if (target) target.scrollIntoView({ behavior, block: "start" });
-    else els[els.length - 1]?.querySelector("[data-step-end]")?.scrollIntoView({ behavior, block: "center" });
-  };
   const go = (p: number) => {
     setDir(p >= pos ? "next" : "prev");
     setPos(p);
@@ -297,7 +282,7 @@ export default function ActivityView({
           {blocked && blockedPanel}
           {reopened && (
             <Callout tone="info">
-              Ya guardaste {activity.id}. Puedes corregirla y volver a guardarla hasta que toques <strong>Terminar</strong>.
+              Ya guardaste {activity.id}. Puedes corregirla y volver a guardarla hasta que envíes la encuesta final.
             </Callout>
           )}
           <div className={"overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200" + dk(hasOrders ? "" : "lg:max-w-3xl")}>
@@ -536,8 +521,10 @@ export default function ActivityView({
   const screenIssues = state.issues.filter((i) => i.activityId === activity.id && screenSteps.some((s) => s.id === i.stepId));
 
   // Todos los pasos de la pantalla en una sola tarjeta, cada uno con su captura. «Listo, siguiente»
-  // se habilita cuando el tester ya pasó por todos los pasos; antes, el botón lo lleva al siguiente.
-  const pending = screenSteps.filter((s) => !seen[s.id] && !outcomeOf(s));
+  // se habilita cuando el tester llegó al final de la sección (o ya la había marcado).
+  const lastStep = screenSteps[screenSteps.length - 1];
+  const atEnd = !!seen[lastStep.id] || screenDone(screen);
+  const reportChoices = screenSteps.filter((s) => !s.checkpoint).map((s) => s.id);
   const cpPending = screenSteps.some((s) => s.checkpoint && !checkpointDone(s));
   const next = () => {
     for (const s of screenSteps) if (!outcomeOf(s)) onStep(s.id, "ok");
@@ -667,16 +654,9 @@ export default function ActivityView({
                       <StepImage key={s.image} src={s.image} caption={s.caption} desktop={desktop} />
                     </div>
                   )}
-                  {!s.checkpoint && !blocked && (
-                    <div className="mt-1 flex flex-wrap gap-x-4 text-sm">
-                      {o === "fail" ? (
-                        <span className="min-h-10 py-2 font-medium text-rose-700">Reportaste una falla en este paso.</span>
-                      ) : (
-                        <button type="button" onClick={() => onReport("issue", s.id, true)} className="min-h-10 py-2 font-medium text-rose-700 hover:underline">
-                          ✗ Tuve un problema
-                        </button>
-                      )}
-                      {s.conditional && o !== "fail" && (
+                  {o === "fail" && <p className="mt-2 text-sm font-medium text-rose-700">Reportaste una falla en este paso.</p>}
+                  {s.conditional && !blocked && o !== "fail" && (
+                    <div className="mt-1 text-sm">
                         <button
                           type="button"
                           aria-pressed={o === "na"}
@@ -686,7 +666,6 @@ export default function ActivityView({
                         >
                           {o === "na" ? "✓ No me apareció (toca para quitar)" : "No me apareció"}
                         </button>
-                      )}
                     </div>
                   )}
                 </div>
@@ -713,9 +692,9 @@ export default function ActivityView({
     >
       {blocked ? (
         <p className="mb-2 text-center text-xs font-medium text-rose-700">Actividad en pausa: pide ayuda al guía para continuar.</p>
-      ) : pending.length ? (
-        <p className="mb-2 text-center text-sm text-slate-700">
-          Lee los {screenSteps.length} pasos antes de seguir · te {pending.length === 1 ? "falta 1" : `faltan ${pending.length}`}
+      ) : !atEnd ? (
+        <p className="mb-2 text-center text-sm font-medium text-slate-700" id={`end-hint-${activity.id}-${pos}`}>
+          ↓ Baja hasta el final de las instrucciones para seguir
         </p>
       ) : cpPending ? (
         <p className="mb-2 text-center text-xs font-medium text-slate-700" id={`cp-hint-${activity.id}-${pos}`}>
@@ -724,24 +703,18 @@ export default function ActivityView({
       ) : (
         <p className="mb-2 text-center text-sm font-medium text-slate-700">¿Hiciste {screenSteps.length > 1 ? "estos pasos" : "este paso"}?</p>
       )}
-      {pending.length && !blocked ? (
-        <Button variant="outline" size="lg" className="w-full" onClick={() => showNextStep(pending.map((s) => s.id))} data-testid="screen-more">
-          ↓ Ver siguiente paso
-        </Button>
-      ) : (
-        <Button
-          variant="success"
-          size="lg"
-          className="w-full"
-          disabled={blocked || cpPending}
-          aria-describedby={cpPending ? `cp-hint-${activity.id}-${pos}` : undefined}
-          pulse={!blocked && !cpPending && !screenDone(screen)}
-          onClick={next}
-          data-testid="screen-next"
-        >
-          {screenDone(screen) ? "Siguiente →" : "✓ Listo, siguiente"}
-        </Button>
-      )}
+      <Button
+        variant="success"
+        size="lg"
+        className="w-full"
+        disabled={blocked || cpPending || !atEnd}
+        aria-describedby={!atEnd ? `end-hint-${activity.id}-${pos}` : cpPending ? `cp-hint-${activity.id}-${pos}` : undefined}
+        pulse={!blocked && !cpPending && atEnd && !screenDone(screen)}
+        onClick={next}
+        data-testid="screen-next"
+      >
+        {screenDone(screen) ? "Siguiente →" : "✓ Listo, siguiente"}
+      </Button>
       <div className={"mt-1 flex items-center justify-between text-sm" + dk("lg:mt-2")}>
         <button
           type="button"
@@ -753,10 +726,14 @@ export default function ActivityView({
         </button>
         <button
           type="button"
-          onClick={() => onReport("issue", screenSteps[screenSteps.length - 1].id)}
-          className={"min-h-11 px-2 py-2 font-medium text-rose-700" + dk("lg:rounded-lg lg:hover:bg-rose-50")}
+          disabled={blocked}
+          onClick={() =>
+            reportChoices.length > 1 ? onReport("issue", undefined, true, reportChoices) : onReport("issue", reportChoices[0] ?? lastStep.id, reportChoices.length === 1)
+          }
+          className={"min-h-11 px-2 py-2 font-semibold text-rose-700 disabled:opacity-30" + dk("lg:rounded-lg lg:hover:bg-rose-50")}
+          data-testid="screen-problem"
         >
-          Reportar otra falla
+          ✗ Tuve un problema
         </button>
       </div>
     </div>

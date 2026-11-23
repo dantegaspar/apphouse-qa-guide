@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Banner } from "./Banner";
 import { IconOffline } from "./icons";
@@ -14,6 +15,11 @@ export type ConnectionBannerProps = {
 };
 
 export const DEFAULT_OFFLINE_MESSAGE = "Sin conexión: tus respuestas se guardan y se enviarán al volver la señal.";
+/**
+ * En /repartidor lo escrito se guarda en el celular, pero solo se manda solo si ya tocaron «Enviar»
+ * (CourierSurvey reintenta al volver la señal); antes de eso no hay nada que enviar.
+ */
+const COURIER_OFFLINE_MESSAGE = "Sin conexión: lo que llevas queda guardado en este celular. Si ya tocaste «Enviar», se manda solo al volver la señal.";
 
 function OfflineBar({ message }: { message: string }) {
   // Vive solo mientras no hay conexión: al volver a desconectarse empieza otra vez expandido.
@@ -52,8 +58,10 @@ function OfflineBar({ message }: { message: string }) {
  * Muestra un banner fijo arriba cuando el navegador pierde la conexión y un aviso
  * "Conexión recuperada" cuando vuelve. Ya está montado en el layout raíz.
  */
-export function ConnectionBanner({ offlineMessage = DEFAULT_OFFLINE_MESSAGE, onlineMessage = "Conexión recuperada" }: ConnectionBannerProps) {
+export function ConnectionBanner({ offlineMessage, onlineMessage = "Conexión recuperada" }: ConnectionBannerProps) {
   const online = useOnlineStatus();
+  const pathname = usePathname();
+  const message = offlineMessage ?? (pathname?.startsWith("/repartidor") ? COURIER_OFFLINE_MESSAGE : DEFAULT_OFFLINE_MESSAGE);
   const wasOffline = useRef(false);
 
   useEffect(() => {
@@ -68,5 +76,5 @@ export function ConnectionBanner({ offlineMessage = DEFAULT_OFFLINE_MESSAGE, onl
     }
   }, [online, onlineMessage]);
 
-  return online ? null : <OfflineBar message={offlineMessage} />;
+  return online ? null : <OfflineBar message={message} />;
 }

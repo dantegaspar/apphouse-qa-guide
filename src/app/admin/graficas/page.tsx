@@ -124,12 +124,18 @@ export default async function ChartsPage({ searchParams }: { searchParams: Promi
           <Kpi label="Terminadas por bloqueo" value={fmt(k.endedBlocked)} accent={COLORS.critical} />
           <Kpi label="Fallas reportadas" value={fmt(k.failures)} />
           <Kpi label="Fallas bloqueantes" value={fmt(k.blocking)} accent={COLORS.critical} hint={k.failures ? `${Math.round((k.blocking / k.failures) * 100)}% del total` : undefined} />
+          {k.hasNps && (
+            <Kpi
+              label="NPS"
+              value={k.nps === null ? "—" : k.nps > 0 ? `+${k.nps}` : k.nps}
+              hint={k.npsN ? `Promedio ${fmt(k.npsAvg ?? 0, 1)}/10 · ${k.npsN} resp.` : "Sin respuestas"}
+            />
+          )}
           <Kpi
-            label="NPS"
-            value={k.nps === null ? "—" : k.nps > 0 ? `+${k.nps}` : k.nps}
-            hint={k.npsN ? `Promedio ${fmt(k.npsAvg ?? 0, 1)}/10 · ${k.npsN} resp.` : "Sin respuestas"}
+            label="SUS equivalente (UMUX-Lite, 0–100)"
+            value={k.susAvg === null ? "—" : fmt(k.susAvg, 0)}
+            hint={k.susN ? `Promedio de ${k.susN} encuesta${k.susN === 1 ? "" : "s"} · 68 = promedio de la industria` : "Sin respuestas"}
           />
-          <Kpi label="Calificación promedio" value={k.scaleAvg === null ? "—" : `${fmt(k.scaleAvg, 1)}`} hint={k.scaleAvg === null ? "Sin respuestas" : "de 5 (preguntas de escala)"} />
         </div>
       </section>
 
@@ -292,6 +298,37 @@ export default async function ChartsPage({ searchParams }: { searchParams: Promi
                   </div>
                 </div>
               ))}
+            <ChartCard
+              title="Comentarios abiertos"
+              subtitle={
+                s.openComments.total === 0
+                  ? "Respuestas de texto libre de la encuesta"
+                  : s.openComments.total > s.openComments.items.length
+                    ? `Los ${s.openComments.items.length} más recientes de ${s.openComments.total}`
+                    : `${s.openComments.total} comentario${s.openComments.total === 1 ? "" : "s"}, del más reciente al más antiguo`
+              }
+            >
+              {s.openComments.total === 0 ? (
+                <Empty>Aún no hay datos: nadie ha escrito un comentario</Empty>
+              ) : (
+                <ul className="max-h-[32rem] divide-y divide-slate-100 overflow-y-auto">
+                  {s.openComments.items.map((c) => (
+                    <li key={`${c.runId}|${c.questionId}`} className="py-3">
+                      <p className="whitespace-pre-line break-words text-sm text-slate-800">{c.text}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        <Link href={`/admin/runs/${encodeURIComponent(c.runId)}`} className="font-medium text-[#2F5DA8] hover:underline">
+                          {c.tester}
+                        </Link>
+                        {" · "}
+                        {c.guideTitle}
+                        {" · "}
+                        {new Date(c.at).toLocaleString("es-MX", { timeZone: "America/Mexico_City", dateStyle: "medium", timeStyle: "short" })}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </ChartCard>
           </div>
         )}
       </section>

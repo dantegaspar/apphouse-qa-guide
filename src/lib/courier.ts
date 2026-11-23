@@ -1,7 +1,17 @@
 /** Encuesta para repartidores: preguntas y caritas (compartido entre cliente y servidor). */
 
-/** `faces`: etiqueta de cada carita (1 = peor … 5 = mejor) que responde a lo que se pregunta. */
-export type CourierQuestion = { id: string; label: string; short: string; faces: [string, string, string, string, string] };
+/**
+ * `faces`: etiqueta de cada carita (1 = peor … 5 = mejor) que responde a lo que se pregunta.
+ * `na`: la pregunta depende de haber tenido un pedido, así que admite «No me tocó» (se guarda como
+ * COURIER_NA y no cuenta en los promedios).
+ */
+export type CourierQuestion = { id: string; label: string; short: string; faces: [string, string, string, string, string]; na?: boolean };
+
+/** Valor guardado cuando el repartidor elige «No me tocó / No llegué a esta parte». */
+export const COURIER_NA = "na";
+export const COURIER_NA_LABEL = "No me tocó / No llegué a esta parte";
+/** Respuesta guardada de una pregunta: carita 1–5 o «no aplica». */
+export type CourierAnswer = number | typeof COURIER_NA;
 
 const EASY: CourierQuestion["faces"] = ["Muy difícil", "Difícil", "Regular", "Fácil", "Muy fácil"];
 
@@ -11,10 +21,11 @@ export const COURIER_QUESTIONS: CourierQuestion[] = [
     id: "avisos",
     label: "¿Te llegaron bien los avisos de pedidos nuevos?",
     short: "Avisos de pedidos",
+    na: true,
     faces: ["Nunca", "Pocas veces", "A veces", "Casi siempre", "Siempre"],
   },
-  { id: "direccion", label: "¿Fue fácil encontrar la dirección y llegar?", short: "Encontrar la dirección", faces: EASY },
-  { id: "entregado", label: "¿Fue fácil marcar el pedido como entregado?", short: "Marcar entregado", faces: EASY },
+  { id: "direccion", label: "¿Fue fácil encontrar la dirección y llegar?", short: "Encontrar la dirección", faces: EASY, na: true },
+  { id: "entregado", label: "¿Fue fácil marcar el pedido como entregado?", short: "Marcar entregado", faces: EASY, na: true },
   {
     id: "rapida",
     label: "¿La app funcionó rápido y sin trabarse?",
@@ -45,3 +56,18 @@ export const COURIER_ID_RE = /^[A-Za-z0-9-]{8,64}$/;
 
 /** Tipos de foto que acepta la encuesta (subconjunto de imágenes de ALLOWED_MIME). */
 export const ALLOWED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif"];
+
+/** Tipo de una foto por su extensión, para cuando el navegador deja `File.type` vacío (algunos Android y HEIC). */
+export function guessPhotoMime(name: string): string {
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  const map: Record<string, string> = {
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    webp: "image/webp",
+    gif: "image/gif",
+    heic: "image/heic",
+    heif: "image/heif",
+  };
+  return map[ext] ?? "";
+}

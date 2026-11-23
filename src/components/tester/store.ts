@@ -332,17 +332,23 @@ export async function detectDevice(): Promise<Record<string, string | number>> {
 /** Reduce fotos grandes antes de subirlas (ahorra datos en el celular). */
 export async function compressImage(file: File): Promise<File> {
   if (!/^image\/(jpeg|png|webp)$/.test(file.type) || file.size < 700 * 1024) return file;
+  let bmp: ImageBitmap | undefined;
   try {
-    const bmp = await createImageBitmap(file);
+    bmp = await createImageBitmap(file);
     const scale = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
     const canvas = document.createElement("canvas");
     canvas.width = Math.round(bmp.width * scale);
     canvas.height = Math.round(bmp.height * scale);
     canvas.getContext("2d")!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    // Libera ya el mapa de bits descomprimido (pesa decenas de MB en celulares sencillos)
+    bmp.close();
+    bmp = undefined;
     const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.82));
     if (!blob || blob.size >= file.size) return file;
     return new File([blob], file.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" });
   } catch {
     return file;
+  } finally {
+    bmp?.close();
   }
 }

@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { getDb, now, UPLOAD_DIR } from "@/lib/db";
 import { checkCourierToken } from "@/lib/courier-data";
-import { ALLOWED_PHOTO_TYPES } from "@/lib/courier";
+import { ALLOWED_PHOTO_TYPES, guessPhotoMime } from "@/lib/courier";
 import { ALLOWED_MIME, err, hasErrors, invalid, json, MAX_UPLOAD_MB, str } from "@/lib/http";
 import { collect, idError } from "@/lib/validate";
 
@@ -36,8 +36,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (hasErrors(errors)) return invalid(errors);
   if (!(file instanceof File)) return invalid({ file: "Falta la foto." });
   if (file.size > maxBytes) return invalid({ file: `La foto pasa el límite de ${MAX_UPLOAD_MB} MB.` }, 413);
-  const ext = ALLOWED_MIME[file.type];
-  if (!ext || !ALLOWED_PHOTO_TYPES.includes(file.type)) return invalid({ file: "Solo se aceptan fotos (JPG, PNG, WebP, GIF, HEIC)." }, 415);
+  // Algunos celulares mandan la foto sin tipo: se deduce por la extensión
+  const mime = file.type || guessPhotoMime(file.name);
+  const ext = ALLOWED_MIME[mime];
+  if (!ext || !ALLOWED_PHOTO_TYPES.includes(mime)) return invalid({ file: "Solo se aceptan fotos (JPG, PNG, WebP, GIF, HEIC)." }, 415);
 
   const db = getDb();
   if (!db.prepare("SELECT 1 FROM courier_issues WHERE id=? AND feedback_id=?").get(issueId, id)) return err("Problema no encontrado", 404);
@@ -55,6 +57,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   await fs.writeFile(abs, Buffer.from(await file.arrayBuffer()));
   db.prepare(
     "INSERT INTO courier_attachments (id, feedback_id, issue_id, original_name, mime, size, path, created_at) VALUES (?,?,?,?,?,?,?,?)"
-  ).run(attId, id, issueId, str(file.name, 200) || `captura.${ext}`, file.type, file.size, rel, now());
+  ).run(attId, id, issueId, str(file.name, 200) || `captura.${ext}`, mime, file.size, rel, now());
   return json({ id: attId, size: file.size });
 }

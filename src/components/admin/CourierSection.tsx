@@ -1,6 +1,6 @@
 import { deviceSummary, fmtDate, isImage, parseRec } from "@/lib/admin-data";
 import { COURIER_QUESTIONS, FACES, faceOf } from "@/lib/courier";
-import { answerOf, courierStats, loadCourier } from "@/lib/courier-data";
+import { answerOf, courierStats, isCourierNa, loadCourier } from "@/lib/courier-data";
 import { ExportButton } from "@/components/admin/ExportButton";
 import { Bars, ChartCard, COLORS, Columns, Empty, fmt, Kpi } from "@/components/admin/charts/Charts";
 
@@ -12,6 +12,8 @@ const COURIER_EXPORTS: [string, string][] = [
   ["courier_issues", "Repartidores - fallas (CSV)"],
 ];
 const avgText = (v: number | null) => (v === null ? "—" : fmt(v, 1));
+/** Cuántas encuestas se listan en /admin (las más recientes). */
+const RECENT = 30;
 
 function FaceAvg({ value }: { value: number | null }) {
   const f = faceOf(value);
@@ -72,8 +74,9 @@ export function CourierAdminSection() {
               <th className="px-3 py-2">Pregunta</th>
               <th className="px-3 py-2">Promedio</th>
               {FACES.map((f) => (
-                <th key={f.value} className="px-2 py-2 text-center" title={f.label}>{f.emoji}</th>
+                <th key={f.value} className="px-2 py-2 text-center" title={`Carita ${f.value} de 5`}>{f.emoji}</th>
               ))}
+              <th className="px-2 py-2 text-center normal-case" title="No me tocó / No llegué a esta parte (no cuenta en el promedio)">No aplica</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -82,8 +85,9 @@ export function CourierAdminSection() {
                 <td className="px-3 py-2">{q.label}</td>
                 <td className="px-3 py-2"><FaceAvg value={q.avg} /></td>
                 {q.counts.map((c, i) => (
-                  <td key={i} className={`px-2 py-2 text-center ${c ? "font-semibold" : "text-slate-300"}`}>{c}</td>
+                  <td key={i} title={q.faces[i]} className={`px-2 py-2 text-center ${c ? "font-semibold" : "text-slate-300"}`}>{c}</td>
                 ))}
+                <td className={`px-2 py-2 text-center ${q.naCount ? "font-semibold text-slate-600" : "text-slate-300"}`}>{q.naCount}</td>
               </tr>
             ))}
           </tbody>
@@ -92,9 +96,14 @@ export function CourierAdminSection() {
 
       <div>
         <h3 className="mb-2 text-base font-semibold text-slate-900">Últimas encuestas</h3>
+        {feedback.length > RECENT && (
+          <p className="mb-2 text-sm text-slate-600" data-testid="courier-recent-note">
+            Mostrando las {RECENT} más recientes de {feedback.length}. Para verlas todas, descarga «Repartidores (CSV)».
+          </p>
+        )}
         <ul className="space-y-3">
           {feedback.length === 0 && <li className="text-sm text-slate-500">Todavía no hay encuestas de repartidores.</li>}
-          {feedback.slice(0, 30).map((f) => {
+          {feedback.slice(0, RECENT).map((f) => {
             const ans = parseRec(f.answers);
             const its = issuesBy.get(f.id) ?? [];
             return (
@@ -107,10 +116,17 @@ export function CourierAdminSection() {
                 </div>
                 <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-700">
                   {COURIER_QUESTIONS.map((q) => {
-                    const face = faceOf(answerOf(ans, q.id));
+                    const v = answerOf(ans, q.id);
+                    const face = faceOf(v);
+                    if (isCourierNa(ans, q.id))
+                      return (
+                        <span key={q.id} title={q.label}>
+                          {q.short}: <span className="text-slate-500">No le tocó</span>
+                        </span>
+                      );
                     return (
                       <span key={q.id} title={q.label}>
-                        {q.short}: <span aria-hidden>{face?.emoji ?? "—"}</span> <span className="text-slate-500">{face?.label ?? ""}</span>
+                        {q.short}: <span aria-hidden>{face?.emoji ?? "—"}</span> <span className="text-slate-500">{v ? q.faces[v - 1] : ""}</span>
                       </span>
                     );
                   })}
@@ -161,7 +177,7 @@ export function CourierChartsSection() {
         <Kpi label="Problemas reportados" value={fmt(issues.length)} accent={COLORS.warning} />
       </div>
       {s.responses === 0 ? (
-        <ChartCard className="mt-4" title="Encuesta de repartidores" subtitle="Caritas de 1 (Muy mal) a 5 (Muy bien)">
+        <ChartCard className="mt-4" title="Encuesta de repartidores" subtitle="Caritas de 1 (😡 la peor) a 5 (😍 la mejor)">
           <Empty />
         </ChartCard>
       ) : (
@@ -169,12 +185,13 @@ export function CourierChartsSection() {
           <ChartCard
             className="mt-4"
             title="Promedio por pregunta"
-            subtitle="De 1 (😡 Muy mal) a 5 (😍 Muy bien)"
-            table={{ head: ["Pregunta", "Promedio", "Respuestas"], rows: s.questions.map((q) => [q.label, avgText(q.avg), q.n]) }}
+            subtitle="De 1 (😡 la peor carita) a 5 (😍 la mejor). «No me tocó» no cuenta."
+            table={{ head: ["Pregunta", "Promedio", "Respuestas", "No aplica"], rows: s.questions.map((q) => [q.label, avgText(q.avg), q.n, q.naCount]) }}
           >
             <Bars
               max={5}
-              format={(n) => fmt(n, 1)}
+              // Los promedios van de 1 a 5: 0 = sin caritas (p. ej. todos eligieron «No me tocó»)
+              format={(n) => (n ? fmt(n, 1) : "—")}
               rows={s.questions.map((q) => ({ key: q.id, label: q.short, sub: q.label, aria: q.label, value: q.avg ?? 0 }))}
             />
           </ChartCard>
@@ -183,8 +200,14 @@ export function CourierChartsSection() {
               <ChartCard
                 key={q.id}
                 title={q.label}
-                subtitle={q.n ? `Promedio ${avgText(q.avg)} de 5 · ${q.n} respuesta${q.n === 1 ? "" : "s"}` : "Sin respuestas"}
-                table={{ head: ["Carita", "Respuestas"], rows: q.counts.map((c, i) => [`${FACES[i].emoji} ${FACES[i].label}`, c]) }}
+                subtitle={
+                  (q.n ? `Promedio ${avgText(q.avg)} de 5 · ${q.n} respuesta${q.n === 1 ? "" : "s"}` : "Sin respuestas") +
+                  (q.naCount ? ` · No le tocó: ${q.naCount}` : "")
+                }
+                table={{
+                  head: ["Carita", "Respuestas"],
+                  rows: [...q.counts.map((c, i) => [`${FACES[i].emoji} ${q.faces[i]}`, c]), ...(q.naCount ? [["No me tocó", q.naCount]] : [])],
+                }}
               >
                 {q.n === 0 ? (
                   <Empty />
@@ -198,12 +221,12 @@ export function CourierChartsSection() {
                         label: FACES[i].emoji,
                         value: c,
                         color: FACE_COLORS[i],
-                        title: `${FACES[i].label}: ${c} respuesta(s)`,
+                        title: `${q.faces[i]}: ${c} respuesta(s)`,
                       }))}
                     />
                     <div className="mt-1 flex justify-between gap-2 text-[11px] text-slate-500">
-                      <span>Muy mal</span>
-                      <span>Muy bien</span>
+                      <span>{q.faces[0]}</span>
+                      <span>{q.faces[4]}</span>
                     </div>
                   </>
                 )}

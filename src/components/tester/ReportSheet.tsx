@@ -13,6 +13,8 @@ export type ReportDraft = {
   blocking: boolean;
   severity?: Severity;
   orderNumber: string;
+  /** Paso que eligió el tester (cuando el reporte viene de una pantalla con varios pasos). */
+  stepId?: string;
 };
 
 /**
@@ -43,8 +45,11 @@ export default function ReportSheet({
   allowedMime = [],
   reportExample,
   orderExample,
+  steps,
   onSubmit,
 }: {
+  /** Pasos de la pantalla: el tester elige en cuál pasó (un solo botón «Tuve un problema» por pantalla). */
+  steps?: { id: string; label: string }[];
   /** Ejemplos de la guía para «¿Qué pasó?» y el número de pedido. */
   reportExample?: string;
   orderExample?: string;
@@ -62,6 +67,7 @@ export default function ReportSheet({
   const [expected, setExpected] = useState("");
   const [severity, setSeverity] = useState<Severity | null>(null);
   const [orderNumber, setOrderNumber] = useState("");
+  const [step, setStep] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [fileErrors, setFileErrors] = useState<string[]>([]);
@@ -77,6 +83,7 @@ export default function ReportSheet({
       setExpected("");
       setSeverity(null);
       setOrderNumber("");
+      setStep("");
       setFiles([]);
       setFileErrors([]);
       setError(null);
@@ -122,6 +129,7 @@ export default function ReportSheet({
     else if (d.length > LIMITS.description) errors.description = `Máximo ${LIMITS.description} caracteres (llevas ${d.length}).`;
     if (expected.trim().length > LIMITS.expected) errors.expected = `Máximo ${LIMITS.expected} caracteres.`;
     if (severity === null) errors.blocking = "Elige una opción.";
+    if (steps && steps.length > 1 && !step) errors.step = "Elige el paso (o «No sé / fue otra cosa»).";
     if (orderNumber.trim().length > LIMITS.orderNumber) errors.orderNumber = `Máximo ${LIMITS.orderNumber} caracteres.`;
   } else {
     if (files.length === 0) errors.files = "Agrega al menos una captura o video.";
@@ -139,7 +147,7 @@ export default function ReportSheet({
     setBusy(true);
     setError(null);
     const msg = await onSubmit(
-      { kind, description: description.trim(), expected: expected.trim(), blocking: severity === "alto", severity: severity ?? undefined, orderNumber: orderNumber.trim() },
+      { kind, description: description.trim(), expected: expected.trim(), blocking: severity === "alto", severity: severity ?? undefined, orderNumber: orderNumber.trim(), stepId: steps?.length ? (steps.length === 1 ? steps[0].id : step && step !== "_" ? step : undefined) : undefined },
       files
     );
     setBusy(false);
@@ -176,6 +184,21 @@ export default function ReportSheet({
         <div className="space-y-4">
         {isIssue && (
           <>
+            {steps && steps.length > 1 && (
+              <FormField id="r-step" label="¿En qué paso pasó? *" error={shown.step}>
+                {(p) => (
+                  <select {...p} value={step} onChange={(e) => setStep(e.target.value)} data-testid="report-step">
+                    <option value="">Elige el paso…</option>
+                    {steps.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.label}
+                      </option>
+                    ))}
+                    <option value="_">No sé / fue otra cosa</option>
+                  </select>
+                )}
+              </FormField>
+            )}
             <FormField
               id="r-desc"
               label="¿Qué pasó? *"

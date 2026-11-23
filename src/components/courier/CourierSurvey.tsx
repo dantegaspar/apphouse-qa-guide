@@ -2,8 +2,16 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ALLOWED_PHOTO_TYPES, COURIER_QUESTIONS, FACES } from "@/lib/courier";
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import {
+  ALLOWED_PHOTO_TYPES,
+  COURIER_NA,
+  COURIER_NA_LABEL,
+  COURIER_QUESTIONS,
+  FACES,
+  guessPhotoMime,
+  type CourierAnswer,
+} from "@/lib/courier";
 import {
   COURIER_RULES,
   courierAnswerError,
@@ -30,7 +38,7 @@ type Draft = {
   token: string;
   name: string;
   phone: string;
-  answers: Record<string, number>;
+  answers: Record<string, CourierAnswer>;
   comment: string;
   issues: DraftIssue[];
 };
@@ -39,6 +47,10 @@ type NewIssue = { id: string; description: string; photo: File | null };
 
 const KEY = "apphouse-repartidor:draft";
 const OFFLINE = "No hay internet.";
+/** Anillo de foco visible con teclado (no cambia el aspecto al tocar). */
+const FOCUS = "focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-brand-600";
+/** Cada cuánto se reintenta solo un envío que falló por falta de internet (además del evento «online»). */
+const RETRY_MS = 30_000;
 
 function newToken() {
   const a = new Uint8Array(24);
@@ -87,7 +99,7 @@ function validateDraft(d: Draft): FieldErrors {
   const comment = courierCommentError(d.comment);
   if (comment) e.comment = comment;
   for (const q of COURIER_QUESTIONS) {
-    const a = courierAnswerError(d.answers[q.id]);
+    const a = courierAnswerError(d.answers[q.id], q.na);
     if (a) e[`answers.${q.id}`] = a;
   }
   return e;
@@ -102,14 +114,84 @@ function focusField(id: string) {
   (target as HTMLElement).focus({ preventScroll: true });
 }
 
-/** Contador de caracteres que aparece cerca del límite. */
+/**
+ * Flechas, Inicio y Fin dentro de un grupo de opciones (role="radiogroup"): mueven el foco y eligen,
+ * como los botones de opción nativos. `select` recibe la posición de la opción.
+ */
+function radioKeys(e: KeyboardEvent<HTMLElement>, select: (index: number) => void) {
+  const radios = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('[role="radio"]'));
+  const cur = radios.indexOf(document.activeElement as HTMLElement);
+  if (cur < 0) return;
+  const last = radios.length - 1;
+  const moves: Record<string, number> = {
+    ArrowRight: cur === last ? 0 : cur + 1,
+    ArrowDown: cur === last ? 0 : cur + 1,
+    ArrowLeft: cur === 0 ? last : cur - 1,
+    ArrowUp: cur === 0 ? last : cur - 1,
+    Home: 0,
+    End: last,
+  };
+  const next = moves[e.key];
+  if (next === undefined) return;
+  e.preventDefault();
+  select(next);
+  radios[next].focus();
+}
+
+/** Contador de caracteres que aparece cerca del límite (cuenta igual que `maxLength`). */
 function Counter({ value, max }: { value: string; max: number }) {
-  const n = value.trim().length;
+  const n = value.length;
   if (n < max * 0.8) return null;
   return (
     <span className={`mt-1 block text-right text-sm ${n > max ? "font-semibold text-rose-700" : "text-slate-500"}`}>
       {n} de {max}
     </span>
+  );
+}
+
+/** Mientras está montado, llama a `onRetry` al volver la señal y cada RETRY_MS si hay red. */
+function RetryWhenOnline({ onRetry }: { onRetry: () => void }) {
+  const fire = useEffectEvent(onRetry);
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout> | undefined;
+    // Al volver la señal la red tarda un poco en estar lista
+    const onOnline = () => {
+      clearTimeout(t);
+      t = setTimeout(() => fire(), 1500);
+    };
+    const every = setInterval(() => navigator.onLine && fire(), RETRY_MS);
+    window.addEventListener("online", onOnline);
+    return () => {
+      clearTimeout(t);
+      clearInterval(every);
+      window.removeEventListener("online", onOnline);
+    };
+  }, []);
+  return null;
+}
+
+/** Cómo tomar captura de pantalla según el sistema del celular. */
+function CaptureHint({ os }: { os?: string }) {
+  const ios = /^iOS/.test(os ?? "");
+  const android = /^Android/.test(os ?? "");
+  return (
+    <p className="mt-2 text-sm text-slate-600">
+      {ios ? (
+        <>
+          Para tomar una foto de la pantalla, aprieta al mismo tiempo el botón de <b>subir volumen</b> y el <b>botón lateral</b>.
+        </>
+      ) : android ? (
+        <>
+          Para tomar una foto de la pantalla, aprieta al mismo tiempo el botón de <b>bajar volumen</b> y el de <b>encendido</b>.
+        </>
+      ) : (
+        <>
+          Para tomar una foto de la pantalla: en Android aprieta <b>bajar volumen + encendido</b>; en iPhone, <b>subir volumen + botón
+          lateral</b>.
+        </>
+      )}{" "}
+      La foto es opcional.
+    </p>
   );
 }
 
@@ -134,6 +216,10 @@ export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) 
   const [serverErrors, setServerErrors] = useState<FieldErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [sent, setSent] = useState<Sent | null>(null);
+  /** El envío falló por falta de internet: se reintenta solo al volver la señal. */
+  const [autoRetry, setAutoRetry] = useState(false);
+  /** Fotos del borrador que ya no están en el celular (p. ej. modo privado y se recargó). */
+  const [missingPhotos, setMissingPhotos] = useState<Set<string>>(() => new Set());
   const ref = useRef<Draft | null>(null);
   const confirm = useConfirm();
 
@@ -144,6 +230,12 @@ export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) 
     setDraft(ref.current);
     setRestored(Boolean(d && (d.name || Object.keys(d.answers).length || d.issues.length || d.comment)));
     detectDevice().then(setDevice, () => {});
+    const withPhoto = ref.current.issues.flatMap((i) => (i.photo ? [i.photo.id] : []));
+    if (withPhoto.length)
+      void Promise.all(withPhoto.map(async (pid) => ((await getPhoto(pid)) ? null : pid))).then((ids) => {
+        const lost = ids.filter((x): x is string => x !== null);
+        if (lost.length) setMissingPhotos(new Set(lost));
+      });
   }, []);
 
   const update = useCallback((fn: (d: Draft) => Draft) => {
@@ -168,6 +260,7 @@ export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) 
       <ThankYou
         sent={sent}
         maxUploadMb={maxUploadMb}
+        os={String(device.os ?? "")}
         onIssueSent={() => setSent({ ...sent, issues: sent.issues + 1 })}
         onAgain={() => {
           ref.current = newDraft();
@@ -179,6 +272,8 @@ export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) 
       />
     );
   }
+
+  const choose = (qid: string, v: CourierAnswer) => update((d) => ({ ...d, answers: { ...d.answers, [qid]: v } }));
 
   const errs: FieldErrors = { ...validateDraft(draft), ...serverErrors };
   /** Error visible de un campo: tras intentar enviar, al salir del campo, o si lo marcó el servidor. */
@@ -206,7 +301,9 @@ export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) 
     return null;
   };
 
-  const send = async () => {
+  /** `auto`: reintento solo al volver la señal; si ahora falta algo, espera a que la persona toque «Enviar». */
+  const send = async (auto = false) => {
+    if (auto && (problems.length || sending)) return;
     setShowErrors(true);
     setSendError(null);
     if (problems.length) {
@@ -233,19 +330,24 @@ export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) 
           issues: d.issues.map((i) => ({ id: i.id, description: i.description })),
         }),
       });
+      let lostPhotos = 0;
       for (const it of d.issues) {
         if (error) break;
         if (!it.photo) continue;
         const blob = await getPhoto(it.photo.id);
-        if (!blob) continue; // la foto ya no está en el celular (p. ej. modo privado y se recargó)
+        // La foto ya no está en el celular (p. ej. modo privado y se recargó): se avisa abajo y al terminar
+        if (!blob) {
+          lostPhotos++;
+          continue;
+        }
         error = await uploadPhoto(d.id, d.token, it.id, it.photo.id, blob, it.photo.name);
       }
       if (error) {
         setSendError(error);
-        toast.error(error === OFFLINE ? "No hay internet. Tus respuestas siguen guardadas; conéctate e inténtalo de nuevo." : error, {
-          id: "courier-form",
-          title: error === OFFLINE ? "Sin conexión" : "No se pudo enviar",
-        });
+        setAutoRetry(error === OFFLINE);
+        // Sin internet ya se ven el banner de arriba y el aviso junto al botón: no se suma otro aviso
+        if (error === OFFLINE) toast.dismiss("courier-form");
+        else toast.error(error, { id: "courier-form", title: "No se pudo enviar" });
         if (Object.keys(lastFields).length) {
           setServerErrors(lastFields);
           const first = firstError(lastFields);
@@ -259,9 +361,17 @@ export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) 
         /* nada */
       }
       await clearPhotos();
+      setAutoRetry(false);
       setSent({ id: d.id, token: d.token, name: d.name.trim(), issues: d.issues.length });
       toast.dismiss("courier-form");
       toast.success("Encuesta enviada. ¡Gracias!");
+      if (lostPhotos)
+        toast.warning(
+          lostPhotos === 1
+            ? "1 foto no se envió porque ya no estaba en el celular. Puedes mandarla con «Reportar otro problema»."
+            : `${lostPhotos} fotos no se enviaron porque ya no estaban en el celular. Puedes mandarlas con «Reportar otro problema».`,
+          { title: "Faltó una foto" }
+        );
       window.scrollTo(0, 0);
     } finally {
       setSending(false);
@@ -279,7 +389,7 @@ export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) 
           <p className="text-base text-slate-600">Son 2 minutos. Toca la carita que diga cómo te fue.</p>
         </div>
       </header>
-      <TodayGuide />
+      <TodayGuide defaultOpen={!restored} />
       {restored && (
         <p className="mt-3 rounded-xl bg-brand-50 px-4 py-2.5 text-sm text-brand-700">Guardamos lo que ya llevabas. Puedes seguir.</p>
       )}
@@ -357,50 +467,69 @@ export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) 
               data-testid={`q-${q.id}`}
               className={`rounded-3xl bg-white p-4 shadow-sm ring-1 ${bad ? "ring-2 ring-rose-500" : "ring-slate-200"}`}
             >
-              <h3 className="text-lg font-semibold leading-snug">
-                <span className="text-slate-400">{i + 1}.</span> {q.label}
+              <h3 id={`q-${q.id}-label`} className="text-lg font-semibold leading-snug">
+                <span className="text-slate-500">{i + 1}.</span> {q.label}
               </h3>
               <div
                 role="radiogroup"
-                aria-label={q.label}
+                aria-labelledby={`q-${q.id}-label`}
                 aria-invalid={bad}
                 aria-describedby={bad ? `q-${q.id}-error` : undefined}
-                className="mt-3 grid grid-cols-5 gap-1.5"
+                onKeyDown={(e) => radioKeys(e, (n) => choose(q.id, n === FACES.length ? COURIER_NA : FACES[n].value))}
               >
-                {FACES.map((f, fi) => {
-                  const on = value === f.value;
-                  const faceLabel = q.faces[fi] ?? f.label;
-                  return (
-                    <motion.button
-                      key={f.value}
-                      type="button"
-                      role="radio"
-                      aria-checked={on}
-                      aria-label={faceLabel}
-                      onClick={() => update((d) => ({ ...d, answers: { ...d.answers, [q.id]: f.value } }))}
-                      whileHover={reduce ? undefined : { y: -3 }}
-                      whileTap={reduce ? { opacity: 0.8 } : { scale: 0.88 }}
-                      animate={on && !reduce ? { scale: [1, 1.14, 1.05] } : { scale: 1 }}
-                      transition={{ duration: 0.35, ease: "easeOut" }}
-                      className={`relative flex min-h-[84px] flex-col items-center justify-center rounded-2xl px-0.5 py-2 transition-[background-color,box-shadow,opacity] duration-200 ${
-                        on ? "bg-brand-50 ring-[3px] ring-brand-500" : "bg-slate-50 ring-1 ring-slate-200"
-                      } ${value && !on ? "opacity-45" : ""}`}
-                    >
-                      <motion.span
-                        className="relative inline-block text-[2.6rem] leading-none"
-                        aria-hidden
-                        animate={on ? (reduce ? { opacity: [0.4, 1] } : { y: [0, -14, 0, -5, 0], rotate: [0, -14, 12, -6, 0], scale: [1, 1.3, 1, 1.08, 1] }) : undefined}
-                        transition={{ duration: 0.65, ease: "easeOut" }}
+                <div className="mt-3 grid grid-cols-5 gap-1.5">
+                  {FACES.map((f, fi) => {
+                    const on = value === f.value;
+                    const faceLabel = q.faces[fi] ?? f.label;
+                    return (
+                      <motion.button
+                        key={f.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={on}
+                        aria-label={faceLabel}
+                        tabIndex={on || (value === undefined && fi === 0) ? 0 : -1}
+                        onClick={() => choose(q.id, f.value)}
+                        whileHover={reduce ? undefined : { y: -3 }}
+                        whileTap={reduce ? { opacity: 0.8 } : { scale: 0.88 }}
+                        animate={on && !reduce ? { scale: [1, 1.14, 1.05] } : { scale: 1 }}
+                        transition={{ duration: 0.35, ease: "easeOut" }}
+                        className={`relative flex min-h-[84px] flex-col items-center justify-center rounded-2xl px-0.5 py-2 transition-[background-color,box-shadow] duration-200 ${FOCUS} ${
+                          on ? "bg-brand-50 shadow-sm ring-[3px] ring-brand-600" : "bg-white ring-1 ring-slate-300"
+                        }`}
                       >
-                        {f.emoji}
-                        {on && <Sparkles count={8} radius={34} size={11} />}
-                      </motion.span>
-                      <span className={`mt-1.5 text-xs leading-tight ${on ? "font-bold text-brand-700" : "font-medium text-slate-600"}`}>
-                        {faceLabel}
-                      </span>
-                    </motion.button>
-                  );
-                })}
+                        <motion.span
+                          className="relative inline-block text-[2.6rem] leading-none"
+                          aria-hidden
+                          animate={on ? (reduce ? { opacity: [0.4, 1] } : { y: [0, -14, 0, -5, 0], rotate: [0, -14, 12, -6, 0], scale: [1, 1.3, 1, 1.08, 1] }) : undefined}
+                          transition={{ duration: 0.65, ease: "easeOut" }}
+                        >
+                          {f.emoji}
+                          {on && <Sparkles count={8} radius={34} size={11} />}
+                        </motion.span>
+                        <span className={`mt-1.5 text-xs leading-tight ${on ? "font-bold text-brand-700" : "font-medium text-slate-700"}`}>
+                          {faceLabel}
+                        </span>
+                      </motion.button>
+                    );
+                  })}
+                </div>
+                {q.na && (
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={value === COURIER_NA}
+                    tabIndex={value === COURIER_NA ? 0 : -1}
+                    onClick={() => choose(q.id, COURIER_NA)}
+                    data-testid={`q-${q.id}-na`}
+                    className={`mt-2.5 inline-flex min-h-11 items-center rounded-full px-4 text-sm font-medium transition-colors ${FOCUS} ${
+                      value === COURIER_NA ? "bg-slate-700 text-white ring-2 ring-slate-700" : "bg-white text-slate-700 ring-1 ring-slate-300"
+                    }`}
+                  >
+                    {value === COURIER_NA ? "✓ " : ""}
+                    {COURIER_NA_LABEL}
+                  </button>
+                )}
               </div>
               {bad && (
                 <p id={`q-${q.id}-error`} className="mt-2 text-base font-medium text-rose-700">
@@ -450,10 +579,16 @@ export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) 
           <ul className="mt-4 space-y-3">
             {draft.issues.map((it, i) => (
               <li key={it.id} className="flex gap-3 rounded-2xl bg-amber-50 p-3 ring-1 ring-amber-200" data-testid="saved-issue">
-                {it.photo && <PhotoThumb id={it.photo.id} />}
+                {it.photo && <PhotoThumb id={it.photo.id} missing={missingPhotos.has(it.photo.id)} />}
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-semibold text-amber-900">Problema {i + 1}</div>
                   <p className="whitespace-pre-wrap break-words text-base text-slate-800">{it.description}</p>
+                  {it.photo && missingPhotos.has(it.photo.id) && (
+                    <p className="mt-1 text-sm font-medium text-rose-800" data-testid="photo-missing">
+                      ⚠️ La foto ya no está en este celular. El problema se enviará sin foto; si quieres mandarla, borra este problema y agrégalo
+                      otra vez con la foto.
+                    </p>
+                  )}
                   <button
                     type="button"
                     onClick={async () => {
@@ -469,7 +604,7 @@ export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) 
                       update((d) => ({ ...d, issues: d.issues.filter((x) => x.id !== it.id) }));
                       toast.success("Problema borrado");
                     }}
-                    className="mt-2 rounded-xl px-3 py-2 text-base font-semibold text-rose-700 ring-1 ring-rose-200 active:bg-rose-50"
+                    className={`mt-2 min-h-11 rounded-xl px-3 py-2 text-base font-semibold text-rose-700 ring-1 ring-rose-200 active:bg-rose-50 ${FOCUS}`}
                   >
                     🗑️ Borrar
                   </button>
@@ -482,6 +617,7 @@ export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) 
         {editing ? (
           <IssueEditor
             maxUploadMb={maxUploadMb}
+            os={String(device.os ?? "")}
             onDirty={setEditorDirty}
             onCancel={() => {
               setEditing(false);
@@ -504,7 +640,7 @@ export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) 
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="mt-4 flex min-h-16 w-full items-center justify-center gap-2 rounded-2xl bg-amber-100 px-4 text-lg font-bold text-amber-900 ring-1 ring-amber-300 active:scale-[0.98]"
+            className={`mt-4 flex min-h-16 w-full items-center justify-center gap-2 rounded-2xl bg-amber-100 px-4 text-lg font-bold text-amber-900 ring-1 ring-amber-300 active:scale-[0.98] ${FOCUS}`}
           >
             ➕ {draft.issues.length ? "Agregar otro problema" : "Agregar problema"}
           </button>
@@ -525,20 +661,24 @@ export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) 
             {sendError === OFFLINE ? (
               <>
                 <p className="font-bold">📵 No hay internet.</p>
-                <p className="mt-1">Tus respuestas siguen guardadas en este celular. Conéctate y toca «Intentar de nuevo».</p>
+                <p className="mt-1">
+                  Tus respuestas siguen guardadas en este celular. Se mandan solas cuando vuelva la señal: deja esta página abierta. También
+                  puedes tocar «Intentar de nuevo».
+                </p>
               </>
             ) : (
               <p>{sendError}</p>
             )}
           </div>
         )}
+        {autoRetry && !sending && <RetryWhenOnline onRetry={() => void send(true)} />}
         <motion.button
           type="button"
-          onClick={send}
+          onClick={() => void send()}
           disabled={sending}
           whileHover={reduce || sending ? undefined : { y: -2 }}
           whileTap={reduce || sending ? { opacity: 0.85 } : { scale: 0.96 }}
-          className={`flex min-h-[68px] w-full items-center justify-center rounded-2xl bg-emerald-600 px-4 text-xl font-bold text-white shadow-md disabled:opacity-60 ${
+          className={`flex min-h-[68px] w-full items-center justify-center rounded-2xl bg-emerald-600 px-4 text-xl font-bold text-white shadow-md disabled:opacity-60 ${FOCUS} ${
             !sending && COURIER_QUESTIONS.every((q) => draft.answers[q.id]) ? "attn attn-success" : ""
           }`}
         >
@@ -558,14 +698,29 @@ const TODAY_STEPS = [
   "Al terminar, contesta esta encuesta. Si algo falló, cuéntalo en «¿Algo falló?».",
 ];
 
-/** Guía corta «Qué haces hoy», arriba de la encuesta: pasos numerados, letra grande. */
-function TodayGuide() {
+/**
+ * Guía corta «Qué haces hoy», arriba de la encuesta: pasos numerados, letra grande. Se puede plegar;
+ * empieza abierta solo si el borrador está vacío (quien ya empezó la encuesta no la necesita).
+ */
+function TodayGuide({ defaultOpen }: { defaultOpen: boolean }) {
   return (
-    <section aria-labelledby="c-today" className="mt-5 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200" data-testid="today-guide">
-      <h2 id="c-today" className="text-2xl font-bold">
-        Qué haces hoy
-      </h2>
-      <ol className="mt-4 space-y-4">
+    <details
+      open={defaultOpen}
+      className="group mt-5 rounded-3xl bg-white shadow-sm ring-1 ring-slate-200"
+      data-testid="today-guide"
+    >
+      <summary
+        className={`flex min-h-16 cursor-pointer list-none items-center justify-between gap-3 rounded-3xl px-5 py-3 [&::-webkit-details-marker]:hidden ${FOCUS}`}
+      >
+        <span>
+          <span className="block text-2xl font-bold">Qué haces hoy</span>
+          <span className="block text-sm text-slate-600 group-open:hidden">Toca para ver los {TODAY_STEPS.length} pasos de la prueba</span>
+        </span>
+        <span aria-hidden className="text-2xl text-slate-500 transition-transform group-open:rotate-180">
+          ⌄
+        </span>
+      </summary>
+      <ol className="space-y-4 px-5 pb-5 pt-1">
         {TODAY_STEPS.map((t, i) => (
           <li key={i} className="flex gap-3">
             <span
@@ -581,13 +736,15 @@ function TodayGuide() {
           </li>
         ))}
       </ol>
-    </section>
+    </details>
   );
 }
 
 /** Miniatura de una foto guardada en el celular (IndexedDB). */
-function PhotoThumb({ id }: { id: string }) {
+function PhotoThumb({ id, missing }: { id: string; missing?: boolean }) {
   const [url, setUrl] = useState<string | null>(null);
+  /** El navegador no puede mostrar la foto (p. ej. HEIC fuera de Safari): igual se envía. */
+  const [broken, setBroken] = useState(false);
   useEffect(() => {
     let u: string | null = null;
     let alive = true;
@@ -603,11 +760,15 @@ function PhotoThumb({ id }: { id: string }) {
   }, [id]);
   return (
     <div className="h-20 w-16 shrink-0 overflow-hidden rounded-xl bg-white ring-1 ring-amber-200">
-      {url ? (
+      {missing ? (
+        <span className="flex h-full items-center justify-center text-2xl" role="img" aria-label="Foto no disponible">
+          ⚠️
+        </span>
+      ) : url && !broken ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={url} alt="Foto de la pantalla" className="h-full w-full object-cover" />
+        <img src={url} alt="Foto de la pantalla" className="h-full w-full object-cover" onError={() => setBroken(true)} />
       ) : (
-        <span className="flex h-full items-center justify-center text-2xl" aria-label="Con foto">
+        <span className="flex h-full items-center justify-center text-2xl" role="img" aria-label="Con foto">
           📷
         </span>
       )}
@@ -618,12 +779,15 @@ function PhotoThumb({ id }: { id: string }) {
 /** Formulario de un problema: qué pasó + foto de la pantalla (opcional). */
 function IssueEditor({
   maxUploadMb,
+  os,
   onSave,
   onCancel,
   onDirty,
   saveLabel = "Guardar problema",
 }: {
   maxUploadMb: number;
+  /** Sistema del celular (detectDevice), para explicar cómo tomar la captura. */
+  os?: string;
   onSave: (it: NewIssue) => Promise<string | null>;
   onCancel: () => void;
   onDirty?: (dirty: boolean) => void;
@@ -637,15 +801,20 @@ function IssueEditor({
   const [descError, setDescError] = useState(false);
   const [busy, setBusy] = useState(false);
   const preview = useMemo(() => (photo ? URL.createObjectURL(photo) : null), [photo]);
+  /** Vista previa que el navegador no sabe mostrar (HEIC fuera de Safari). */
+  const [brokenPreview, setBrokenPreview] = useState<string | null>(null);
   useEffect(() => () => void (preview && URL.revokeObjectURL(preview)), [preview]);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const pick = async (f: File | undefined) => {
+  const pick = async (picked: File | undefined) => {
     if (inputRef.current) inputRef.current.value = "";
-    if (!f) return;
+    if (!picked) return;
     setError(null);
     setDescError(false);
-    if (!ALLOWED_PHOTO_TYPES.includes(f.type)) {
+    // Algunos celulares no dicen el tipo de la foto: se deduce por la extensión
+    const type = picked.type || guessPhotoMime(picked.name);
+    const f = type === picked.type ? picked : new File([picked], picked.name, { type, lastModified: picked.lastModified });
+    if (!ALLOWED_PHOTO_TYPES.includes(type)) {
       setError("Ese archivo no es una foto. Elige una foto de la pantalla.");
       toast.error("Ese archivo no es una foto. Elige una foto de la pantalla.", { id: "courier-issue" });
       return;
@@ -719,8 +888,26 @@ function IssueEditor({
       <div className="mt-4">
         {photo && preview ? (
           <div className="flex items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={preview} alt="Foto de la pantalla" className="h-28 w-20 rounded-xl object-cover ring-1 ring-slate-300" />
+            {brokenPreview === preview ? (
+              <span
+                role="img"
+                aria-label="Foto adjunta (este celular no puede mostrarla, pero sí se envía)"
+                className="flex h-28 w-20 flex-col items-center justify-center rounded-xl bg-slate-100 text-center text-xs text-slate-600 ring-1 ring-slate-300"
+              >
+                <span aria-hidden className="text-3xl">
+                  📷
+                </span>
+                Foto adjunta
+              </span>
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={preview}
+                alt="Foto de la pantalla"
+                className="h-28 w-20 rounded-xl object-cover ring-1 ring-slate-300"
+                onError={() => setBrokenPreview(preview)}
+              />
+            )}
             <div className="flex flex-col gap-2">
               <span className="text-base font-medium text-emerald-700">✅ Foto lista</span>
               <button
@@ -729,14 +916,14 @@ function IssueEditor({
                   setPhoto(null);
                   onDirty?.(Boolean(description.trim()));
                 }}
-                className="rounded-xl px-3 py-2 text-base font-semibold text-rose-700 ring-1 ring-rose-200 active:bg-rose-50"
+                className={`min-h-11 rounded-xl px-3 py-2 text-base font-semibold text-rose-700 ring-1 ring-rose-200 active:bg-rose-50 ${FOCUS}`}
               >
                 Quitar foto
               </button>
             </div>
           </div>
         ) : (
-          <label className="flex min-h-16 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-white px-4 text-lg font-bold text-brand-700 ring-2 ring-brand-500 active:scale-[0.98]">
+          <label className="flex min-h-16 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-white px-4 text-lg font-bold text-brand-700 ring-2 ring-brand-500 active:scale-[0.98] has-[:focus-visible]:outline-[3px] has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-brand-600">
             📷 Foto de la pantalla
             <input
               ref={inputRef}
@@ -748,10 +935,7 @@ function IssueEditor({
             />
           </label>
         )}
-        <p className="mt-2 text-sm text-slate-500">
-          Para tomar una foto de la pantalla, aprieta al mismo tiempo el botón de <b>bajar volumen</b> y el de <b>encendido</b>. La foto
-          es opcional.
-        </p>
+        <CaptureHint os={os} />
       </div>
 
       {error && (
@@ -765,7 +949,7 @@ function IssueEditor({
           type="button"
           onClick={onCancel}
           disabled={busy}
-          className="min-h-14 flex-1 rounded-2xl bg-white px-3 text-lg font-semibold text-slate-700 ring-1 ring-slate-300 active:scale-[0.98]"
+          className={`min-h-14 flex-1 rounded-2xl bg-white px-3 text-lg font-semibold text-slate-700 ring-1 ring-slate-300 active:scale-[0.98] ${FOCUS}`}
         >
           Cancelar
         </button>
@@ -773,7 +957,7 @@ function IssueEditor({
           type="button"
           onClick={save}
           disabled={busy}
-          className="min-h-14 flex-[2] rounded-2xl bg-brand-500 px-3 text-lg font-bold text-white active:scale-[0.98] disabled:opacity-60"
+          className={`min-h-14 flex-[2] rounded-2xl bg-brand-500 px-3 text-lg font-bold text-white active:scale-[0.98] disabled:opacity-60 ${FOCUS}`}
         >
           {busy ? "Un momento…" : saveLabel}
         </button>
@@ -786,11 +970,13 @@ function IssueEditor({
 function ThankYou({
   sent,
   maxUploadMb,
+  os,
   onIssueSent,
   onAgain,
 }: {
   sent: Sent;
   maxUploadMb: number;
+  os?: string;
   onIssueSent: () => void;
   onAgain: () => void;
 }) {
@@ -833,6 +1019,7 @@ function ThankYou({
           <IssueEditor
             maxUploadMb={maxUploadMb}
             saveLabel="Enviar problema"
+            os={os}
             onCancel={() => setEditing(false)}
             onSave={async (it) => {
               let error = await api(`/api/repartidor/${sent.id}/issues`, {
@@ -858,7 +1045,7 @@ function ThankYou({
             setLastOk(false);
             setEditing(true);
           }}
-          className="mt-5 flex min-h-16 w-full items-center justify-center gap-2 rounded-2xl bg-amber-100 px-4 text-lg font-bold text-amber-900 ring-1 ring-amber-300 active:scale-[0.98]"
+          className={`mt-5 flex min-h-16 w-full items-center justify-center gap-2 rounded-2xl bg-amber-100 px-4 text-lg font-bold text-amber-900 ring-1 ring-amber-300 active:scale-[0.98] ${FOCUS}`}
         >
           ⚠️ Reportar otro problema
         </button>
@@ -868,7 +1055,7 @@ function ThankYou({
         <button
           type="button"
           onClick={onAgain}
-          className="min-h-14 rounded-2xl bg-white px-4 text-lg font-semibold text-slate-700 ring-1 ring-slate-300 active:scale-[0.98]"
+          className={`min-h-14 rounded-2xl bg-white px-4 text-lg font-semibold text-slate-700 ring-1 ring-slate-300 active:scale-[0.98] ${FOCUS}`}
         >
           Llenar otra encuesta
         </button>

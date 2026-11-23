@@ -354,7 +354,7 @@ export function computeVerdict(): Verdict {
     };
   });
 
-  // Repartidores (formulario aparte, caritas 1–5)
+  // Repartidores (formulario aparte, caritas 1–5). answerOf descarta «No me tocó» ("na"): no cuenta en el promedio.
   const { feedback, issues: cIssues } = loadCourier();
   const vals = feedback.flatMap((f) => {
     const a = parseRec(f.answers);

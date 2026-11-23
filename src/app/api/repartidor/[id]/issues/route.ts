@@ -4,7 +4,8 @@ import { err, hasErrors, invalid, json, readJsonObject } from "@/lib/http";
 import { collect, courierIssueError, idError, text } from "@/lib/validate";
 
 /**
- * Agrega un problema a una encuesta ya enviada (solo quien la envió, con su token). Idempotente por id.
+ * Agrega un problema a una encuesta ya enviada (solo quien la envió, con su token). Idempotente por id:
+ * si el problema ya existe, actualiza su descripción.
  * Reglas: id del navegador (8–64); descripción obligatoria 3–1000.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -22,7 +23,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const db = getDb();
   const row = db.prepare("SELECT feedback_id FROM courier_issues WHERE id = ?").get(issueId) as { feedback_id: string } | undefined;
-  if (row) return row.feedback_id === id ? json({ id: issueId }) : err("Datos inválidos", 409);
+  if (row) {
+    if (row.feedback_id !== id) return err("Datos inválidos", 409);
+    // Reintento del mismo problema (p. ej. falló la foto): guarda la descripción corregida
+    const ts = now();
+    db.transaction(() => {
+      db.prepare("UPDATE courier_issues SET description = ? WHERE id = ?").run(description, issueId);
+      db.prepare("UPDATE courier_feedback SET updated_at = ? WHERE id = ?").run(ts, id);
+    })();
+    return json({ id: issueId });
+  }
   const count = (db.prepare("SELECT COUNT(*) c FROM courier_issues WHERE feedback_id = ?").get(id) as { c: number }).c;
   if (count >= 50) return err("Ya no se pueden agregar más problemas a esta encuesta");
   const ts = now();
