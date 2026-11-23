@@ -39,6 +39,11 @@ export type Step = {
   conditional?: boolean;
   /** Aviso en amarillo dentro de este paso (p. ej. «No toques Cerrar ahora»). */
   warning?: string;
+  /**
+   * Pantalla a la que pertenece el paso (los pasos seguidos con el mismo valor se muestran juntos).
+   * Opcional: sin este campo los pasos se agrupan solos (ver screensOf en guide-utils).
+   */
+  screen?: string;
 };
 
 /** Resultado esperado: texto simple, o con conditional=true para ofrecer Sí · No · No aplica. */

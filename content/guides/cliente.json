@@ -1,6 +1,6 @@
 {
   "id": "cliente",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "role": "Cliente final",
   "title": "Manual del Cliente final",
   "subtitle": "Guía de prueba de la app AppHouse",
@@ -51,7 +51,7 @@
     ],
     "rules": [
       "Ningún cobro es real. Usa solo las **tarjetas de práctica** de la hoja de datos.",
-      "No necesitas mandar ni esperar mensajes del grupo: la guía te dice qué sigue. Si algo falla, repórtalo con el botón **No pude** o **Reportar falla**.",
+      "No necesitas mandar ni esperar mensajes del grupo: la guía te dice qué sigue. Si algo falla, repórtalo con el botón **Tuve un problema** o **Reportar falla**.",
       "La sucursal va a rechazar, cancelar o dejar sin responder algunos pedidos para probar su parte. Si te pasa, es normal: anótalo y haz otro pedido.",
       "**C12** (cómo se ven las pantallas) se revisa durante toda la prueba, no al final.",
       "Graba la pantalla solo para mostrar una falla, de 1 a 2 minutos. **Android:** desliza desde arriba y toca **Grabar pantalla**. **iPhone:** desliza desde la esquina de arriba a la derecha y toca el círculo con punto."
@@ -362,7 +362,7 @@
           "text": "Elige **Mediana** y **Orilla rellena**: debe decir **$156** (el descuento es solo del precio base). Cierra con la **X** sin agregar."
         }
       ],
-      "notes": "Si Promociones dice «No tenemos promociones por ahora», toma una captura, repórtalo con **No pude** y marca la actividad como **No pude hacerla por otro problema**.",
+      "notes": "Si Promociones dice «No tenemos promociones por ahora», toma una captura, repórtalo con **Tuve un problema** y marca la actividad como **No pude hacerla por otro problema**.",
       "expected": [
         "La Pizza Hawaiana 20 % aparece en Promociones a $96, con $120 tachado.",
         "El descuento se aplica solo al precio base: Chica $96 y Mediana con Orilla rellena $156."
@@ -760,12 +760,12 @@
   },
   "survey": {
     "title": "Encuesta del Cliente final",
-    "intro": "Tus respuestas nos ayudan a mejorar la app. Toma 2 minutos.",
+    "intro": "Son 4 preguntas; toma 1 minuto.",
     "questions": [
       {
         "id": "ease",
         "type": "scale",
-        "label": "¿Qué tan fácil fue usar la app AppHouse?",
+        "label": "En general, ¿qué tan fácil fue usar la app AppHouse?",
         "min": 1,
         "max": 5,
         "minLabel": "Muy difícil",
@@ -773,33 +773,17 @@
         "required": true
       },
       {
-        "id": "speed",
-        "type": "scale",
-        "label": "¿Qué tan rápida sentiste la app?",
-        "min": 1,
-        "max": 5,
-        "minLabel": "Muy lenta",
-        "maxLabel": "Muy rápida",
-        "required": true
-      },
-      {
-        "id": "tracking",
-        "type": "scale",
-        "label": "¿Qué tan claro fue seguir tu pedido (etapas y avisos)?",
-        "min": 1,
-        "max": 5,
-        "minLabel": "Nada claro",
-        "maxLabel": "Muy claro",
-        "required": true
-      },
-      {
-        "id": "payment",
+        "id": "hardest",
         "type": "choice",
-        "label": "¿Pagar fue sencillo?",
+        "label": "¿Qué parte te costó más trabajo?",
         "options": [
-          "Sí, sin problemas",
-          "Con algunas dudas",
-          "No, me costó trabajo"
+          "Crear mi cuenta o entrar",
+          "Guardar mis direcciones",
+          "Ver el menú y las promociones",
+          "El carrito y el pago",
+          "Seguir mi pedido",
+          "Cancelar un pedido",
+          "Ninguna, todo fue fácil"
         ],
         "required": true
       },
@@ -810,23 +794,9 @@
         "required": true
       },
       {
-        "id": "liked",
-        "type": "text",
-        "label": "¿Qué fue lo que más te gustó?"
-      },
-      {
         "id": "improve",
         "type": "text",
-        "label": "¿Qué mejorarías primero?"
-      },
-      {
-        "id": "guide",
-        "type": "scale",
-        "label": "¿Qué tan clara fue esta guía de pruebas?",
-        "min": 1,
-        "max": 5,
-        "minLabel": "Nada clara",
-        "maxLabel": "Muy clara"
+        "label": "¿Qué fue lo más difícil o confuso, y qué mejorarías primero? (opcional)"
       }
     ]
   },

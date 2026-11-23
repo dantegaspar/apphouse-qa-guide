@@ -996,7 +996,7 @@ function Identify({
             <li className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
               <div className="text-xl" aria-hidden="true">🐞</div>
               <div className="mt-1 font-semibold text-slate-800">Reporta fallas</div>
-              Con «No pude» describes qué pasó y adjuntas capturas.
+              Con «Tuve un problema» describes qué pasó y adjuntas capturas.
             </li>
           </ul>
         )}

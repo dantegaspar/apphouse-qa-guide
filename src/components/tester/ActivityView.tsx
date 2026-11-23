@@ -5,7 +5,7 @@ import type { Activity, FieldDef } from "@/lib/types";
 import { ACTIVITY_RESULTS, type ActivityResult } from "@/lib/types";
 import { Coachmark, confirm, useToastOffset } from "@/components/feedback";
 import { Bump, motion, Sparkles, StepFrame, TickBadge, useReducedMotion } from "@/components/motion";
-import { expectedConditional, expectedText, NOT_APPLICABLE } from "@/lib/guide-utils";
+import { expectedConditional, expectedText, NOT_APPLICABLE, screensOf } from "@/lib/guide-utils";
 import OrdersField, { ordersError } from "./OrdersField";
 import { DaysPicker, FolioTimePicker, TimePicker, TimeRangePicker } from "./pickers";
 import { Button, Callout, FieldError, FormField, ProgressBar, Rich, StepImage } from "./ui";
@@ -65,7 +65,10 @@ export default function ActivityView({
   reopened?: boolean;
 }) {
   const steps = activity.steps;
-  const [pos, setPos] = useState(Math.min(initialStep, steps.length)); // steps.length = cierre
+  // Los pasos se muestran por pantallas (varios pasos juntos); pos = pantalla, screens.length = cierre
+  const screens = screensOf(steps);
+  const screenOfStep = (i: number) => (i >= steps.length ? screens.length : Math.max(0, screens.findIndex((sc) => i < sc.start + sc.steps.length)));
+  const [pos, setPos] = useState(() => screenOfStep(initialStep));
   const saved = state.activities[activity.id] ?? emptyActivity();
   const [draft, setDraftState] = useState<ActivityState>(saved);
   /** Cada cambio del cierre se guarda al momento (sobrevive a recargas); se envía al servidor al guardar. */
@@ -81,9 +84,13 @@ export default function ActivityView({
   const [dir, setDir] = useState<"next" | "prev">("next");
   const reduce = useReducedMotion();
   // Pasos en los que ya se abrió «Datos» (el botón deja de pulsar)
-  const [dataSeen, setDataSeen] = useState<Record<string, boolean>>({});
+  const [dataSeen, setDataSeen] = useState<Record<number, boolean>>({});
   // Errores del cierre (se muestran después del primer intento de guardar)
   const [tried, setTried] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
+  // Captura a la vista en la pantalla actual y si el tester está eligiendo en qué paso tuvo el problema
+  const [shot, setShot] = useState<string | null>(null);
+  const [problem, setProblem] = useState(false);
   const closingRef = useRef<HTMLDivElement>(null);
   // Los avisos flotantes van arriba de la barra fija de botones
   useToastOffset(desktop ? 96 : 150);
@@ -91,6 +98,8 @@ export default function ActivityView({
   const go = (p: number) => {
     setDir(p >= pos ? "next" : "prev");
     setPos(p);
+    setShot(null);
+    setProblem(false);
     window.scrollTo({ top: 0 });
   };
   const parts = partsOf(activity);
@@ -102,9 +111,10 @@ export default function ActivityView({
 
   // Atajos de teclado en escritorio: ← paso anterior, → paso siguiente (solo si ya se marcó y no hay pausa)
   const keyState = useRef({ pos, canNext: false });
-  const curOutcome = pos < steps.length ? state.steps[stepKey(activity.id, steps[pos].id)] : undefined;
+  const screenDone = (sc: (typeof screens)[number]) =>
+    sc.steps.every((s) => !!state.steps[stepKey(activity.id, s.id)] && checkpointDone(s));
   useEffect(() => {
-    keyState.current = { pos, canNext: pos < steps.length && !!curOutcome && !blocked && checkpointDone(steps[pos]) };
+    keyState.current = { pos, canNext: pos < screens.length && !blocked && screenDone(screens[pos]) };
   });
   useEffect(() => {
     if (!desktop) return;
@@ -119,7 +129,7 @@ export default function ActivityView({
       if (e.key === "ArrowLeft" && p > 0) {
         e.preventDefault();
         setDir("prev");
-        setPos(Math.min(p, steps.length) - 1);
+        setPos(Math.min(p, screens.length) - 1);
         window.scrollTo({ top: 0 });
       } else if (e.key === "ArrowRight" && canNext) {
         e.preventDefault();
@@ -130,7 +140,7 @@ export default function ActivityView({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [desktop, steps.length]);
+  }, [desktop, screens.length]);
 
   // Cuándo, dónde, avisos y notas de la actividad (en escritorio, en dos columnas)
   const info = (compact = false) => (
@@ -179,19 +189,19 @@ export default function ActivityView({
       <h1 className={"line-clamp-2 text-lg font-bold leading-tight" + dk("lg:mt-1 lg:line-clamp-none lg:text-[26px]")}>
         <span className="text-teal-ink">{activity.id}</span> · {activity.title}
       </h1>
-      {pos < steps.length && parts.list.length > 1 && parts.of(steps[pos].id) && (
+      {pos < screens.length && parts.list.length > 1 && parts.of(screens[pos].steps[0].id) && (
         <p className={"mt-0.5 text-xs font-semibold text-brand-700" + dk("lg:mt-1 lg:text-base")} data-testid="part-indicator">
-          Parte {parts.of(steps[pos].id)} de {parts.list[parts.list.length - 1]}
-          {parts.titles[parts.of(steps[pos].id)!] ? ` · ${parts.titles[parts.of(steps[pos].id)!]}` : ""}
+          Parte {parts.of(screens[pos].steps[0].id)} de {parts.list[parts.list.length - 1]}
+          {parts.titles[parts.of(screens[pos].steps[0].id)!] ? ` · ${parts.titles[parts.of(screens[pos].steps[0].id)!]}` : ""}
         </p>
       )}
       <div className={"mt-1.5 flex items-center gap-2" + dk("lg:mt-3 lg:gap-3")}>
-        <ProgressBar value={pos / steps.length} />
+        <ProgressBar value={pos / screens.length} />
         <span className={"shrink-0 text-xs font-medium text-slate-600" + dk("lg:text-sm")}>
-          {pos < steps.length ? `Paso ${pos + 1}/${steps.length}` : "Cierre"}
+          {pos < screens.length ? `Pantalla ${pos + 1}/${screens.length + 1}` : `Cierre · ${screens.length + 1}/${screens.length + 1}`}
         </span>
       </div>
-      {desktop && pos > 0 && pos < steps.length && (
+      {desktop && pos > 0 && pos < screens.length && (
         <details className="group mt-3 hidden rounded-xl bg-white text-sm ring-1 ring-slate-200 lg:block">
           <summary className="cursor-pointer select-none px-4 py-2 font-medium text-slate-600 marker:text-slate-400 hover:text-slate-900">
             Cuándo, dónde y avisos de {activity.id}
@@ -203,20 +213,25 @@ export default function ActivityView({
   );
 
   // Pantalla de cierre de la actividad
-  if (pos >= steps.length) {
+  if (pos >= screens.length) {
     const failed = steps.some((s) => state.steps[stepKey(activity.id, s.id)] === "fail");
     const allChecked = activity.expected.every((_, i) => draft.checks[String(i)] !== undefined);
+    const anyNo = activity.expected.some((_, i) => draft.checks[String(i)] === false);
+    // El resultado se sugiere solo (con falla si algún paso o punto salió mal); el tester lo puede cambiar
+    const suggested: ActivityResult | undefined = failed || anyNo ? "issue" : allChecked ? "ok" : undefined;
+    const result = draft.result ?? suggested;
+    const allYes = () => setDraft({ ...draft, checks: Object.fromEntries(activity.expected.map((_, i) => [String(i), true])) });
     const ordersErrs = Object.fromEntries(
-      (activity.fields ?? []).filter((f) => f.type === "orders").map((f) => [f.id, ordersError(draft.fields[f.id], !!f.required && (!draft.result || draft.result === "ok" || draft.result === "issue"))])
+      (activity.fields ?? []).filter((f) => f.type === "orders").map((f) => [f.id, ordersError(draft.fields[f.id], !!f.required && (!result || result === "ok" || result === "issue"))])
     );
-    const skipped = draft.result === "skipped";
+    const skipped = result === "skipped";
     const hasOrders = (activity.fields ?? []).some((f) => f.type === "orders");
     // Obligatorios solo si le fue bien o con falla; con «No pude» o «No me tocó» basta con que lo escrito tenga buen formato
-    const requireFilled = !draft.result || draft.result === "ok" || draft.result === "issue";
+    const requireFilled = !result || result === "ok" || result === "issue";
     const fieldErrors = validateFields((activity.fields ?? []).filter((f) => f.type !== "orders"), draft.fields, requireFilled);
     const errors: Errors = { ...fieldErrors };
     for (const [k, v] of Object.entries(ordersErrs)) if (v) errors[k] = v;
-    if (!draft.result) errors._result = `Elige cómo te fue en ${activity.id}.`;
+    if (!result) errors._result = `Elige cómo te fue en ${activity.id}.`;
     if (draft.notes.trim().length > LIMITS.notes) errors._notes = `Máximo ${LIMITS.notes} caracteres.`;
     const shown: Errors = tried ? errors : {};
     const complete = Object.keys(errors).length === 0 && (allChecked || skipped);
@@ -229,7 +244,7 @@ export default function ActivityView({
       }
       // Guardar cierra la actividad para siempre: con «No pude hacerla» se pide confirmación
       if (
-        draft.result === "blocked" &&
+        result === "blocked" &&
         !(await confirm({
           title: `¿Guardar ${activity.id} como «${ACTIVITY_RESULTS.blocked}»?`,
           message: "Al guardar, la actividad se cierra y ya no podrás cambiarla. Si fue una falla, revisa que la hayas reportado con «No pude».",
@@ -238,7 +253,7 @@ export default function ActivityView({
         }))
       )
         return;
-      onSave({ ...draft, fields: trimAll(draft.fields), notes: draft.notes.trim(), done: true });
+      onSave({ ...draft, result, fields: trimAll(draft.fields), notes: draft.notes.trim(), done: true });
     };
     return (
       <>
@@ -254,8 +269,22 @@ export default function ActivityView({
           )}
           <div className={dk(hasOrders ? "lg:space-y-6" : "lg:grid lg:grid-cols-2 lg:items-start lg:gap-6")}>
             <div className={card}>
-              <h2 className={"font-semibold" + dk("lg:text-lg")}>Resultado esperado</h2>
-              <p className="mb-3 text-sm text-slate-600">¿Pasó lo que dice cada punto?</p>
+              <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <h2 className={"font-semibold" + dk("lg:text-lg")}>Resultado esperado</h2>
+                  <p className="text-sm text-slate-600">¿Pasó lo que dice cada punto?</p>
+                </div>
+                {!allChecked && (
+                  <button
+                    type="button"
+                    onClick={allYes}
+                    data-testid="all-yes"
+                    className="min-h-10 rounded-lg bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-800 ring-1 ring-emerald-300 hover:bg-emerald-100"
+                  >
+                    ✓ Sí a todo
+                  </button>
+                )}
+              </div>
               <ul className="space-y-3">
                 {activity.expected.map((item, i) => {
                   const v = draft.checks[String(i)];
@@ -378,7 +407,11 @@ export default function ActivityView({
                 <h2 className={"font-semibold" + dk("lg:text-lg")} id={`res-${activity.id}`}>
                   ¿Cómo te fue en {activity.id}? *
                 </h2>
-                {failed && <p className="mt-1 text-sm text-amber-800">Marcaste al menos un paso como «No pude».</p>}
+                {failed ? (
+                  <p className="mt-1 text-sm text-amber-800">Reportaste al menos una falla en los pasos.</p>
+                ) : !draft.result && suggested ? (
+                  <p className="mt-1 text-sm text-slate-600">Lo marcamos según tus respuestas. Cámbialo si no fue así.</p>
+                ) : null}
                 <div
                   className={"mt-3 grid grid-cols-1 gap-2" + dk("lg:grid-cols-2") + (shown._result ? " animate-shake rounded-xl" : "")}
                   role="group"
@@ -389,14 +422,14 @@ export default function ActivityView({
                     <motion.button
                       key={r}
                       type="button"
-                      aria-pressed={draft.result === r}
+                      aria-pressed={result === r}
                       onClick={() => setDraft({ ...draft, result: r })}
                       whileHover={reduce ? undefined : { x: 2 }}
                       whileTap={reduce ? { opacity: 0.8 } : { scale: 0.96 }}
-                      animate={draft.result === r && !reduce ? { scale: [1, 1.04, 1] } : { scale: 1 }}
+                      animate={result === r && !reduce ? { scale: [1, 1.04, 1] } : { scale: 1 }}
                       transition={{ duration: 0.25 }}
                       className={`min-h-12 rounded-xl px-4 py-3 text-left font-medium ring-1 transition-colors ${
-                        draft.result === r ? RESULT_STYLE[r] : shown._result ? "bg-white ring-2 ring-rose-400" : "bg-white ring-slate-300 hover:bg-slate-50"
+                        result === r ? RESULT_STYLE[r] : shown._result ? "bg-white ring-2 ring-rose-400" : "bg-white ring-slate-300 hover:bg-slate-50"
                       }`}
                     >
                       {ACTIVITY_RESULTS[r]}
@@ -404,6 +437,15 @@ export default function ActivityView({
                   ))}
                 </div>
                 {shown._result && <FieldError id={`res-${activity.id}-err`}>{shown._result}</FieldError>}
+                {!showNotes && !draft.notes ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowNotes(true)}
+                    className="mt-3 min-h-11 px-1 text-sm font-medium text-brand-700 hover:underline"
+                  >
+                    + Agregar un comentario (opcional)
+                  </button>
+                ) : (
                 <FormField
                   id={`notes-${activity.id}`}
                   className="mt-4"
@@ -421,6 +463,7 @@ export default function ActivityView({
                     />
                   )}
                 </FormField>
+                )}
               </div>
 
               <IssueList issues={issuesFor()} />
@@ -438,13 +481,13 @@ export default function ActivityView({
               <p className={"text-center text-xs font-medium text-rose-700" + dk("lg:mr-auto lg:text-sm")} role="alert">
                 Revisa {Object.keys(errors).length === 1 ? "el dato marcado" : `los ${Object.keys(errors).length} datos marcados`} en rojo.
               </p>
-            ) : !allChecked && draft.result && !skipped ? (
+            ) : !allChecked && result && !skipped ? (
               <p className={"text-center text-xs text-slate-600" + dk("lg:mr-auto lg:text-sm")}>Te faltan puntos del resultado esperado.</p>
             ) : desktop ? (
               <p className="hidden text-sm text-slate-600 lg:mr-auto lg:block">Tus respuestas se guardan solas mientras llenas.</p>
             ) : null}
             <div className={"grid grid-cols-[auto_1fr] gap-2" + dk("lg:w-[420px]")}>
-              <Button variant="outline" size="lg" onClick={() => go(steps.length - 1)} aria-label="Paso anterior">
+              <Button variant="outline" size="lg" onClick={() => go(screens.length - 1)} aria-label="Pantalla anterior">
                 ←
               </Button>
               <Button size="lg" disabled={blocked} pulse={complete} onClick={save}>
@@ -459,304 +502,347 @@ export default function ActivityView({
     );
   }
 
-  const step = steps[pos];
-  const outcome = state.steps[stepKey(activity.id, step.id)];
-  const stepIssues = issuesFor(step.id);
-  const legend = step.caption ? captionLegend(step.caption) : null;
-  const ticks = ticksFor(step.id);
-  const cpTotal = step.checkpoint?.items.length ?? 0;
-  const cpDone = step.checkpoint ? step.checkpoint.items.filter((_, i) => ticks[String(i)]).length : 0;
-  const cpComplete = cpDone === cpTotal;
-  // En la guía de escritorio, si el paso no tiene captura, la confirmación ocupa la columna derecha
-  const cpRight = desktop && !step.image && !!step.checkpoint;
-  const checkpointCard = step.checkpoint && (
-              <fieldset
-                className={`rounded-2xl p-4 shadow-sm ring-2 transition-colors ${cpComplete ? "bg-emerald-50 ring-emerald-300" : "bg-white ring-brand-500/40"}` + dk("lg:p-5")}
-                data-testid="checkpoint"
-              >
-                <legend className="sr-only">{step.checkpoint.title}</legend>
-                <div className="flex items-start justify-between gap-3">
-                  <h2 className="font-semibold leading-snug text-slate-900" aria-hidden="true">
-                    <Bump k={cpComplete ? "si" : "no"} className="relative mr-1">
-                      {cpComplete ? "✅" : "☑️"}
-                      {cpComplete && <Sparkles count={10} radius={30} size={11} />}
-                    </Bump>
-                    {step.checkpoint.title}
-                  </h2>
-                  <span
-                    className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold transition-colors duration-300 ${cpComplete ? "bg-emerald-700 text-white" : "bg-slate-100 text-slate-700"}`}
-                    aria-live="polite"
-                  >
-                    <Bump k={cpDone}>{cpDone}</Bump> de {cpTotal}
+  const screen = screens[pos];
+  const screenSteps = screen.steps;
+  const doSteps = screenSteps.filter((s) => !s.checkpoint);
+  const cpSteps = screenSteps.filter((s) => s.checkpoint);
+  const condSteps = doSteps.filter((s) => s.conditional);
+  const imgSteps = screenSteps.filter((s) => s.image);
+  const num = (s: Activity["steps"][number]) => screen.start + screenSteps.indexOf(s) + 1;
+  const outcomeOf = (s: Activity["steps"][number]) => state.steps[stepKey(activity.id, s.id)];
+  const failedSteps = doSteps.filter((s) => outcomeOf(s) === "fail");
+  const marked = screenDone(screen);
+  const cpAllDone = cpSteps.every(checkpointDone);
+  const screenIssues = state.issues.filter((i) => i.activityId === activity.id && screenSteps.some((s) => s.id === i.stepId));
+  const dataStep = screenSteps.find((s) => s.dataButton);
+  const evidenceSteps = doSteps.filter((s) => s.evidence);
+  const shotStep = imgSteps.find((s) => s.id === shot) ?? imgSteps[0];
+  const legend = shotStep?.caption ? captionLegend(shotStep.caption) : null;
+
+  /** «Sí, siguiente»: los pasos sin marcar quedan como logrados (los de falla o «No me apareció» se quedan así). */
+  const next = () => {
+    for (const s of screenSteps) if (!outcomeOf(s)) onStep(s.id, "ok");
+    setProblem(false);
+    go(pos + 1);
+  };
+  const checkpointCard = (s: Activity["steps"][number]) => {
+    const cp = s.checkpoint!;
+    const ticks = ticksFor(s.id);
+    const done = cp.items.filter((_, i) => ticks[String(i)]).length;
+    const complete = done === cp.items.length;
+    return (
+      <fieldset
+        key={s.id}
+        className={`rounded-2xl p-4 shadow-sm ring-2 transition-colors ${complete ? "bg-emerald-50 ring-emerald-300" : "bg-white ring-brand-500/40"}` + dk("lg:p-5")}
+        data-testid="checkpoint"
+      >
+        <legend className="sr-only">{cp.title}</legend>
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="font-semibold leading-snug text-slate-900" aria-hidden="true">
+            <Bump k={complete ? "si" : "no"} className="relative mr-1">
+              {complete ? "✅" : "☑️"}
+              {complete && <Sparkles count={10} radius={30} size={11} />}
+            </Bump>
+            {cp.title}
+          </h3>
+          <span
+            className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold transition-colors duration-300 ${complete ? "bg-emerald-700 text-white" : "bg-slate-100 text-slate-700"}`}
+            aria-live="polite"
+          >
+            <Bump k={done}>{done}</Bump> de {cp.items.length}
+          </span>
+        </div>
+        <ul className="mt-3 space-y-2">
+          {cp.items.map((it, i) => {
+            const on = !!ticks[String(i)];
+            return (
+              <motion.li key={i} layout={!reduce} whileTap={reduce || blocked ? undefined : { scale: 0.98 }}>
+                <label
+                  className={`relative flex min-h-12 cursor-pointer items-start gap-3 rounded-xl p-3 text-[15px] ring-1 transition-colors duration-300 ${
+                    on ? "bg-white ring-emerald-300" : "bg-slate-50 ring-slate-200 hover:bg-slate-100"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-6 w-6 shrink-0 accent-emerald-600"
+                    checked={on}
+                    disabled={blocked}
+                    onChange={(e) => onCheckpoint?.(s.id, { ...ticks, [String(i)]: e.target.checked })}
+                  />
+                  <span className={"flex-1 " + (on ? "text-slate-900" : "text-slate-800")}>
+                    <Rich text={it} />
                   </span>
-                </div>
-                <p className="mt-1 text-sm text-slate-600">Marca cada punto que ya quedó listo. Al marcar todos podrás seguir.</p>
-                <ul className="mt-3 space-y-2">
-                  {step.checkpoint.items.map((it, i) => {
-                    const on = !!ticks[String(i)];
-                    return (
-                      <motion.li key={i} layout={!reduce} whileTap={reduce || blocked ? undefined : { scale: 0.98 }}>
-                        <label
-                          className={`relative flex min-h-12 cursor-pointer items-start gap-3 rounded-xl p-3 text-[15px] ring-1 transition-colors duration-300 ${
-                            on ? "bg-white ring-emerald-300" : "bg-slate-50 ring-slate-200 hover:bg-slate-100"
-                          }`}
-                        >
-                          {on && (
-                            <motion.span
-                              aria-hidden="true"
-                              className="pointer-events-none absolute inset-0 rounded-xl ring-4 ring-emerald-400/70"
-                              initial={{ opacity: 1, scale: 1 }}
-                              animate={{ opacity: 0, scale: reduce ? 1 : 1.05 }}
-                              transition={{ duration: 0.55, ease: "easeOut" }}
-                            />
-                          )}
-                          <input
-                            type="checkbox"
-                            className="mt-0.5 h-6 w-6 shrink-0 accent-emerald-600"
-                            checked={on}
-                            disabled={blocked}
-                            onChange={(e) => onCheckpoint?.(step.id, { ...ticks, [String(i)]: e.target.checked })}
-                          />
-                          <span className={"flex-1 " + (on ? "text-slate-900" : "text-slate-800")}>
-                            <Rich text={it} />
-                          </span>
-                          <TickBadge on={on} />
-                        </label>
-                      </motion.li>
-                    );
-                  })}
-                </ul>
-              </fieldset>
-  );
+                  <TickBadge on={on} />
+                </label>
+              </motion.li>
+            );
+          })}
+        </ul>
+      </fieldset>
+    );
+  };
   const openData = () => {
-    setDataSeen((m) => ({ ...m, [step.id]: true }));
+    setDataSeen((m) => ({ ...m, [screen.start]: true }));
     onOpenData?.();
   };
+
+  // Bloque 1: instrucciones de la pantalla
+  const instructions = (
+    <div className={"rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200" + dk("lg:p-6")} data-testid="instructions">
+      <h2 className={"mb-3 text-xs font-semibold uppercase tracking-wide text-slate-600" + dk("lg:text-sm")}>
+        Instrucciones{doSteps.length > 1 ? ` · ${doSteps.length} pasos` : ""}
+      </h2>
+      <ol className="space-y-3">
+        {doSteps.map((s) => {
+          const o = outcomeOf(s);
+          return (
+            <li key={s.id} className="flex gap-3" data-testid="instruction">
+              <span
+                className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white shadow-sm ${
+                  o === "fail" ? "bg-rose-600" : "bg-brand-gradient"
+                }`}
+                aria-hidden="true"
+              >
+                {o === "fail" ? "!" : num(s)}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className={"text-[16px] leading-relaxed text-slate-800" + dk("lg:text-base lg:leading-7")}>
+                  <span className="sr-only">Paso {num(s)}. </span>
+                  <Rich text={s.text} links />
+                </p>
+                {s.warning && (
+                  <div className="mt-2 flex gap-2 rounded-xl bg-amber-50 px-3 py-2 text-[15px] text-amber-950 ring-1 ring-amber-300" role="note" data-testid="step-warning">
+                    <span aria-hidden="true">⚠️</span>
+                    <span>
+                      <Rich text={s.warning} links />
+                    </span>
+                  </div>
+                )}
+                {(s.image && imgSteps.length > 1) || o === "fail" ? (
+                  <div className="mt-1 flex flex-wrap gap-x-3 text-sm">
+                    {s.image && imgSteps.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShot(s.id);
+                          // En celular la captura va debajo de las instrucciones: se baja hasta ella
+                          if (!window.matchMedia("(min-width: 1024px)").matches || !desktop)
+                            document.getElementById("screen-shots")?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+                        }}
+                        className={`min-h-9 font-medium ${shotStep?.id === s.id ? "text-slate-500" : "text-brand-700 hover:underline"}`}
+                        aria-pressed={shotStep?.id === s.id}
+                      >
+                        📷 {shotStep?.id === s.id ? "Captura a la vista" : "Ver su captura"}
+                      </button>
+                    )}
+                    {o === "fail" && <span className="min-h-9 py-2 font-medium text-rose-700">Falla reportada</span>}
+                  </div>
+                ) : null}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+      {dataStep && (
+        <Coachmark
+          id="tester-datos-sucursal"
+          title={dataLabel}
+          message="Aquí están los nombres, precios y datos exactos que debes escribir en estos pasos."
+          placement="top"
+        >
+          <motion.button
+            type="button"
+            onClick={openData}
+            data-testid="data-button"
+            whileHover={reduce ? undefined : { y: -2 }}
+            whileTap={reduce ? { opacity: 0.8 } : { scale: 0.96 }}
+            className={`mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-amber-50 px-4 py-3 text-base font-semibold text-amber-950 ring-2 ring-amber-300 transition-colors hover:bg-amber-100 ${
+              dataSeen[screen.start] ? "" : "attn attn-amber"
+            }`}
+          >
+            <span aria-hidden="true">📊</span> {dataLabel}
+          </motion.button>
+        </Coachmark>
+      )}
+      {evidenceSteps.map((s) => (
+        <button
+          key={s.id}
+          type="button"
+          onClick={() => onReport("evidence", s.id)}
+          className="mt-3 flex min-h-11 w-full items-center gap-2 rounded-lg bg-brand-50 px-3 py-2 text-left text-sm font-medium text-brand-700 hover:bg-brand-100"
+        >
+          📷 Adjuntar la captura que pide el paso {num(s)}
+        </button>
+      ))}
+    </div>
+  );
+
+  // Bloque 2: capturas de la pantalla (una a la vista; se cambia con las pestañas o «Ver su captura»)
+  const shots = imgSteps.length > 0 && shotStep && (
+    <div data-testid="screenshots">
+      {imgSteps.length > 1 && (
+        <div className="mb-2 flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Capturas de esta pantalla">
+          {imgSteps.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              role="tab"
+              aria-selected={shotStep.id === s.id}
+              onClick={() => setShot(s.id)}
+              className={`min-h-9 rounded-full px-3 py-1 text-sm font-medium ring-1 transition-colors ${
+                shotStep.id === s.id ? "bg-brand-600 text-white ring-brand-600" : "bg-white text-slate-700 ring-slate-300 hover:bg-slate-50"
+              }`}
+            >
+              Paso {num(s)}
+            </button>
+          ))}
+        </div>
+      )}
+      <Coachmark id="tester-captura-zoom" message="Toca la captura para verla en grande y con zoom." placement="top">
+        <StepImage key={shotStep.image} src={shotStep.image!} caption={shotStep.caption} desktop={desktop} captionAside={desktop && !!legend} flash={!!legend?.numbered} />
+      </Coachmark>
+      {desktop && legend && (
+        <div className="mt-3 hidden rounded-xl bg-white p-3 ring-1 ring-slate-200 lg:block" data-testid="caption-legend">
+          <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-600">En la captura del paso {num(shotStep)}</div>
+          {legend.numbered ? (
+            <ul className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm text-slate-700">
+              {legend.items.map(([n, t], i) => (
+                <li key={i} className="flex items-start gap-2">
+                  <span className="mt-px flex h-5 min-w-5 shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-rose-600 px-1.5 text-[11px] font-bold text-white">
+                    {n}
+                  </span>
+                  <span>{t}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-slate-700">{shotStep.caption}</p>
+          )}
+          {legend.numbered && legend.note && <p className="mt-2 text-xs text-slate-600">{legend.note}</p>}
+        </div>
+      )}
+    </div>
+  );
+
+  // Bloque 3: formulario breve + Siguiente
+  const form = (
+    <div className="space-y-3" data-testid="screen-form">
+      {cpSteps.map(checkpointCard)}
+      {condSteps.length > 0 && (
+        <div className="rounded-2xl bg-white p-4 text-sm shadow-sm ring-1 ring-slate-200">
+          <p className="text-slate-700">¿No te salió lo que dice algún paso «Si…»? Márcalo (cuenta como terminado):</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {condSteps.map((s) => {
+              const na = outcomeOf(s) === "na";
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  disabled={blocked || outcomeOf(s) === "fail"}
+                  aria-pressed={na}
+                  onClick={() => onStep(s.id, na ? null : "na")}
+                  className={`min-h-10 rounded-lg px-3 py-1.5 font-medium ring-1 transition-colors disabled:opacity-40 ${
+                    na ? "bg-slate-600 text-white ring-slate-600" : "bg-white text-slate-700 ring-slate-300 hover:bg-slate-50"
+                  }`}
+                >
+                  {na ? "✓ " : ""}Paso {num(s)}: no me apareció
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      <IssueList issues={screenIssues} />
+      <div
+        className={
+          "pb-safe sticky bottom-0 z-10 -mx-4 bg-[#f4f6fa]/95 px-4 pt-2 backdrop-blur" +
+          dk("lg:static lg:mx-0 lg:rounded-2xl lg:bg-white lg:p-4 lg:shadow-sm lg:ring-1 lg:ring-slate-200 lg:backdrop-blur-none")
+        }
+      >
+        {blocked ? (
+          <p className="mb-2 text-center text-xs font-medium text-rose-700">Actividad en pausa: pide ayuda al guía para continuar.</p>
+        ) : !cpAllDone ? (
+          <p className="mb-2 text-center text-xs font-medium text-slate-700" id={`cp-hint-${activity.id}-${pos}`}>
+            Marca todas las casillas de arriba para poder seguir.
+          </p>
+        ) : problem && doSteps.length > 1 ? (
+          <p className="mb-2 text-center text-sm font-medium text-slate-800">¿En qué paso tuviste el problema?</p>
+        ) : failedSteps.length ? (
+          <p className="mb-2 text-center text-xs text-slate-600">Reportaste una falla. Si puedes seguir, toca «Siguiente».</p>
+        ) : (
+          <p className={"mb-2 text-center text-sm font-medium text-slate-700" + dk("lg:text-left")}>
+            ¿Pudiste hacer {doSteps.length > 1 ? "todos estos pasos" : "este paso"}?
+          </p>
+        )}
+        {problem && doSteps.length > 1 && !blocked ? (
+          <div className="grid grid-cols-4 gap-2" data-testid="problem-steps">
+            {doSteps.map((s) => (
+              <Button key={s.id} variant="danger" size="lg" onClick={() => { setProblem(false); onReport("issue", s.id, true); }}>
+                {num(s)}
+              </Button>
+            ))}
+            <Button variant="outline" size="lg" className="col-span-4" onClick={() => setProblem(false)}>
+              Cancelar
+            </Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              variant="danger"
+              size="lg"
+              disabled={blocked}
+              onClick={() => (doSteps.length > 1 ? setProblem(true) : onReport("issue", doSteps[0]?.id ?? screenSteps[0].id, true))}
+            >
+              ✗ Tuve un problema
+            </Button>
+            <Button
+              variant="success"
+              size="lg"
+              disabled={blocked || !cpAllDone}
+              aria-describedby={!cpAllDone ? `cp-hint-${activity.id}-${pos}` : undefined}
+              pulse={!marked && !blocked && cpAllDone}
+              onClick={next}
+              data-testid="screen-next"
+            >
+              {failedSteps.length || marked ? "Siguiente →" : "✓ Sí, siguiente"}
+            </Button>
+          </div>
+        )}
+        <div className={"mt-1 flex items-center justify-between text-sm" + dk("lg:mt-2")}>
+          <button
+            type="button"
+            disabled={pos === 0}
+            onClick={() => go(pos - 1)}
+            className={"min-h-11 px-2 py-2 text-slate-600 disabled:opacity-30" + dk("lg:rounded-lg lg:hover:bg-slate-100 lg:hover:text-slate-800")}
+          >
+            ← Anterior
+          </button>
+          <button
+            type="button"
+            onClick={() => onReport("issue", (doSteps[doSteps.length - 1] ?? screenSteps[0]).id)}
+            className={"min-h-11 px-2 py-2 font-medium text-rose-700" + dk("lg:rounded-lg lg:hover:bg-rose-50")}
+          >
+            Reportar otra falla
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <>
     {header}
-    <StepFrame id={step.id} dir={dir}>
+    <StepFrame id={`${activity.id}-p${pos}`} dir={dir}>
       <section className={"mt-1 space-y-4" + dk("lg:mt-4 lg:space-y-5")}>
-        {blocked && !desktop && blockedPanel}
+        {blocked && blockedPanel}
         {pos === 0 && info()}
-
-        <div className={dk("lg:grid lg:grid-cols-[minmax(340px,400px)_minmax(0,1fr)] lg:items-start lg:gap-6")}>
-          {/* Columna izquierda (en celular, todo va en una sola columna) */}
+        <div className={dk(shots ? "lg:grid lg:grid-cols-[minmax(360px,440px)_minmax(0,1fr)] lg:items-start lg:gap-6" : "lg:max-w-3xl")}>
           <div className="space-y-4">
-            {blocked && desktop && blockedPanel}
-            <div className={"rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200" + dk("lg:p-6")}>
-              <div className={"mb-2 flex items-center gap-3" + dk("lg:mb-3")}>
-                <motion.div
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-gradient text-sm font-bold text-white shadow-sm"
-                  aria-hidden="true"
-                  initial={reduce ? { opacity: 0 } : { scale: 0.3, rotate: -90, opacity: 0 }}
-                  animate={{ scale: 1, rotate: 0, opacity: 1 }}
-                  transition={reduce ? { duration: 0.25 } : { type: "spring", stiffness: 420, damping: 15, delay: 0.12 }}
-                >
-                  {pos + 1}
-                </motion.div>
-                <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">
-                  Paso {pos + 1} de {steps.length}
-                </span>
-              </div>
-              <p className={"text-[17px] leading-relaxed text-slate-800" + dk("lg:text-base lg:leading-7")}>
-                <Rich text={step.text} links />
-              </p>
-              {step.warning && (
-                <div className="mt-3 flex gap-2 rounded-xl bg-amber-50 px-3 py-2.5 text-[15px] text-amber-950 ring-1 ring-amber-300" role="note" data-testid="step-warning">
-                  <span aria-hidden="true">⚠️</span>
-                  <span>
-                    <Rich text={step.warning} links />
-                  </span>
-                </div>
-              )}
-              {step.dataButton && (
-                <Coachmark
-                  id="tester-datos-sucursal"
-                  title={dataLabel}
-                  message="Aquí están los nombres, precios y datos exactos que debes escribir en este paso."
-                  placement="top"
-                >
-                <motion.button
-                  type="button"
-                  onClick={openData}
-                  data-testid="data-button"
-                  whileHover={reduce ? undefined : { y: -2 }}
-                  whileTap={reduce ? { opacity: 0.8 } : { scale: 0.96 }}
-                  className={`mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-amber-50 px-4 py-3 text-base font-semibold text-amber-950 ring-2 ring-amber-300 transition-colors hover:bg-amber-100 ${
-                    dataSeen[step.id] ? "" : "attn attn-amber"
-                  }`}
-                >
-                  <motion.span
-                    aria-hidden="true"
-                    className="inline-block"
-                    animate={dataSeen[step.id] ? undefined : reduce ? { opacity: [1, 0.45, 1] } : { rotate: [0, -12, 10, -6, 0], scale: [1, 1.2, 1] }}
-                    transition={{ duration: 0.9, repeat: Infinity, repeatDelay: 0.7 }}
-                  >
-                    📊
-                  </motion.span>{" "}
-                  {dataLabel}
-                </motion.button>
-                </Coachmark>
-              )}
-              {desktop && legend && (
-                <div className="animate-flash mt-4 hidden rounded-xl bg-slate-50 p-3 ring-1 ring-slate-100 lg:block" data-testid="caption-legend">
-                  <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-600">En la captura</div>
-                  {legend.numbered ? (
-                    <ul className="space-y-1.5 text-sm text-slate-700">
-                      {legend.items.map(([n, t], i) => (
-                        <li key={i} className="flex items-start gap-2">
-                          <span className="mt-px flex h-5 min-w-5 shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-rose-600 px-1.5 text-[11px] font-bold text-white">
-                            {n}
-                          </span>
-                          <span>{t}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-sm text-slate-700">{step.caption}</p>
-                  )}
-                  {legend.numbered && legend.note && <p className="mt-2 text-xs text-slate-600">{legend.note}</p>}
-                </div>
-              )}
-              {step.evidence && (
-                <button
-                  type="button"
-                  onClick={() => onReport("evidence", step.id)}
-                  className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-lg bg-brand-50 px-3 py-2 text-sm font-medium text-brand-700 hover:bg-brand-100"
-                >
-                  📷 Adjuntar la captura que pide este paso
-                </button>
-              )}
-            </div>
-
-            {step.checkpoint && <div className={cpRight ? "lg:hidden" : undefined}>{checkpointCard}</div>}
-
-            {step.image && (
-              <div className={desktop ? "lg:hidden" : undefined}>
-                <Coachmark id="tester-captura-zoom" message="Toca la captura para verla en grande y con zoom." placement="top">
-                  <StepImage src={step.image} caption={step.caption} flash={!!legend?.numbered} />
-                </Coachmark>
-              </div>
-            )}
-
-            <IssueList issues={stepIssues} />
-
-            <div
-              className={
-                "pb-safe sticky bottom-0 z-10 -mx-4 bg-[#f4f6fa]/95 px-4 pt-2 backdrop-blur" +
-                dk("lg:static lg:mx-0 lg:rounded-2xl lg:bg-white lg:p-4 lg:shadow-sm lg:ring-1 lg:ring-slate-200 lg:backdrop-blur-none")
-              }
-            >
-              {blocked ? (
-                <p className="mb-2 text-center text-xs font-medium text-rose-700">Actividad en pausa: pide ayuda al guía para continuar.</p>
-              ) : step.checkpoint && !cpComplete ? (
-                <p className="mb-2 text-center text-xs font-medium text-slate-700" id={`cp-hint-${step.id}`}>
-                  Marca las {cpTotal} casillas de arriba para poder seguir ({cpDone} de {cpTotal}).
-                </p>
-              ) : outcome ? (
-                <p className="mb-2 text-center text-xs text-slate-600">
-                  Marcaste: <strong>{outcome === "ok" ? "Lo logré" : outcome === "na" ? "No me apareció" : "No pude"}</strong> · puedes cambiarlo
-                </p>
-              ) : desktop ? (
-                <p className="mb-3 hidden text-sm font-medium text-slate-700 lg:block">¿Pudiste hacer este paso?</p>
-              ) : null}
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  variant="danger"
-                  size="lg"
-                  className={outcome === "fail" ? "!bg-rose-600 !text-white" : ""}
-                  onClick={() => onReport("issue", step.id, true)}
-                >
-                  ✗ No pude
-                </Button>
-                <Button
-                  variant="success"
-                  size="lg"
-                  disabled={blocked || !cpComplete}
-                  aria-describedby={step.checkpoint && !cpComplete ? `cp-hint-${step.id}` : undefined}
-                  pulse={!outcome && !blocked && cpComplete}
-                  className={outcome === "ok" ? "ring-4 ring-emerald-200" : ""}
-                  onClick={() => {
-                    onStep(step.id, "ok");
-                    go(pos + 1);
-                  }}
-                >
-                  ✓ Lo logré
-                </Button>
-                {step.conditional && (
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    disabled={blocked}
-                    className={"col-span-2" + (outcome === "na" ? " !bg-slate-600 !text-white !ring-slate-600" : "")}
-                    onClick={() => {
-                      onStep(step.id, "na");
-                      go(pos + 1);
-                    }}
-                  >
-                    No me apareció
-                  </Button>
-                )}
-              </div>
-              {step.conditional && (
-                <p className="mt-1.5 text-center text-xs text-slate-600">Si lo que dice el paso no te salió, toca «No me apareció»: cuenta como terminado.</p>
-              )}
-              <div className={"mt-1 flex items-center justify-between text-sm" + dk("lg:mt-2")}>
-                <button
-                  type="button"
-                  disabled={pos === 0}
-                  onClick={() => go(pos - 1)}
-                  className={"min-h-11 px-2 py-2 text-slate-600 disabled:opacity-30" + dk("lg:rounded-lg lg:hover:bg-slate-100 lg:hover:text-slate-800")}
-                >
-                  ← Anterior
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onReport("issue", step.id)}
-                  className={"min-h-11 px-2 py-2 font-medium text-rose-700" + dk("lg:rounded-lg lg:hover:bg-rose-50")}
-                >
-                  Reportar otra falla
-                </button>
-                {outcome ? (
-                  <button
-                    type="button"
-                    disabled={blocked || !cpComplete}
-                    onClick={() => go(pos + 1)}
-                    className={"min-h-11 px-2 py-2 text-slate-600 disabled:opacity-30" + dk("lg:rounded-lg lg:hover:bg-slate-100 lg:hover:text-slate-800")}
-                  >
-                    Siguiente →
-                  </button>
-                ) : (
-                  <span className="w-20" />
-                )}
-              </div>
-              {desktop && (
-                <p className="mt-2 hidden border-t border-slate-100 pt-2 text-center text-xs text-slate-600 lg:block">
-                  Atajos: <kbd className="rounded bg-slate-100 px-1.5 py-0.5 font-sans text-slate-700">←</kbd> paso anterior ·{" "}
-                  <kbd className="rounded bg-slate-100 px-1.5 py-0.5 font-sans text-slate-700">→</kbd> siguiente (si ya lo marcaste)
-                </p>
-              )}
-            </div>
+            {instructions}
+            {shots && <div id="screen-shots" className={"scroll-mt-28" + (desktop ? " lg:hidden" : "")}>{shots}</div>}
+            {form}
           </div>
-
-          {/* Columna derecha (escritorio): la captura en grande */}
-          {desktop && (
-            <div className="hidden lg:block">
-              {step.image ? (
-                <StepImage key={step.image} src={step.image} caption={step.caption} desktop captionAside={!!legend} />
-              ) : cpRight ? (
-                checkpointCard
-              ) : (
-                <div className="flex h-64 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 text-center text-sm text-slate-600">
-                  <span className="text-3xl opacity-60" aria-hidden="true">🖥️</span>
-                  <span className="mt-2">Este paso no tiene captura de pantalla.</span>
-                  <span>Sigue las indicaciones de la izquierda.</span>
-                </div>
-              )}
-            </div>
-          )}
+          {desktop && shots && <div className="hidden lg:sticky lg:top-4 lg:block">{shots}</div>}
         </div>
       </section>
     </StepFrame>
