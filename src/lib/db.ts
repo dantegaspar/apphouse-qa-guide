@@ -172,6 +172,18 @@ const MIGRATIONS: string[] = [
   ALTER TABLE issues ADD COLUMN triage_at TEXT;
   UPDATE issues SET severity = CASE WHEN blocking = 1 THEN 'bloqueante' ELSE 'mayor' END WHERE kind = 'issue';
   `,
+  // 7: escala de severidad del Plan de pruebas (crítico / alto / medio / bajo) y criterios de finalización
+  // 2–13 de la sección 7.5 (bots, servidor y seguridad), que Mesa de control captura en el panel.
+  `
+  UPDATE issues SET severity = CASE severity WHEN 'bloqueante' THEN 'alto' WHEN 'mayor' THEN 'medio' WHEN 'menor' THEN 'bajo' ELSE severity END;
+  CREATE TABLE IF NOT EXISTS exit_criteria (
+    id INTEGER PRIMARY KEY,
+    measured TEXT NOT NULL DEFAULT '',
+    met INTEGER,
+    note TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL
+  );
+  `,
 ];
 
 function migrate(db: Database.Database) {

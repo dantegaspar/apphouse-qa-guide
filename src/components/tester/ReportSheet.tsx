@@ -15,11 +15,14 @@ export type ReportDraft = {
   orderNumber: string;
 };
 
-/** Opciones de «¿Qué tanto te afecta?» en palabras simples (gravedad tipo IEEE 1044). */
+/**
+ * Opciones de «¿Qué tanto te afecta?» en palabras simples (severidad del Plan de pruebas).
+ * «Crítico» no se ofrece: lo asigna Mesa de control al revisar (pedidos o cobros perdidos, seguridad).
+ */
 const SEVERITY_OPTIONS: { v: Severity; label: string; hint: string }[] = [
-  { v: "bloqueante", label: "No puedo seguir", hint: "La actividad se detiene hasta que el guía te ayude." },
-  { v: "mayor", label: "Sigo, pero salió mal", hint: "Un dato, un precio o un aviso no es el correcto." },
-  { v: "menor", label: "Es un detalle", hint: "Texto, apariencia o algo que no cambia el resultado." },
+  { v: "alto", label: "No puedo seguir", hint: "La actividad se detiene hasta que el guía te ayude." },
+  { v: "medio", label: "Sigo, pero salió mal", hint: "Un dato, un precio o un aviso no es el correcto." },
+  { v: "bajo", label: "Es un detalle", hint: "Texto, apariencia o algo que no cambia el resultado." },
 ];
 
 /** «Ej. 261120-0004» con la fecha de hoy (formato de folio AAMMDD-NNNN). */
@@ -136,7 +139,7 @@ export default function ReportSheet({
     setBusy(true);
     setError(null);
     const msg = await onSubmit(
-      { kind, description: description.trim(), expected: expected.trim(), blocking: severity === "bloqueante", severity: severity ?? undefined, orderNumber: orderNumber.trim() },
+      { kind, description: description.trim(), expected: expected.trim(), blocking: severity === "alto", severity: severity ?? undefined, orderNumber: orderNumber.trim() },
       files
     );
     setBusy(false);
@@ -221,7 +224,7 @@ export default function ReportSheet({
                 ))}
               </div>
               {shown.blocking && <FieldError>{shown.blocking}</FieldError>}
-              {severity === "bloqueante" && (
+              {severity === "alto" && (
                 <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-800">
                   La actividad quedará en pausa y tendrás que pedir ayuda al guía de la prueba para continuar.
                 </p>

@@ -15,7 +15,7 @@ export type Issue = {
   description: string;
   expected: string;
   blocking: boolean;
-  /** Gravedad (bloqueante / mayor / menor); reportes viejos no la traen. */
+  /** Severidad (alto / medio / bajo; antes bloqueante / mayor / menor); reportes viejos no la traen. */
   severity?: Severity;
   orderNumber: string;
   attachments: IssueAttachment[];

@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Revisión de una falla por Mesa de control: cambia la gravedad y/o el estado de revisión.
- * Cuerpo: { severity?: bloqueante|mayor|menor, triage?: pendiente|confirmada|no_es_falla|duplicada|corregida, note?: string }.
+ * Cuerpo: { severity?: critico|alto|medio|bajo, triage?: pendiente|confirmada|no_es_falla|duplicada|corregida, note?: string }.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await isAdmin())) return err("No autorizado", 401);
@@ -21,8 +21,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const vals: (string | number)[] = [];
   if (body.severity !== undefined) {
     if (typeof body.severity !== "string" || !(body.severity in SEVERITIES)) return err("Gravedad inválida");
-    sets.push("severity = ?", "blocking = ?");
-    vals.push(body.severity, body.severity === "bloqueante" ? 1 : 0);
+    // «blocking» (la actividad quedó en pausa) es lo que vivió el tester; la severidad la decide Mesa de control.
+    sets.push("severity = ?");
+    vals.push(body.severity);
   }
   if (body.triage !== undefined) {
     if (typeof body.triage !== "string" || !(body.triage in TRIAGE)) return err("Estado inválido");

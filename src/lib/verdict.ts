@@ -3,25 +3,35 @@ import { GUIDES } from "./guides";
 import { answerOf, loadCourier } from "./courier-data";
 import { COURIER_QUESTIONS } from "./courier";
 import { parseRec } from "./admin-data";
-import { PRIORITIES, SEVERITIES, TRIAGE, type Guide, type Priority, type Severity } from "./types";
+import { LEGACY_SEVERITY, PRIORITIES, SEVERITIES, TRIAGE, type Guide, type OrderRow, type Priority, type Severity } from "./types";
 
 /**
- * Veredicto «¿Listo para producción?» con criterios de salida fijos y medibles.
+ * Dictamen «¿Lista para publicar?» con los criterios de finalización del Plan de pruebas
+ * (PP-APPHOUSE-ESTRES-001, sección 7.5) y el formato del Informe de resultados (IR-APPHOUSE-ESTRES-001,
+ * plantilla de reporte de finalización de ISO/IEC/IEEE 29119-3:2021).
  *
- * Metodología (resumen; el texto completo se muestra en /admin/veredicto):
- * - Pruebas de aceptación de usuario (UAT) basadas en riesgo, ISO/IEC/IEEE 29119-2:2021 y 29119-3:2021:
- *   cada actividad de la guía es un caso de prueba con prioridad (riesgo) y veredicto
- *   (pasa / falla / bloqueada / no ejecutada). Criterios de salida definidos ANTES de probar.
- * - Defectos clasificados por gravedad (IEEE 1044-2009): bloqueante / mayor / menor, revisados por
- *   Mesa de control (triage). Los no revisados cuentan como vigentes (criterio conservador).
- * - Usabilidad ISO 9241-11:2018: efectividad (tasa de aprobación), eficiencia (minutos por caso vs.
- *   estimado) y satisfacción (UMUX-Lite convertido a escala SUS; 68 = promedio de la industria).
- * - Intervalos de confianza del 95 % con Wald ajustado (Agresti-Coull), recomendado para
- *   muestras pequeñas de tasas de éxito.
+ * - 13 criterios con peso; cada uno cumplido suma su peso completo. Puntaje = suma de pesos cumplidos.
+ *   Aprobado: ≥ 90 %, los 3 críticos (1, 2 y 13) cumplidos y ningún hallazgo crítico abierto.
+ *   Aprobado con observaciones: 80–89 % con lo demás igual. No aprobado: lo demás.
+ * - El criterio 1 sale de los manuales (Hoja de pedidos de E07); los demás (bots, servidor, seguridad
+ *   WSTG/MASVS) los captura Mesa de control. Sin dato = pendiente (no suma).
+ * - Por actividad (Informe): cumple si ≥ 90 % de quienes la hicieron marcaron «Todo salió bien» y no tiene
+ *   hallazgos críticos abiertos.
+ * - Hallazgos con la severidad del Plan (crítico / alto / medio / bajo), revisados por Mesa de control.
+ *   Los no revisados cuentan como abiertos.
+ * - Complementarios (no cambian el dictamen): usabilidad ISO 9241-11:2018 (UMUX-Lite → SUS, minutos por
+ *   caso) e intervalos de confianza del 95 % con Wald ajustado.
  */
 
 // ---------------------------------------------------------------- Umbrales (criterios de salida)
 export const THRESHOLDS = {
+  /** Actividad: «Todo salió bien» de quienes la hicieron (Informe de resultados). */
+  activityOk: 0.9,
+  /** Criterio 1: pedidos completados de punta a punta. */
+  endToEnd: 0.98,
+  /** Puntaje para «Aprobado» y para «Aprobado con observaciones» (Plan 7.5). */
+  scorePass: 90,
+  scoreObs: 80,
   /** Testers con la prueba terminada por guía (Nielsen y Landauer: 5 usuarios ≈ 85 % de los problemas). */
   minFinished: 5,
   /** Casos de la guía ejecutados por al menos un tester. */
@@ -34,8 +44,6 @@ export const THRESHOLDS = {
   criticalCasePassRate: 0.8,
   /** Aprobación de todos los casos. */
   overallPassRate: 0.9,
-  /** Fallas mayores vigentes permitidas (fuera de casos críticos). */
-  maxMajor: 5,
   /** SUS equivalente (a partir de UMUX-Lite). */
   sus: 68,
   /** Respuestas mínimas de encuesta para juzgar la satisfacción. */
@@ -94,6 +102,71 @@ export type CaseStat = {
   medianMin: number | null;
   slow: boolean;
   openDefects: Record<Severity, number>;
+  /** Marcaron «Todo salió bien» (resultado ok, sin tomar en cuenta la revisión de fallas). */
+  allOk: number;
+  okRate: number | null;
+  /** Regla del Informe: ≥ 90 % «Todo salió bien» y sin hallazgos críticos abiertos. */
+  meets: boolean | null;
+};
+
+/** Criterio de finalización del Plan (sección 7.5). */
+export type PlanCriterion = {
+  n: number;
+  label: string;
+  goal: string;
+  weight: number;
+  critical: boolean;
+  /** Lo que midieron los bots el 20/11 (Informe, columna «Preliminar»). */
+  prelim: string;
+  /** Medido el 24/11 (de los manuales o capturado por Mesa de control). */
+  measured: string;
+  /** null = pendiente. */
+  met: boolean | null;
+  source: "manuales" | "mesa" | "pendiente";
+  note: string;
+  /** Dato de apoyo que sale de los manuales, para criterios que se capturan a mano. */
+  hint?: string;
+};
+
+export const PLAN_CRITERIA: Omit<PlanCriterion, "measured" | "met" | "source" | "note" | "hint">[] = [
+  { n: 1, label: "Pedidos completados de punta a punta por usuarios reales", goal: "≥ 98 %", weight: 15, critical: true, prelim: "No aplica a bots; se mide con participantes el 24/11." },
+  { n: 2, label: "Pedidos o cobros perdidos o duplicados", goal: "0", weight: 15, critical: true, prelim: "0 duplicados en 112 reintentos idempotentes; 0 dobles asignaciones; pagos simulados sin cargos reales." },
+  { n: 3, label: "Tiempo de respuesta de la API, p95", goal: "≤ 800 ms", weight: 10, critical: false, prelim: "Sin dato: el reporte da p95 de conexión WebSocket (308.9 ms) y de búsqueda de catálogo (1,920 ms), no de la API." },
+  { n: 4, label: "Tiempo de respuesta de la API, p99", goal: "≤ 2 s", weight: 5, critical: false, prelim: "Sin dato." },
+  { n: 5, label: "Tasa de errores 5xx a carga objetivo", goal: "≤ 1 %", weight: 10, critical: false, prelim: "0.026 % con 280 bots y 0.083 % en los 8 escenarios." },
+  { n: 6, label: "Carga soportada sin caída", goal: "≥ 3 veces el pico esperado", weight: 10, critical: false, prelim: "Sin dato: falta definir el pico esperado. Quiebre entre 1,119 y 1,559 usuarios virtuales." },
+  { n: 7, label: "Disponibilidad durante la prueba", goal: "≥ 99.5 %", weight: 5, critical: false, prelim: "Sin porcentaje; 0 caídas de Apache, PHP-FPM o Reverb durante el pico súbito." },
+  { n: 8, label: "Aviso del pedido al establecimiento", goal: "≤ 5 s", weight: 5, critical: false, prelim: "Sin dato." },
+  { n: 9, label: "Asignación de repartidor", goal: "≤ 60 s", weight: 5, critical: false, prelim: "Sin tiempo medido; 12 declinaciones reasignadas de inmediato al segundo repartidor." },
+  { n: 10, label: "Retraso en la ubicación del repartidor", goal: "≤ 10 s", weight: 5, critical: false, prelim: "Sin dato; los bots reportan ubicación cada 4 s." },
+  { n: 11, label: "Tráfico abusivo bloqueado / legítimos bloqueados", goal: "≥ 95 % / ≤ 1 %", weight: 5, critical: false, prelim: "Inicios de sesión: 18 de 18 ataques bloqueados y 0 falsos positivos. Falta extracción y denegación de servicio." },
+  { n: 12, label: "Vuelta a la línea base tras detener los bots", goal: "≤ 5 min", weight: 5, critical: false, prelim: "Recuperación sin intervención manual; el reporte no da el tiempo." },
+  { n: 13, label: "Vulnerabilidades críticas o altas abiertas", goal: "0", weight: 5, critical: true, prelim: "Sin evaluar (no hay pruebas WSTG ni MASVS)." },
+];
+
+export type Dictamen = "aprobado" | "observaciones" | "no_aprobado";
+export const DICTAMEN_LABEL: Record<Dictamen, string> = {
+  aprobado: "Lista para publicar",
+  observaciones: "Lista con observaciones",
+  no_aprobado: "No lista para publicar",
+};
+
+/** Fila de «Resultados por actividad de los manuales» (web y app del establecimiento juntas). */
+export type ActivityRow = {
+  id: string;
+  title: string;
+  priority: Priority;
+  executed: number;
+  allOk: number;
+  failed: number;
+  blocked: number;
+  okRate: number | null;
+  ci: [number, number] | null;
+  openCritical: number;
+  meets: boolean | null;
+  medianMin: number | null;
+  estMin: number | null;
+  slow: boolean;
 };
 
 export type Criterion = {
@@ -130,6 +203,18 @@ export type GuideVerdict = {
 };
 
 export type Verdict = {
+  /** Dictamen del Plan (7.5). */
+  dictamen: Dictamen;
+  /** Hay criterios sin dato: el dictamen puede cambiar. */
+  provisional: boolean;
+  score: number;
+  plan: PlanCriterion[];
+  criticalMet: number;
+  openCritical: number;
+  activities: ActivityRow[];
+  participants: { clientes: number; establecimientos: number };
+  orders: { total: number; completed: number; intentional: number; rate: number | null };
+  /** Igual a dictamen === "aprobado" (compatibilidad). */
   ready: boolean;
   /** Frases cortas: por qué sí o por qué no. */
   reasons: string[];
@@ -142,7 +227,7 @@ export type Verdict = {
 
 // ---------------------------------------------------------------- Cálculo
 type RunRow = { id: string; guide_id: string; name: string; status: string };
-type ActRow = { run_id: string; activity_id: string; result: string | null; updated_at: string };
+type ActRow = { run_id: string; activity_id: string; result: string | null; fields: string; updated_at: string };
 type StepRow = { run_id: string; activity_id: string; updated_at: string };
 type IssueRow = { id: string; run_id: string; activity_id: string; kind: string; blocking: number; severity: string; triage: string; description: string };
 
@@ -156,12 +241,12 @@ function safeAll<T>(sql: string): T[] {
 
 const pct = (x: number | null | undefined) => (x == null ? "—" : `${Math.round(x * 100)} %`);
 const sevOf = (i: IssueRow): Severity =>
-  i.severity && i.severity in SEVERITIES ? (i.severity as Severity) : i.blocking ? "bloqueante" : "mayor";
+  i.severity && i.severity in SEVERITIES ? (i.severity as Severity) : LEGACY_SEVERITY[i.severity] ?? (i.blocking ? "alto" : "medio");
 
 export function computeVerdict(): Verdict {
   const T = THRESHOLDS;
   const runs = safeAll<RunRow>("SELECT id, guide_id, name, status FROM runs");
-  const acts = safeAll<ActRow>("SELECT run_id, activity_id, result, updated_at FROM activity_results");
+  const acts = safeAll<ActRow>("SELECT run_id, activity_id, result, fields, updated_at FROM activity_results");
   const steps = safeAll<StepRow>("SELECT run_id, activity_id, updated_at FROM step_results");
   const issues = safeAll<IssueRow>(
     "SELECT id, run_id, activity_id, kind, blocking, severity, triage, description FROM issues WHERE kind = 'issue'"
@@ -202,16 +287,19 @@ export function computeVerdict(): Verdict {
 
     const cases: CaseStat[] = g.activities.map((a) => {
       const rows = acts.filter((x) => ids.has(x.run_id) && x.activity_id === a.id && x.result && x.result !== "skipped");
-      let passed = 0, passedWithNotes = 0, failed = 0, blocked = 0;
+      let passed = 0, passedWithNotes = 0, failed = 0, blocked = 0, allOk = 0;
       const mins: number[] = [];
       for (const r of rows) {
         if (r.result === "blocked") blocked++;
-        else if (r.result === "ok") passed++;
+        else if (r.result === "ok") {
+          passed++;
+          allOk++;
+        }
         else {
-          // «Tuvo alguna falla»: falla si hay una falla vigente bloqueante o mayor en este caso;
-          // con solo menores (o descartadas) pasa con observaciones. Sin reporte, cuenta como falla.
+          // «Tuvo alguna falla»: falla si hay un hallazgo abierto crítico, alto o medio en este caso;
+          // con solo bajos (o descartados) pasa con observaciones. Sin reporte, cuenta como falla.
           const mine = gIssues.filter((i) => i.run_id === r.run_id && i.activity_id === a.id);
-          const serious = mine.some((i) => !CLOSED_TRIAGE.has(i.triage) && sevOf(i) !== "menor");
+          const serious = mine.some((i) => !CLOSED_TRIAGE.has(i.triage) && sevOf(i) !== "bajo");
           if (mine.length && !serious) {
             passed++;
             passedWithNotes++;
@@ -245,6 +333,9 @@ export function computeVerdict(): Verdict {
         medianMin: med,
         slow: med !== null && !!a.estMin && med > a.estMin * T.slowFactor,
         openDefects,
+        allOk,
+        okRate: executed ? allOk / executed : null,
+        meets: executed ? allOk / executed >= T.activityOk && openDefects.critico === 0 : null,
       };
     });
 
@@ -274,17 +365,6 @@ export function computeVerdict(): Verdict {
     const crit = cases.filter((c) => c.priority === "critica");
     const critMinRuns = Math.min(T.minCriticalRuns, Math.max(1, gRuns.length));
     const critUnder = crit.filter((c) => c.executed < critMinRuns);
-    const critExec = crit.reduce((s, c) => s + c.executed, 0);
-    const critPass = crit.reduce((s, c) => s + c.passed, 0);
-    const critRate = critExec ? critPass / critExec : null;
-    const critLow = crit.filter((c) => c.passRate !== null && c.passRate < T.criticalCasePassRate);
-    const allExec = cases.reduce((s, c) => s + c.executed, 0);
-    const allPass = cases.reduce((s, c) => s + c.passed, 0);
-    const allRate = allExec ? allPass / allExec : null;
-    const gDefects = defects.filter((d) => d.guideId === g.id);
-    const blockers = gDefects.filter((d) => d.severity === "bloqueante");
-    const majorsCrit = gDefects.filter((d) => d.severity === "mayor" && d.priority === "critica");
-    const majors = gDefects.filter((d) => d.severity === "mayor");
     const short = g.title.replace(/^Manual del?\s*/i, "");
 
     const criteria: Criterion[] = [
@@ -302,31 +382,7 @@ export function computeVerdict(): Verdict {
         measured: `${executedCases} de ${cases.length} casos ejecutados (${pct(coverage)})${critUnder.length ? `; con pocas ejecuciones: ${critUnder.map((c) => c.id).join(", ")}` : ""}`,
         threshold: `≥ ${pct(T.coverage)} de los casos y cada caso crítico ≥ ${critMinRuns} veces`,
         pass: coverage >= T.coverage && critUnder.length === 0,
-        basis: "ISO/IEC/IEEE 29119-3:2021: criterio de cobertura de la especificación de pruebas.",
-      },
-      {
-        id: "criticos",
-        label: "Casos críticos aprobados",
-        measured: `${critPass} de ${critExec} ejecuciones (${pct(critRate)})${critLow.length ? `; bajo ${pct(T.criticalCasePassRate)}: ${critLow.map((c) => `${c.id} ${pct(c.passRate)}`).join(", ")}` : ""}`,
-        threshold: `≥ ${pct(T.criticalPassRate)} en conjunto y ≥ ${pct(T.criticalCasePassRate)} cada uno`,
-        pass: critRate !== null && critRate >= T.criticalPassRate && critLow.length === 0,
-        basis: "Pruebas basadas en riesgo (ISO/IEC/IEEE 29119-2:2021; ISTQB CTFL v4.0): los flujos de pedido y dinero tienen la exigencia más alta.",
-      },
-      {
-        id: "global",
-        label: "Aprobación global",
-        measured: `${allPass} de ${allExec} ejecuciones (${pct(allRate)})`,
-        threshold: `≥ ${pct(T.overallPassRate)}`,
-        pass: allRate !== null && allRate >= T.overallPassRate,
-        basis: "ISO 9241-11:2018: efectividad = tareas completadas con éxito.",
-      },
-      {
-        id: "defectos",
-        label: "Fallas vigentes",
-        measured: `${blockers.length} bloqueantes · ${majors.length} mayores (${majorsCrit.length} en casos críticos)`,
-        threshold: `0 bloqueantes · 0 mayores en críticos · ≤ ${T.maxMajor} mayores`,
-        pass: blockers.length === 0 && majorsCrit.length === 0 && majors.length <= T.maxMajor,
-        basis: "IEEE 1044-2009 (clasificación de anomalías): no se libera con defectos que impiden el uso.",
+        basis: "ISO/IEC/IEEE 29119-3:2021: cobertura de la especificación de procedimientos (los manuales).",
       },
       {
         id: "satisfaccion",
@@ -366,24 +422,131 @@ export function computeVerdict(): Verdict {
       }
     : null;
 
-  const all = [...guideVerdicts.flatMap((g) => g.criteria), ...(courierCriterion ? [courierCriterion] : [])];
-  const failed = all.filter((c) => !c.pass);
-  const ready = failed.length === 0 && guideVerdicts.some((g) => g.testers > 0);
-  const reasons = ready
-    ? [
-        "Se cumplieron todos los criterios de salida definidos antes de la prueba.",
-        ...guideVerdicts.map(
-          (g) => `${g.guide.title}: ${g.criteria.find((c) => c.id === "criticos")?.measured} en casos críticos; satisfacción ${g.criteria.find((c) => c.id === "satisfaccion")?.measured}.`
-        ),
-      ]
-    : failed.map((c) => `${c.label}: ${c.measured} (se pide ${c.threshold}).`);
-  if (!guideVerdicts.some((g) => g.testers > 0)) reasons.unshift("Todavía no hay pruebas registradas.");
+  // ---- Resultados por actividad (Informe): web y app del establecimiento juntas, primero C y luego E.
+  const byId = new Map<string, CaseStat[]>();
+  for (const g of guideVerdicts) for (const c of g.cases) byId.set(c.id, [...(byId.get(c.id) ?? []), c]);
+  const activities: ActivityRow[] = [...byId.entries()]
+    .sort(([a], [b]) => (a[0] === b[0] ? a.localeCompare(b) : a[0] === "C" ? -1 : 1))
+    .map(([id, cs]) => {
+      const executed = cs.reduce((s, c) => s + c.executed, 0);
+      const allOk = cs.reduce((s, c) => s + c.allOk, 0);
+      const openCritical = defects.filter((d) => d.activityId === id && d.severity === "critico").length;
+      const mins = cs.map((c) => c.medianMin).filter((x): x is number => x !== null);
+      const med = median(mins);
+      const est = cs[0].estMin;
+      return {
+        id,
+        title: cs[0].title,
+        priority: cs[0].priority,
+        executed,
+        allOk,
+        failed: cs.reduce((s, c) => s + c.failed, 0),
+        blocked: cs.reduce((s, c) => s + c.blocked, 0),
+        okRate: executed ? allOk / executed : null,
+        ci: adjustedWald(allOk, executed),
+        openCritical,
+        meets: executed ? allOk / executed >= T.activityOk && openCritical === 0 : null,
+        medianMin: med,
+        estMin: est,
+        slow: med !== null && !!est && med > est * T.slowFactor,
+      };
+    });
 
-  const sevRank: Record<Severity, number> = { bloqueante: 0, mayor: 1, menor: 2 };
+  // ---- Criterio 1: Hoja de pedidos (E07) de los establecimientos. Rechazados y cancelados a propósito
+  // (E08 y E09) no cuentan; Entregado = completado de punta a punta.
+  const estRunIds = new Set(runs.filter((r) => r.guide_id.startsWith("establecimiento")).map((r) => r.id));
+  let oTotal = 0, oDone = 0, oIntentional = 0;
+  const assignMins: number[] = [];
+  for (const a of acts) {
+    if (!estRunIds.has(a.run_id)) continue;
+    const f = parseRec(a.fields);
+    if (a.activity_id === "E07") {
+      let rows: OrderRow[] = [];
+      try {
+        rows = typeof f.orderSheet === "string" ? JSON.parse(f.orderSheet) : Array.isArray(f.orderSheet) ? (f.orderSheet as OrderRow[]) : [];
+      } catch {
+        rows = [];
+      }
+      for (const o of rows) {
+        if (!o || (!String(o.folio ?? "").trim() && !o.status)) continue;
+        if (o.status === "Rechazado" || o.status === "Cancelado") {
+          oIntentional++;
+          continue;
+        }
+        oTotal++;
+        if (o.status === "Entregado") oDone++;
+      }
+    }
+    if (a.activity_id === "E11") {
+      const m = Number(f.assignMinutes);
+      if (Number.isFinite(m) && m >= 0) assignMins.push(m);
+    }
+  }
+  const e2e = oTotal ? oDone / oTotal : null;
+
+  // ---- Criterios del Plan (7.5): el 1 sale de los manuales; los demás los captura Mesa de control.
+  const manual = new Map(
+    safeAll<{ id: number; measured: string; met: number | null; note: string }>("SELECT id, measured, met, note FROM exit_criteria").map((r) => [r.id, r])
+  );
+  const openCritical = defects.filter((d) => d.severity === "critico").length;
+  const assignMed = median(assignMins);
+  const plan: PlanCriterion[] = PLAN_CRITERIA.map((c) => {
+    const m = manual.get(c.n);
+    const hasManual = !!m && (m.met !== null || m.measured.trim() !== "");
+    let measured = hasManual ? m!.measured : "";
+    let met: boolean | null = hasManual && m!.met !== null ? m!.met === 1 : null;
+    let source: PlanCriterion["source"] = met !== null ? "mesa" : "pendiente";
+    let hint: string | undefined;
+    if (c.n === 1) {
+      const auto = oTotal ? `${oDone} de ${oTotal} pedidos entregados (${pct(e2e)}), según la Hoja de pedidos de E07; ${oIntentional} rechazados o cancelados a propósito no cuentan.` : "Sin pedidos en la Hoja de pedidos (E07).";
+      if (met === null) {
+        measured = auto;
+        met = e2e === null ? null : e2e >= T.endToEnd;
+        source = met === null ? "pendiente" : "manuales";
+      } else hint = auto;
+    }
+    if (c.n === 2 || c.n === 13) hint = `Hallazgos críticos abiertos de los participantes: ${openCritical}.`;
+    if (c.n === 9 && assignMed !== null) hint = `Mediana que anotaron los establecimientos en E11: ${Math.round(assignMed * 10) / 10} min (${assignMins.length} respuestas).`;
+    return { ...c, measured, met, source, note: m?.note ?? "", hint };
+  });
+  const score = plan.reduce((s, c) => s + (c.met ? c.weight : 0), 0);
+  const crits = plan.filter((c) => c.critical);
+  const criticalMet = crits.filter((c) => c.met).length;
+  const allCrit = criticalMet === crits.length;
+  const dictamen: Dictamen =
+    allCrit && openCritical === 0 && score >= T.scorePass ? "aprobado" : allCrit && openCritical === 0 && score >= T.scoreObs ? "observaciones" : "no_aprobado";
+  const pending = plan.filter((c) => c.met === null);
+  const ready = dictamen === "aprobado";
+
+  const reasons: string[] = [];
+  if (!runs.length) reasons.push("Todavía no hay pruebas registradas.");
+  reasons.push(`Puntaje ${score} % (se pide ≥ ${T.scorePass} % para publicar y ≥ ${T.scoreObs} % para publicar con observaciones).`);
+  reasons.push(`Criterios críticos cumplidos: ${criticalMet} de ${crits.length}${allCrit ? "." : ` (faltan: ${crits.filter((c) => !c.met).map((c) => `${c.n} ${c.label}`).join("; ")}).`}`);
+  reasons.push(openCritical ? `Hay ${openCritical} hallazgo${openCritical === 1 ? "" : "s"} crítico${openCritical === 1 ? "" : "s"} abierto${openCritical === 1 ? "" : "s"}.` : "Ningún hallazgo crítico abierto.");
+  for (const c of plan) if (c.met === false) reasons.push(`No cumple ${c.n} · ${c.label}: ${c.measured || "sin dato"} (meta ${c.goal}).`);
+  if (pending.length) reasons.push(`Sin dato todavía (no suman): ${pending.map((c) => c.n).join(", ")}. El dictamen es provisional.`);
+  const actFail = activities.filter((a) => a.meets === false);
+  if (actFail.length) reasons.push(`Actividades que no cumplen (≥ ${pct(T.activityOk)} «Todo salió bien» y sin hallazgos críticos): ${actFail.map((a) => `${a.id} ${pct(a.okRate)}`).join(", ")}.`);
+
+  const participants = {
+    clientes: runs.filter((r) => r.guide_id === "cliente").length,
+    establecimientos: runs.filter((r) => r.guide_id.startsWith("establecimiento")).length,
+  };
+
+  const sevRank: Record<Severity, number> = { critico: 0, alto: 1, medio: 2, bajo: 3 };
   const priRank = Object.fromEntries(Object.keys(PRIORITIES).map((k, i) => [k, i])) as Record<Priority, number>;
   defects.sort((a, b) => sevRank[a.severity] - sevRank[b.severity] || priRank[a.priority] - priRank[b.priority]);
 
   return {
+    dictamen,
+    provisional: pending.length > 0,
+    score,
+    plan,
+    criticalMet,
+    openCritical,
+    activities,
+    participants,
+    orders: { total: oTotal, completed: oDone, intentional: oIntentional, rate: e2e },
     ready,
     reasons,
     guides: guideVerdicts,
