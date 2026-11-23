@@ -66,7 +66,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <Link href={`/admin/mesa${qs}`} className="rounded-lg bg-[#2F5DA8] px-3 py-2 text-sm font-semibold text-white hover:bg-[#274f8f]">Mesa de control</Link>
           <a href="#repartidores" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-[#2F5DA8] hover:bg-slate-50">Repartidores</a>
           <Link href={`/admin/graficas${qs}`} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-[#2F5DA8] hover:bg-slate-50">Gráficas</Link>
-          <Link href="/admin/veredicto" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-[#2F5DA8] hover:bg-slate-50">¿Lista para publicar?</Link>
+          <Link href="/admin/veredicto" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-[#2F5DA8] hover:bg-slate-50">¿Listo para producción?</Link>
           <LogoutButton />
         </div>
       </header>

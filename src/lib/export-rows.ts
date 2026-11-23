@@ -6,7 +6,7 @@ import {
 import { COURIER_QUESTIONS, faceOf } from "@/lib/courier";
 import { answerOf, loadCourier } from "@/lib/courier-data";
 import { insightsExport } from "@/lib/insights";
-import { computeVerdict, DICTAMEN_LABEL } from "@/lib/verdict";
+import { computeVerdict } from "@/lib/verdict";
 import { PRIORITIES, SEVERITIES, TRIAGE } from "@/lib/types";
 
 export type Cell = string | number | null | undefined;
@@ -148,7 +148,7 @@ export function requestOrigin(req: Request) {
   }`;
 }
 
-/** Hojas «Veredicto» (dictamen del Plan, criterios 7.5 y hallazgos abiertos) y «Casos» (resultados por actividad). */
+/** Hojas «Veredicto» (criterios de salida y hallazgos abiertos) y «Casos» (resultados por actividad). */
 function verdictExport(kind: "verdict" | "cases"): { headers: string[]; rows: Cell[][] } {
   const v = computeVerdict();
   const r100 = (x: number | null) => (x === null ? null : Math.round(x * 100));
@@ -162,13 +162,12 @@ function verdictExport(kind: "verdict" | "cases"): { headers: string[]; rows: Ce
       ]),
     };
   }
-  const crit = [...v.guides.flatMap((g) => g.criteria), ...(v.courier.criterion ? [v.courier.criterion] : [])];
+  const crit = [...v.criteria, ...v.guides.filter((g) => !g.guide.hidden).flatMap((g) => g.criteria), ...(v.courier.criterion ? [v.courier.criterion] : [])];
   return {
-    headers: ["sección", "concepto", "medición", "meta", "resultado", "detalle"],
+    headers: ["sección", "concepto", "medición", "umbral", "cumple", "fundamento"],
     rows: [
-      ["Dictamen", "¿Lista para publicar?", `${v.score} %`, "≥ 90 %, 3 críticos y 0 hallazgos críticos", DICTAMEN_LABEL[v.dictamen] + (v.provisional ? " (provisional)" : ""), v.reasons.join(" | ")],
-      ...v.plan.map((c) => [`Criterio ${c.n}${c.critical ? " (crítico)" : ""}`, c.label, c.measured, c.goal, c.met === null ? "pendiente" : c.met ? `cumple (${c.weight})` : "no cumple (0)", [c.prelim && `Preliminar: ${c.prelim}`, c.hint].filter(Boolean).join(" · ")] as Cell[]),
-      ...crit.map((c) => ["Usabilidad (complementario)", c.label, c.measured, c.threshold, c.pass ? "sí" : "no", c.basis] as Cell[]),
+      ["Veredicto", "¿Listo para producción?", v.ready ? "Sí" : "No", "Todos los criterios", v.ready ? "sí" : "no", v.reasons.join(" | ")],
+      ...crit.map((c) => ["Criterio", c.label, c.measured, c.threshold, c.pass ? "sí" : "no", c.basis] as Cell[]),
       ...v.defects.map((d) => ["Hallazgo abierto", `${d.activityId} ${d.activityTitle}`, d.description, `${SEVERITIES[d.severity]} · ${PRIORITIES[d.priority]}`, TRIAGE[d.triage as keyof typeof TRIAGE] ?? d.triage, d.tester] as Cell[]),
     ],
   };
