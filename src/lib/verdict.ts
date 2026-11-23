@@ -169,7 +169,8 @@ export function computeVerdict(): Verdict {
   const surveys = safeAll<{ run_id: string; answers: string }>("SELECT run_id, answers FROM survey_responses WHERE is_draft = 0");
   const runById = new Map(runs.map((r) => [r.id, r]));
 
-  const guides = GUIDES.filter((g) => !g.hidden);
+  // Las guías ocultas (p. ej. la variante de la app móvil del establecimiento) entran si alguien las usó.
+  const guides = GUIDES.filter((g) => !g.hidden || runs.some((r) => r.guide_id === g.id));
   const defects: DefectItem[] = [];
   const defectTotals = Object.fromEntries(Object.keys(SEVERITIES).map((k) => [k, { open: 0, closed: 0 }])) as Verdict["defectTotals"];
 
