@@ -788,7 +788,9 @@
       "steps": [
         {
           "id": "1",
-          "text": "En **Agua de limón 1 L** toca **Marcar agotado**. Debe salir la etiqueta **Agotado** y un aviso con **Deshacer**. No toques Deshacer."
+          "text": "En **Agua de limón 1 L** toca **Marcar agotado**. Debe salir la etiqueta **Agotado** y un aviso con **Deshacer**. No toques Deshacer.",
+          "image": "/guides/establecimiento/w-e15_marcar_agotado.jpg",
+          "caption": "1 = Marcar agotado (en tu producto aparece igual)"
         },
         {
           "id": "2",
