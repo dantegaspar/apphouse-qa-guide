@@ -72,12 +72,12 @@ export type Activity = {
   expected: ExpectedItem[];
   fields?: FieldDef[];
   /**
-   * Caso de prueba (metodología: pruebas de aceptación basadas en riesgo, ISO/IEC/IEEE 29119).
+   * Caso de prueba (metodología: pruebas de aceptación basadas en riesgo, ISO/IEC/IEEE 29119-2:2021).
    * critica = flujos de pedido y dinero; alta = lo que ve el cliente; media; baja = consulta.
    * Decide los criterios de salida del veredicto (src/lib/verdict.ts).
    */
   priority?: Priority;
-  /** Característica de calidad ISO/IEC 25010 que evalúa principalmente el caso. */
+  /** Característica de calidad ISO/IEC 25010:2023 que evalúa principalmente el caso. */
   quality?: string;
   /** Minutos estimados para hacer el caso (eficiencia: se compara con la mediana real). */
   estMin?: number;
@@ -94,7 +94,7 @@ export const PRIORITIES = {
 export type Priority = keyof typeof PRIORITIES;
 
 /**
- * Gravedad de una falla (clasificación de defectos tipo IEEE 1044):
+ * Gravedad de una falla (clasificación de defectos tipo IEEE 1044-2009):
  * bloqueante = no se puede seguir con el flujo; mayor = el flujo sigue pero el resultado está mal;
  * menor = texto, apariencia o detalle que no cambia el resultado.
  */

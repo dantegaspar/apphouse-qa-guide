@@ -153,7 +153,7 @@ function verdictExport(kind: "verdict" | "cases"): { headers: string[]; rows: Ce
   const v = computeVerdict();
   if (kind === "cases") {
     return {
-      headers: ["guía", "caso", "título", "prioridad", "calidad ISO 25010", "ejecuciones", "pasa", "pasa con observaciones", "falla", "bloqueada", "aprobación %", "IC 95 % inferior", "IC 95 % superior", "min reales (mediana)", "min estimados"],
+      headers: ["guía", "caso", "título", "prioridad", "calidad ISO/IEC 25010:2023", "ejecuciones", "pasa", "pasa con observaciones", "falla", "bloqueada", "aprobación %", "IC 95 % inferior", "IC 95 % superior", "min reales (mediana)", "min estimados"],
       rows: v.guides.flatMap((g) =>
         g.cases.map((c) => [
           g.guide.title, c.id, c.title, PRIORITIES[c.priority], c.quality, c.executed, c.passed, c.passedWithNotes, c.failed, c.blocked,

@@ -151,7 +151,7 @@ export default async function VerdictPage() {
                 <tr>
                   <th className="px-3 py-2">Caso</th>
                   <th className="px-3 py-2">Prioridad</th>
-                  <th className="px-3 py-2">Calidad (ISO 25010)</th>
+                  <th className="px-3 py-2">Calidad (ISO/IEC 25010:2023)</th>
                   <th className="px-3 py-2 text-right">Ejec.</th>
                   <th className="px-3 py-2 text-right">Pasa</th>
                   <th className="px-3 py-2 text-right">Falla</th>
@@ -187,17 +187,17 @@ export default async function VerdictPage() {
       <section className="rounded-xl bg-white p-5 text-sm leading-relaxed text-slate-700 shadow-sm ring-1 ring-slate-200">
         <h2 className="mb-2 text-lg font-semibold text-slate-900">Metodología</h2>
         <p>
-          <strong>Pruebas de aceptación de usuario basadas en riesgo</strong> (ISO/IEC/IEEE 29119-2 y -3; vocabulario ISTQB). Cada actividad de la
+          <strong>Pruebas de aceptación de usuario basadas en riesgo</strong> (ISO/IEC/IEEE 29119-2:2021 y 29119-3:2021; vocabulario del Glosario ISTQB v4 y el programa CTFL v4.0). Cada actividad de la
           guía es un caso de prueba con prioridad según el riesgo para el negocio: <em>Crítica</em> (pedidos y dinero), <em>Alta</em> (lo que ve el
           cliente), <em>Media</em> y <em>Baja</em> (consulta). Cada ejecución termina en un veredicto: pasa, falla, bloqueada o no ejecutada.
         </p>
         <p className="mt-2">
-          Las fallas se clasifican por gravedad según IEEE 1044: <strong>bloqueante</strong> (no se puede seguir), <strong>mayor</strong> (el flujo
+          Las fallas se clasifican por gravedad según IEEE 1044-2009: <strong>bloqueante</strong> (no se puede seguir), <strong>mayor</strong> (el flujo
           sigue pero el resultado está mal) y <strong>menor</strong> (texto o apariencia). Mesa de control revisa cada una; una ejecución con solo
           fallas menores pasa «con observaciones».
         </p>
         <p className="mt-2">
-          La usabilidad se mide con ISO 9241-11: <strong>efectividad</strong> (aprobación), <strong>eficiencia</strong> (minutos reales contra el
+          La usabilidad se mide con ISO 9241-11:2018: <strong>efectividad</strong> (aprobación), <strong>eficiencia</strong> (minutos reales contra el
           estimado; informativo) y <strong>satisfacción</strong> (UMUX-Lite, 2 preguntas de 1 a 7, convertido a escala SUS, donde 68 es el promedio
           de referencia). Las tasas llevan intervalo de confianza del 95 % con Wald ajustado, adecuado para muestras pequeñas.
         </p>

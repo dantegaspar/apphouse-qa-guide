@@ -9,12 +9,12 @@ import { PRIORITIES, SEVERITIES, TRIAGE, type Guide, type Priority, type Severit
  * Veredicto «¿Listo para producción?» con criterios de salida fijos y medibles.
  *
  * Metodología (resumen; el texto completo se muestra en /admin/veredicto):
- * - Pruebas de aceptación de usuario (UAT) basadas en riesgo, ISO/IEC/IEEE 29119-2/-3:
+ * - Pruebas de aceptación de usuario (UAT) basadas en riesgo, ISO/IEC/IEEE 29119-2:2021 y 29119-3:2021:
  *   cada actividad de la guía es un caso de prueba con prioridad (riesgo) y veredicto
  *   (pasa / falla / bloqueada / no ejecutada). Criterios de salida definidos ANTES de probar.
- * - Defectos clasificados por gravedad (IEEE 1044): bloqueante / mayor / menor, revisados por
+ * - Defectos clasificados por gravedad (IEEE 1044-2009): bloqueante / mayor / menor, revisados por
  *   Mesa de control (triage). Los no revisados cuentan como vigentes (criterio conservador).
- * - Usabilidad ISO 9241-11: efectividad (tasa de aprobación), eficiencia (minutos por caso vs.
+ * - Usabilidad ISO 9241-11:2018: efectividad (tasa de aprobación), eficiencia (minutos por caso vs.
  *   estimado) y satisfacción (UMUX-Lite convertido a escala SUS; 68 = promedio de la industria).
  * - Intervalos de confianza del 95 % con Wald ajustado (Agresti-Coull), recomendado para
  *   muestras pequeñas de tasas de éxito.
@@ -301,7 +301,7 @@ export function computeVerdict(): Verdict {
         measured: `${executedCases} de ${cases.length} casos ejecutados (${pct(coverage)})${critUnder.length ? `; con pocas ejecuciones: ${critUnder.map((c) => c.id).join(", ")}` : ""}`,
         threshold: `≥ ${pct(T.coverage)} de los casos y cada caso crítico ≥ ${critMinRuns} veces`,
         pass: coverage >= T.coverage && critUnder.length === 0,
-        basis: "ISO/IEC/IEEE 29119-3: criterio de cobertura de la especificación de pruebas.",
+        basis: "ISO/IEC/IEEE 29119-3:2021: criterio de cobertura de la especificación de pruebas.",
       },
       {
         id: "criticos",
@@ -309,7 +309,7 @@ export function computeVerdict(): Verdict {
         measured: `${critPass} de ${critExec} ejecuciones (${pct(critRate)})${critLow.length ? `; bajo ${pct(T.criticalCasePassRate)}: ${critLow.map((c) => `${c.id} ${pct(c.passRate)}`).join(", ")}` : ""}`,
         threshold: `≥ ${pct(T.criticalPassRate)} en conjunto y ≥ ${pct(T.criticalCasePassRate)} cada uno`,
         pass: critRate !== null && critRate >= T.criticalPassRate && critLow.length === 0,
-        basis: "Pruebas basadas en riesgo (ISTQB / ISO 29119-2): los flujos de pedido y dinero tienen la exigencia más alta.",
+        basis: "Pruebas basadas en riesgo (ISO/IEC/IEEE 29119-2:2021; ISTQB CTFL v4.0): los flujos de pedido y dinero tienen la exigencia más alta.",
       },
       {
         id: "global",
@@ -317,7 +317,7 @@ export function computeVerdict(): Verdict {
         measured: `${allPass} de ${allExec} ejecuciones (${pct(allRate)})`,
         threshold: `≥ ${pct(T.overallPassRate)}`,
         pass: allRate !== null && allRate >= T.overallPassRate,
-        basis: "ISO 9241-11: efectividad = tareas completadas con éxito.",
+        basis: "ISO 9241-11:2018: efectividad = tareas completadas con éxito.",
       },
       {
         id: "defectos",
@@ -325,7 +325,7 @@ export function computeVerdict(): Verdict {
         measured: `${blockers.length} bloqueantes · ${majors.length} mayores (${majorsCrit.length} en casos críticos)`,
         threshold: `0 bloqueantes · 0 mayores en críticos · ≤ ${T.maxMajor} mayores`,
         pass: blockers.length === 0 && majorsCrit.length === 0 && majors.length <= T.maxMajor,
-        basis: "IEEE 1044 (clasificación de anomalías): no se libera con defectos que impiden el uso.",
+        basis: "IEEE 1044-2009 (clasificación de anomalías): no se libera con defectos que impiden el uso.",
       },
       {
         id: "satisfaccion",
