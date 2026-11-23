@@ -1,6 +1,6 @@
 {
   "id": "establecimiento",
-  "version": "2.2.1",
+  "version": "2.3.0",
   "role": "Establecimiento",
   "title": "Manual del Establecimiento",
   "subtitle": "Guía de prueba del panel web de tu sucursal",
@@ -89,7 +89,7 @@
     "rules": [
       "Ningún cobro es real. Todos los pagos son de prueba.",
       "Rechazar, cancelar o dejar sin responder los pedidos que elijas para E08 y E09 no es un error: es parte de la prueba.",
-      "Si algo no pasa como dice la guía, toca **No pude** en ese paso, o **Reportar falla**, y escribe qué pasó. No necesitas avisar por WhatsApp: Mesa de control ve tus reportes en el sitio.",
+      "Si algo no pasa como dice la guía, toca **Tuve un problema** y elige el paso, o **Reportar falla**, y escribe qué pasó. No necesitas avisar por WhatsApp: Mesa de control ve tus reportes en el sitio.",
       "No necesitas esperar mensajes del grupo para avanzar: la guía te dice qué sigue. El único mensaje que mandas es **Sucursal (nombre de tu sucursal) lista**, al terminar E04. El grupo también sirve para emergencias, por ejemplo si el panel deja de abrir."
     ]
   },
@@ -289,7 +289,7 @@
     ],
     [
       "Para reportar una falla.",
-      "Toca **No pude** en el paso donde pasó, o **Reportar falla**. Escribe qué estabas haciendo y qué pasó, y adjunta una captura o un video corto."
+      "Toca **Tuve un problema** y elige el paso donde pasó, o **Reportar falla**. Escribe qué estabas haciendo y qué pasó, y adjunta una captura o un video corto."
     ]
   ],
   "activities": [
@@ -441,15 +441,6 @@
           "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d\\s?([aApP]\\.?\\s?[mM]\\.?)?\\s*(a|-|–|—)\\s*([01]?\\d|2[0-3]):[0-5]\\d\\s?([aApP]\\.?\\s?[mM]\\.?)?$",
           "patternHint": "Elige la hora en que abre y la hora en que cierra (en la prueba: 2:00 p.m. a 5:00 p.m.).",
           "maxLength": 40
-        },
-        {
-          "id": "horarioTime",
-          "label": "Hora en que terminé E02",
-          "type": "time",
-          "required": true,
-          "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d(\\s?[aApP]\\.?\\s?[mM]\\.?)?$",
-          "patternHint": "Toca el campo para elegir la hora, o «Ahora» si es en este momento.",
-          "maxLength": 11
         }
       ]
     },
@@ -523,15 +514,6 @@
           "pattern": "^\\d{1,2}$",
           "patternHint": "Escribe solo el número, por ejemplo 3.",
           "maxLength": 2
-        },
-        {
-          "id": "ridersTime",
-          "label": "Hora en que terminé E03",
-          "type": "time",
-          "required": true,
-          "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d(\\s?[aApP]\\.?\\s?[mM]\\.?)?$",
-          "patternHint": "Toca el campo para elegir la hora, o «Ahora» si es en este momento.",
-          "maxLength": 11
         }
       ]
     },
@@ -848,15 +830,6 @@
           "id": "pending",
           "label": "¿Quedó algo pendiente? ¿Qué?",
           "maxLength": 500
-        },
-        {
-          "id": "listoTime",
-          "label": "Hora en que terminé E04",
-          "type": "time",
-          "required": true,
-          "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d(\\s?[aApP]\\.?\\s?[mM]\\.?)?$",
-          "patternHint": "Toca el campo para elegir la hora, o «Ahora» si es en este momento.",
-          "maxLength": 11
         }
       ]
     },
@@ -872,7 +845,7 @@
         },
         {
           "id": "2",
-          "text": "Cuando llegue la hora de apertura que pusiste en E02, el estado debe cambiar solo a **Abierta**, sin que toques nada. Si sigue **Cerrada** después de esa hora, actualiza la página; si sigue igual, toca **No pude**.",
+          "text": "Cuando llegue la hora de apertura que pusiste en E02, el estado debe cambiar solo a **Abierta**, sin que toques nada. Si sigue **Cerrada** después de esa hora, actualiza la página; si sigue igual, toca **Tuve un problema**.",
           "image": "/guides/establecimiento/w-e05_18_estado.jpg",
           "caption": "1 = estado de la sucursal · 2 = Ver horario · 3 = Cerrar ahora (no tocar)"
         },
@@ -1233,113 +1206,8 @@
   },
   "survey": {
     "title": "Encuesta del Establecimiento",
-    "intro": "Tus respuestas nos ayudan a mejorar el panel. Son 13 preguntas cortas; toma unos 3 minutos.",
+    "intro": "Son 4 preguntas; toma 1 minuto.",
     "questions": [
-      {
-        "id": "schedule",
-        "type": "scale",
-        "label": "¿Qué tan fácil fue configurar el horario del viernes en el panel (E02)?",
-        "min": 1,
-        "max": 5,
-        "minLabel": "Muy difícil",
-        "maxLabel": "Muy fácil",
-        "required": true
-      },
-      {
-        "id": "riders",
-        "type": "scale",
-        "label": "¿Qué tan fácil fue dar de alta a tus repartidores (E03)?",
-        "min": 1,
-        "max": 5,
-        "minLabel": "Muy difícil",
-        "maxLabel": "Muy fácil",
-        "required": true
-      },
-      {
-        "id": "menu",
-        "type": "scale",
-        "label": "¿Qué tan fácil fue crear tu menú desde cero: las 5 categorías, los 8 productos, sus variantes y sus complementos (E04 · Parte A)?",
-        "min": 1,
-        "max": 5,
-        "minLabel": "Muy difícil",
-        "maxLabel": "Muy fácil",
-        "required": true
-      },
-      {
-        "id": "promo",
-        "type": "scale",
-        "label": "¿Qué tan fácil fue crear la promoción Pizza Hawaiana 20 % (E04 · Parte B)?",
-        "min": 1,
-        "max": 5,
-        "minLabel": "Muy difícil",
-        "maxLabel": "Muy fácil",
-        "required": true
-      },
-      {
-        "id": "shippingRules",
-        "type": "scale",
-        "label": "¿Qué tan claro fue escribir el costo de envío y revisar el tiempo para confirmar, el pago con tarjeta y los topes (E04 · Partes D y E)?",
-        "min": 1,
-        "max": 5,
-        "minLabel": "Nada claro",
-        "maxLabel": "Muy claro",
-        "required": true
-      },
-      {
-        "id": "alerts",
-        "type": "choice",
-        "label": "Con la sucursal abierta, ¿los pedidos nuevos llegaron solos, con sonido y aviso, sin recargar la página (E05)?",
-        "options": [
-          "Sí, siempre",
-          "Casi siempre",
-          "Fallaron varias veces",
-          "No llegaron solos"
-        ],
-        "required": true
-      },
-      {
-        "id": "flow",
-        "type": "scale",
-        "label": "¿Qué tan claro fue revisar, confirmar y marcar listos los pedidos (E06 y E07)?",
-        "min": 1,
-        "max": 5,
-        "minLabel": "Nada claro",
-        "maxLabel": "Muy claro",
-        "required": true
-      },
-      {
-        "id": "rejectCancel",
-        "type": "scale",
-        "label": "¿Qué tan claro fue rechazar un pedido y cancelar otro escribiendo el motivo (E08)? Déjala en blanco si no te tocó.",
-        "min": 1,
-        "max": 5,
-        "minLabel": "Nada claro",
-        "maxLabel": "Muy claro"
-      },
-      {
-        "id": "autoReject",
-        "type": "choice",
-        "label": "Cuando dejaste un pedido sin responder (E09), ¿se rechazó solo a tiempo?",
-        "options": [
-          "Sí, a los 5 minutos (máximo 6)",
-          "Sí, pero tardó más de 6 minutos",
-          "No se rechazó solo",
-          "No me tocó"
-        ],
-        "required": true
-      },
-      {
-        "id": "assignment",
-        "type": "choice",
-        "label": "¿El panel te mostró claramente cuándo se asignó un repartidor y su nombre (E11)?",
-        "options": [
-          "Sí, siempre",
-          "A veces",
-          "No",
-          "No me tocó"
-        ],
-        "required": true
-      },
       {
         "id": "ease",
         "type": "scale",
@@ -1351,6 +1219,23 @@
         "required": true
       },
       {
+        "id": "hardest",
+        "type": "choice",
+        "label": "¿Qué parte te costó más trabajo?",
+        "options": [
+          "Iniciar sesión",
+          "Configurar el horario",
+          "Dar de alta repartidores",
+          "Crear el menú y los productos",
+          "Crear la promoción",
+          "Envío, pagos y reglas",
+          "Recibir y avanzar pedidos",
+          "Rechazar o cancelar pedidos",
+          "Ninguna, todo fue fácil"
+        ],
+        "required": true
+      },
+      {
         "id": "nps",
         "type": "nps",
         "label": "Del 0 al 10, ¿qué tan probable es que recomiendes el panel a otro establecimiento?",
@@ -1359,7 +1244,7 @@
       {
         "id": "improve",
         "type": "text",
-        "label": "¿Qué fue lo más difícil o confuso, y qué mejorarías primero?"
+        "label": "¿Qué fue lo más difícil o confuso, y qué mejorarías primero? (opcional)"
       }
     ]
   }
