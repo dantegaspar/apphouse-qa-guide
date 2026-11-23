@@ -220,7 +220,6 @@ export default function ActivityView({
     // El resultado se sugiere solo (con falla si algún paso o punto salió mal); el tester lo puede cambiar
     const suggested: ActivityResult | undefined = failed || anyNo ? "issue" : allChecked ? "ok" : undefined;
     const result = draft.result ?? suggested;
-    const allYes = () => setDraft({ ...draft, checks: Object.fromEntries(activity.expected.map((_, i) => [String(i), true])) });
     const ordersErrs = Object.fromEntries(
       (activity.fields ?? []).filter((f) => f.type === "orders").map((f) => [f.id, ordersError(draft.fields[f.id], !!f.required && (!result || result === "ok" || result === "issue"))])
     );
@@ -274,16 +273,6 @@ export default function ActivityView({
                   <h2 className={"font-semibold" + dk("lg:text-lg")}>Resultado esperado</h2>
                   <p className="text-sm text-slate-600">¿Pasó lo que dice cada punto?</p>
                 </div>
-                {!allChecked && (
-                  <button
-                    type="button"
-                    onClick={allYes}
-                    data-testid="all-yes"
-                    className="min-h-10 rounded-lg bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-800 ring-1 ring-emerald-300 hover:bg-emerald-100"
-                  >
-                    ✓ Sí a todo
-                  </button>
-                )}
               </div>
               <ul className="space-y-3">
                 {activity.expected.map((item, i) => {
