@@ -203,8 +203,7 @@ export default async function VerdictPage() {
       <section className="rounded-xl bg-white p-5 text-sm leading-relaxed text-slate-700 shadow-sm ring-1 ring-slate-200">
         <h2 className="mb-2 text-lg font-semibold text-slate-900">Metodología</h2>
         <p>
-          <strong>Pruebas de aceptación de usuario basadas en riesgo</strong> (ISO/IEC/IEEE 29119-2:2021 y 29119-3:2021; vocabulario del Glosario
-          ISTQB v4 y el programa CTFL v4.0). Cada actividad de los manuales es un caso de prueba con prioridad según el riesgo para el negocio:{" "}
+          <strong>Pruebas de aceptación de usuario basadas en riesgo</strong> (ISO/IEC/IEEE 29119-2:2021 y 29119-3:2021). Cada actividad de los manuales es un caso de prueba con prioridad según el riesgo para el negocio:{" "}
           <em>Crítica</em> (pedidos y dinero), <em>Alta</em> (lo que ve el cliente), <em>Media</em> y <em>Baja</em>.
         </p>
         <p className="mt-2">

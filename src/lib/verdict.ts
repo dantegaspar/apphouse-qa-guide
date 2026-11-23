@@ -10,7 +10,7 @@ import { LEGACY_SEVERITY, PRIORITIES, SEVERITIES, TRIAGE, type Guide, type Order
  * participantes (clientes, establecimientos y repartidores): manuales, reportes de falla y encuestas.
  *
  * - Proceso y documentación: ISO/IEC/IEEE 29119-2:2021 y 29119-3:2021 (pruebas de aceptación basadas en
- *   riesgo; criterios de salida fijados antes de probar), vocabulario ISTQB.
+ *   riesgo; criterios de salida fijados antes de probar).
  * - Criterios tomados del Plan de pruebas y del Informe de resultados que aplican a participantes:
  *   pedidos completados de punta a punta (≥ 98 %), ningún hallazgo crítico abierto (pedidos o cobros
  *   perdidos o duplicados) y, por actividad, ≥ 90 % «Todo salió bien» sin hallazgos críticos.
