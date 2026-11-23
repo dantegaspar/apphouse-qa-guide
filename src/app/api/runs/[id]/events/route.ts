@@ -2,7 +2,7 @@ import { getDb, now } from "@/lib/db";
 import { getGuide } from "@/lib/guides";
 import { checkRunToken } from "@/lib/auth";
 import { err, hasErrors, invalid, json, readJsonObject } from "@/lib/http";
-import { ACTIVITY_RESULTS, SEVERITIES, type Activity, type Guide } from "@/lib/types";
+import { ACTIVITY_RESULTS, LEGACY_SEVERITY, SEVERITIES, type Activity, type Guide } from "@/lib/types";
 import { expectedConditional } from "@/lib/guide-utils";
 import {
   boolError,
@@ -218,7 +218,7 @@ function expectedChecksErrors(act: Activity, v: unknown): FieldErrors {
 /**
  * Reporte: id del navegador; activityId/stepId de la guía; kind "issue" | "evidence";
  * descripción obligatoria (3–4000) en fallas y opcional (≤4000) en evidencias; expected ≤4000;
- * blocking sí/no; severity bloqueante|mayor|menor (opcional; sin ella sale de blocking); orderNumber ≤64; createdAt ISO opcional.
+ * blocking sí/no; severity alto|medio|bajo (también critico, o los viejos bloqueante|mayor|menor; sin ella sale de blocking); orderNumber ≤64; createdAt ISO opcional.
  */
 function issueEvent(ctx: Ctx, p: Record<string, unknown>): Checked {
   const { act, errors } = activityAndStep(ctx, p, { stepRequired: false });
@@ -231,15 +231,17 @@ function issueEvent(ctx: Ctx, p: Record<string, unknown>): Checked {
       ["description", textError(p.description, isIssue ? { min: 3, max: 4000, required: true, label: "qué pasó" } : { max: 4000, label: "la descripción" })],
       ["expected", textError(p.expected, { max: 4000, label: "qué esperabas" })],
       ["blocking", boolError(p.blocking, { label: "si la falla te impide seguir" })],
-      ["severity", p.severity === undefined || p.severity === "" ? null : enumError(p.severity, Object.keys(SEVERITIES), { label: "la gravedad" })],
+      ["severity", p.severity === undefined || p.severity === "" ? null : enumError(p.severity, [...Object.keys(SEVERITIES), ...Object.keys(LEGACY_SEVERITY)], { label: "la gravedad" })],
       ["orderNumber", textError(p.orderNumber, { max: 64, label: "el número de pedido" })],
       ["createdAt", isoDateError(p.createdAt)],
     ])
   );
   if (hasErrors(errors)) return { errors };
   const { db, runId, ts } = ctx;
-  const blocking = p.severity ? p.severity === "bloqueante" : p.blocking === true;
-  const severity = !isIssue ? "" : typeof p.severity === "string" && p.severity ? p.severity : blocking ? "bloqueante" : "mayor";
+  // Clientes con la versión anterior mandan bloqueante / mayor / menor: se traducen a la escala del Plan.
+  const blocking = p.blocking === true || p.severity === "bloqueante";
+  const sevIn = typeof p.severity === "string" && p.severity ? (LEGACY_SEVERITY[p.severity] ?? p.severity) : "";
+  const severity = !isIssue ? "" : sevIn || (blocking ? "alto" : "medio");
   return {
     apply: () =>
       db

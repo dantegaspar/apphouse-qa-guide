@@ -94,16 +94,28 @@ export const PRIORITIES = {
 export type Priority = keyof typeof PRIORITIES;
 
 /**
- * Gravedad de una falla (clasificación de defectos tipo IEEE 1044-2009):
- * bloqueante = no se puede seguir con el flujo; mayor = el flujo sigue pero el resultado está mal;
- * menor = texto, apariencia o detalle que no cambia el resultado.
+ * Severidad de un hallazgo, con la escala del Plan de pruebas y el Informe de resultados
+ * (crítico / alto / medio / bajo):
+ * critico = pedidos o cobros perdidos o duplicados, datos expuestos o una vulnerabilidad grave; bloquea la
+ *   publicación (solo lo asigna Mesa de control); alto = no se puede seguir con el flujo («No puedo seguir»);
+ * medio = el flujo sigue pero el resultado está mal; bajo = texto, apariencia o detalle.
  */
 export const SEVERITIES = {
-  bloqueante: "Bloqueante",
-  mayor: "Mayor",
-  menor: "Menor",
+  critico: "Crítico",
+  alto: "Alto",
+  medio: "Medio",
+  bajo: "Bajo",
 } as const;
 export type Severity = keyof typeof SEVERITIES;
+/** Colores de cada severidad (Tailwind). */
+export const SEVERITY_CLASS: Record<Severity, string> = {
+  critico: "bg-red-200 text-red-900",
+  alto: "bg-red-100 text-red-800",
+  medio: "bg-amber-100 text-amber-900",
+  bajo: "bg-slate-100 text-slate-700",
+};
+/** Gravedades de la versión anterior (bloqueante / mayor / menor) → escala del Plan. */
+export const LEGACY_SEVERITY: Record<string, Severity> = { bloqueante: "alto", mayor: "medio", menor: "bajo" };
 
 /** Revisión de Mesa de control sobre una falla reportada. */
 export const TRIAGE = {

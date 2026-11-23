@@ -2,18 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { SEVERITIES, TRIAGE, type Severity, type Triage } from "@/lib/types";
+import { LEGACY_SEVERITY, SEVERITIES, SEVERITY_CLASS as SEV_CLASS, TRIAGE, type Severity, type Triage } from "@/lib/types";
 
-const SEV_CLASS: Record<Severity, string> = {
-  bloqueante: "bg-red-100 text-red-800",
-  mayor: "bg-amber-100 text-amber-900",
-  menor: "bg-slate-100 text-slate-700",
-};
-
-/** Gravedad y revisión de una falla (Mesa de control). Cuentan para el veredicto. */
+/** Severidad y revisión de una falla (Mesa de control). Cuentan para el veredicto. */
 export default function IssueTriage({ id, severity, triage }: { id: string; severity: string; triage: string }) {
   const router = useRouter();
-  const [sev, setSev] = useState<Severity>((severity in SEVERITIES ? severity : "mayor") as Severity);
+  const [sev, setSev] = useState<Severity>((severity in SEVERITIES ? severity : LEGACY_SEVERITY[severity] ?? "medio") as Severity);
   const [tri, setTri] = useState<Triage>((triage in TRIAGE ? triage : "pendiente") as Triage);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +29,7 @@ export default function IssueTriage({ id, severity, triage }: { id: string; seve
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5" data-testid="issue-triage">
       <select
-        aria-label="Gravedad"
+        aria-label="Severidad"
         disabled={busy}
         value={sev}
         onChange={(e) => {

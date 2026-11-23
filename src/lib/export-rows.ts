@@ -106,7 +106,7 @@ export function buildExport(kind: ExportKind, origin: string, guideId: string | 
       return [runLabel(r.id), r.name, a.activity_id, act?.title, resultLabel(a.result), summary, fields, a.notes];
     });
   } else if (kind === "issues") {
-    headers = ["run", "tester", "correo", "dispositivo", "actividad", "paso", "tipo", "descripción", "esperado", "bloqueante", "gravedad", "revisión", "número de pedido", "archivos", "creado"];
+    headers = ["run", "tester", "correo", "dispositivo", "actividad", "paso", "tipo", "descripción", "esperado", "impidió seguir", "severidad", "revisión", "número de pedido", "archivos", "creado"];
     rows = d.issues.map((i) => {
       const r = runById.get(i.run_id)!;
       const files = d.attachments.filter((a) => a.issue_id === i.id).map((a) => `${origin}/api/admin/files/${a.id}`).join("\n");
@@ -148,28 +148,27 @@ export function requestOrigin(req: Request) {
   }`;
 }
 
-/** Hojas «Veredicto» (criterios y fallas vigentes) y «Casos» (métricas por caso de prueba). */
+/** Hojas «Veredicto» (criterios de salida y hallazgos abiertos) y «Casos» (resultados por actividad). */
 function verdictExport(kind: "verdict" | "cases"): { headers: string[]; rows: Cell[][] } {
   const v = computeVerdict();
+  const r100 = (x: number | null) => (x === null ? null : Math.round(x * 100));
   if (kind === "cases") {
     return {
-      headers: ["guía", "caso", "título", "prioridad", "calidad ISO/IEC 25010:2023", "ejecuciones", "pasa", "pasa con observaciones", "falla", "bloqueada", "aprobación %", "IC 95 % inferior", "IC 95 % superior", "min reales (mediana)", "min estimados"],
-      rows: v.guides.flatMap((g) =>
-        g.cases.map((c) => [
-          g.guide.title, c.id, c.title, PRIORITIES[c.priority], c.quality, c.executed, c.passed, c.passedWithNotes, c.failed, c.blocked,
-          c.passRate === null ? null : Math.round(c.passRate * 100), c.ci ? Math.round(c.ci[0] * 100) : null, c.ci ? Math.round(c.ci[1] * 100) : null,
-          c.medianMin === null ? null : Math.round(c.medianMin * 10) / 10, c.estMin,
-        ])
-      ),
+      headers: ["actividad", "título", "prioridad", "la hicieron", "todo salió bien", "todo salió bien %", "IC 95 % inferior", "IC 95 % superior", "con falla", "no pudo", "hallazgos críticos abiertos", "resultado", "min reales (mediana)", "min estimados"],
+      rows: v.activities.map((a) => [
+        a.id, a.title, PRIORITIES[a.priority], a.executed, a.allOk, r100(a.okRate), a.ci && a.executed ? r100(a.ci[0]) : null, a.ci && a.executed ? r100(a.ci[1]) : null,
+        a.failed, a.blocked, a.openCritical, a.meets === null ? "sin datos" : a.meets ? "cumple" : "no cumple",
+        a.medianMin === null ? null : Math.round(a.medianMin * 10) / 10, a.estMin,
+      ]),
     };
   }
-  const crit = [...v.guides.flatMap((g) => g.criteria), ...(v.courier.criterion ? [v.courier.criterion] : [])];
+  const crit = [...v.criteria, ...v.guides.filter((g) => !g.guide.hidden).flatMap((g) => g.criteria), ...(v.courier.criterion ? [v.courier.criterion] : [])];
   return {
     headers: ["sección", "concepto", "medición", "umbral", "cumple", "fundamento"],
     rows: [
       ["Veredicto", "¿Listo para producción?", v.ready ? "Sí" : "No", "Todos los criterios", v.ready ? "sí" : "no", v.reasons.join(" | ")],
       ...crit.map((c) => ["Criterio", c.label, c.measured, c.threshold, c.pass ? "sí" : "no", c.basis] as Cell[]),
-      ...v.defects.map((d) => ["Falla vigente", `${d.activityId} ${d.activityTitle}`, d.description, `${SEVERITIES[d.severity]} · ${PRIORITIES[d.priority]}`, TRIAGE[d.triage as keyof typeof TRIAGE] ?? d.triage, d.tester] as Cell[]),
+      ...v.defects.map((d) => ["Hallazgo abierto", `${d.activityId} ${d.activityTitle}`, d.description, `${SEVERITIES[d.severity]} · ${PRIORITIES[d.priority]}`, TRIAGE[d.triage as keyof typeof TRIAGE] ?? d.triage, d.tester] as Cell[]),
     ],
   };
 }

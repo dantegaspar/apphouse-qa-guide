@@ -32,7 +32,7 @@ export type IssueRow = {
   description: string;
   expected: string;
   blocking: number;
-  /** bloqueante | mayor | menor ('' en evidencias). */
+  /** critico | alto | medio | bajo ('' en evidencias). */
   severity: string;
   /** Revisión de Mesa de control (ver TRIAGE). */
   triage: string;
