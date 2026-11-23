@@ -10,6 +10,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const SHEETS: { kind: ExportKind; name: string }[] = [
+  { kind: "verdict", name: "Veredicto" },
+  { kind: "cases", name: "Casos" },
   { kind: "insights", name: "Resumen" },
   { kind: "runs", name: "Pruebas" },
   { kind: "steps", name: "Pasos" },

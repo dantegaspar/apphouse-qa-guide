@@ -1,0 +1,41 @@
+import { getDb, now } from "@/lib/db";
+import { isAdmin } from "@/lib/auth";
+import { err, json, readJsonObject, str } from "@/lib/http";
+import { SEVERITIES, TRIAGE } from "@/lib/types";
+
+export const dynamic = "force-dynamic";
+
+/**
+ * Revisión de una falla por Mesa de control: cambia la gravedad y/o el estado de revisión.
+ * Cuerpo: { severity?: bloqueante|mayor|menor, triage?: pendiente|confirmada|no_es_falla|duplicada|corregida, note?: string }.
+ */
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (!(await isAdmin())) return err("No autorizado", 401);
+  const { id } = await params;
+  const { body, res } = await readJsonObject(req, 16 * 1024);
+  if (res) return res;
+  const db = getDb();
+  const row = db.prepare("SELECT id FROM issues WHERE id = ? AND kind = 'issue'").get(id);
+  if (!row) return err("Reporte no encontrado", 404);
+  const sets: string[] = [];
+  const vals: (string | number)[] = [];
+  if (body.severity !== undefined) {
+    if (typeof body.severity !== "string" || !(body.severity in SEVERITIES)) return err("Gravedad inválida");
+    sets.push("severity = ?", "blocking = ?");
+    vals.push(body.severity, body.severity === "bloqueante" ? 1 : 0);
+  }
+  if (body.triage !== undefined) {
+    if (typeof body.triage !== "string" || !(body.triage in TRIAGE)) return err("Estado inválido");
+    sets.push("triage = ?");
+    vals.push(body.triage);
+  }
+  if (body.note !== undefined) {
+    sets.push("triage_note = ?");
+    vals.push(str(body.note, 1000));
+  }
+  if (!sets.length) return err("Nada que cambiar");
+  sets.push("triage_at = ?");
+  vals.push(now());
+  db.prepare(`UPDATE issues SET ${sets.join(", ")} WHERE id = ?`).run(...vals, id);
+  return json({ ok: true });
+}

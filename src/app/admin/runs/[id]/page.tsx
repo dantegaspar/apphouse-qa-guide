@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { isAdmin } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { getGuide } from "@/lib/guides";
+import IssueTriage from "@/components/admin/IssueTriage";
 import {
   checkValue, fmtDate, guideTitle, HELP_STATUS, isImage, isVideo, parseRec, resultLabel, runStatusLabel,
   type ActivityRow, type AttachmentRow, type HelpRow, type IssueRow, type RunRow, type StepRow,
@@ -189,7 +190,7 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
               <div key={i.id} className="mt-3 rounded-lg border border-red-200 bg-red-50/50 p-3 text-sm">
                 <div className="flex flex-wrap gap-2 text-xs text-slate-500">
                   <span className="font-semibold text-slate-700">{i.kind === "evidence" ? "Evidencia" : "Reporte"}{i.step_id ? ` · paso ${i.step_id}` : ""}</span>
-                  {i.blocking ? <span className="rounded bg-red-100 px-1.5 font-medium text-red-800">bloqueante</span> : null}
+                  {i.kind === "issue" && <IssueTriage id={i.id} severity={i.severity} triage={i.triage} />}
                   {i.order_number && <span>pedido {i.order_number}</span>}
                   <span>{fmtDate(i.created_at)}</span>
                 </div>

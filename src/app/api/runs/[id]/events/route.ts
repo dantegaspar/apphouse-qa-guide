@@ -2,7 +2,7 @@ import { getDb, now } from "@/lib/db";
 import { getGuide } from "@/lib/guides";
 import { checkRunToken } from "@/lib/auth";
 import { err, hasErrors, invalid, json, readJsonObject } from "@/lib/http";
-import { ACTIVITY_RESULTS, type Activity, type Guide } from "@/lib/types";
+import { ACTIVITY_RESULTS, SEVERITIES, type Activity, type Guide } from "@/lib/types";
 import { expectedConditional } from "@/lib/guide-utils";
 import {
   boolError,
@@ -218,7 +218,7 @@ function expectedChecksErrors(act: Activity, v: unknown): FieldErrors {
 /**
  * Reporte: id del navegador; activityId/stepId de la guía; kind "issue" | "evidence";
  * descripción obligatoria (3–4000) en fallas y opcional (≤4000) en evidencias; expected ≤4000;
- * blocking sí/no; orderNumber ≤64; createdAt ISO opcional.
+ * blocking sí/no; severity bloqueante|mayor|menor (opcional; sin ella sale de blocking); orderNumber ≤64; createdAt ISO opcional.
  */
 function issueEvent(ctx: Ctx, p: Record<string, unknown>): Checked {
   const { act, errors } = activityAndStep(ctx, p, { stepRequired: false });
@@ -231,25 +231,28 @@ function issueEvent(ctx: Ctx, p: Record<string, unknown>): Checked {
       ["description", textError(p.description, isIssue ? { min: 3, max: 4000, required: true, label: "qué pasó" } : { max: 4000, label: "la descripción" })],
       ["expected", textError(p.expected, { max: 4000, label: "qué esperabas" })],
       ["blocking", boolError(p.blocking, { label: "si la falla te impide seguir" })],
+      ["severity", p.severity === undefined || p.severity === "" ? null : enumError(p.severity, Object.keys(SEVERITIES), { label: "la gravedad" })],
       ["orderNumber", textError(p.orderNumber, { max: 64, label: "el número de pedido" })],
       ["createdAt", isoDateError(p.createdAt)],
     ])
   );
   if (hasErrors(errors)) return { errors };
   const { db, runId, ts } = ctx;
+  const blocking = p.severity ? p.severity === "bloqueante" : p.blocking === true;
+  const severity = !isIssue ? "" : typeof p.severity === "string" && p.severity ? p.severity : blocking ? "bloqueante" : "mayor";
   return {
     apply: () =>
       db
         .prepare(
-          `INSERT INTO issues (id, run_id, activity_id, step_id, kind, description, expected, blocking, order_number, created_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?)
+          `INSERT INTO issues (id, run_id, activity_id, step_id, kind, description, expected, blocking, severity, order_number, created_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?)
            ON CONFLICT(id) DO UPDATE SET description=excluded.description, expected=excluded.expected,
-             blocking=excluded.blocking, order_number=excluded.order_number
+             blocking=excluded.blocking, severity=excluded.severity, order_number=excluded.order_number
            WHERE issues.run_id = excluded.run_id`
         )
         .run(
           p.id as string, runId, act!.id, text(p.stepId) || null, p.kind as string,
-          text(p.description), text(p.expected), p.blocking === true ? 1 : 0, text(p.orderNumber), ts
+          text(p.description), text(p.expected), blocking ? 1 : 0, severity, text(p.orderNumber), ts
         ),
   };
 }

@@ -32,6 +32,11 @@ export type IssueRow = {
   description: string;
   expected: string;
   blocking: number;
+  /** bloqueante | mayor | menor ('' en evidencias). */
+  severity: string;
+  /** Revisión de Mesa de control (ver TRIAGE). */
+  triage: string;
+  triage_note: string;
   order_number: string;
   created_at: string;
 };
