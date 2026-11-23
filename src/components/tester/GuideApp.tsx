@@ -63,6 +63,8 @@ export default function GuideApp({
   const { state, loaded, syncing, syncError, commit, update, flush, stateRef } = useRun(guide.id);
   const [view, setView] = useState<View>({ name: "home" });
   const [showRef, setShowRef] = useState(false);
+  // Parte de la actividad desde la que se abrió «Datos» (E04: A, B, C o D)
+  const [refPart, setRefPart] = useState<string | undefined>();
   const reduce = useReducedMotion();
   // Actividad recién guardada (festejo) y actividad recién desbloqueada (destello)
   const [saved, setSaved] = useState<{ id: string; next?: string; n: number } | null>(null);
@@ -236,7 +238,7 @@ export default function GuideApp({
         >
           {syncing ? "Guardando…" : syncError || state.outbox.length ? `● ${state.outbox.length} sin enviar` : "✓ Guardado"}
         </span>
-        <Button variant="outline" onClick={() => setShowRef(true)} className="shrink-0 !min-h-9 !rounded-lg !px-2.5 !py-1 !text-sm lg:!min-h-10 lg:!rounded-xl lg:!px-3 lg:!py-1.5">
+        <Button variant="outline" onClick={() => { setRefPart(undefined); setShowRef(true); }} className="shrink-0 !min-h-9 !rounded-lg !px-2.5 !py-1 !text-sm lg:!min-h-10 lg:!rounded-xl lg:!px-3 lg:!py-1.5">
           <span>
             <span aria-hidden="true">📊 </span>Datos
             {desktop && <span className="hidden lg:inline"> de la prueba</span>}
@@ -294,7 +296,10 @@ export default function GuideApp({
         }
         onExit={() => nav({ name: "home" })}
         dataLabel={guide.reference.title}
-        onOpenData={() => setShowRef(true)}
+        onOpenData={(part) => {
+          setRefPart(part);
+          setShowRef(true);
+        }}
         onStep={(stepId, outcome) =>
           update(
             (s) => {
@@ -618,7 +623,14 @@ export default function GuideApp({
       ) : (
         <main className="mx-auto w-full max-w-xl flex-1 px-4 pt-3 [overflow-x:clip]">{body}</main>
       )}
-      <ReferenceSheet guide={guide} desktop={desktop} open={showRef} onClose={() => setShowRef(false)} />
+      <ReferenceSheet
+        guide={guide}
+        desktop={desktop}
+        open={showRef}
+        onClose={() => setShowRef(false)}
+        activityId={cur.name === "activity" ? cur.id : undefined}
+        part={cur.name === "activity" ? refPart : undefined}
+      />
       <ReportSheet
         open={!!report}
         kind={report?.kind ?? "issue"}
@@ -1302,14 +1314,49 @@ function Stat({ n, label, tone }: { n: number; label: string; tone?: "warn" }) {
 }
 
 /* ---------- Hoja de datos / ayuda ---------- */
-function ReferenceSheet({ guide, open, onClose, desktop = false }: { guide: Guide; open: boolean; onClose: () => void; desktop?: boolean }) {
+function ReferenceSheet({
+  guide,
+  open,
+  onClose,
+  desktop = false,
+  activityId,
+  part,
+}: {
+  guide: Guide;
+  open: boolean;
+  onClose: () => void;
+  desktop?: boolean;
+  /** Actividad en curso: solo se muestran sus datos (con opción de ver todos). */
+  activityId?: string;
+  part?: string;
+}) {
   const [tab, setTab] = useState<"data" | "help">("data");
+  const [all, setAll] = useState(false);
   const [wasOpen, setWasOpen] = useState(open);
-  // Cada vez que se abre, empieza en «Datos»
+  // Cada vez que se abre, empieza en «Datos» y solo con lo de la actividad
   if (open !== wasOpen) {
     setWasOpen(open);
-    if (open) setTab("data");
+    if (open) {
+      setTab("data");
+      setAll(false);
+    }
   }
+  const fits = (tags?: string[]) =>
+    !tags?.length ||
+    tags.some((t) => {
+      const [a, p] = t.split(":");
+      return a === activityId && (!p || !part || p === part);
+    });
+  const filtering = !!activityId && !all;
+  const tables = filtering
+    ? guide.reference.tables
+        .filter((t) => fits(t.activities))
+        .map((t) => {
+          const keep = t.rows.map((_, i) => fits(t.rowActivities?.[i]));
+          return { ...t, rows: t.rows.filter((_, i) => keep[i]) };
+        })
+        .filter((t) => t.rows.length > 0)
+    : guide.reference.tables;
   return (
     <Sheet open={open} onClose={onClose} title={tab === "data" ? guide.reference.title : "Qué hacer si…"} size={desktop ? "wide" : "default"}>
       <div className={"mb-4 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 text-sm" + (desktop ? " lg:max-w-sm" : "")}>
@@ -1329,8 +1376,21 @@ function ReferenceSheet({ guide, open, onClose, desktop = false }: { guide: Guid
       </div>
       {tab === "data" ? (
         <div className="space-y-5">
-          {guide.reference.intro && <Callout tone="info">{guide.reference.intro}</Callout>}
-          {guide.reference.tables.map((t) => (
+          {activityId && (
+            <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+              <span className="font-medium text-slate-700">
+                {filtering ? `Solo lo que usas en ${activityId}${part ? ` · Parte ${part}` : ""}` : "Todos los datos de la prueba"}
+              </span>
+              <button type="button" onClick={() => setAll(!all)} className="min-h-10 font-medium text-brand-700 hover:underline" data-testid="ref-toggle">
+                {filtering ? "Ver todos los datos" : `Ver solo ${activityId}`}
+              </button>
+            </div>
+          )}
+          {!filtering && guide.reference.intro && <Callout tone="info">{guide.reference.intro}</Callout>}
+          {filtering && tables.length === 0 && (
+            <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-700">{activityId} no usa datos de esta hoja.</p>
+          )}
+          {tables.map((t) => (
             <section key={t.title}>
               <h3 className="mb-2 font-semibold">{t.title}</h3>
               <div className={"space-y-2" + (desktop ? " lg:hidden" : "")}>

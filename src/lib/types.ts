@@ -178,7 +178,12 @@ export type Guide = {
   reference: {
     title: string;
     intro?: string;
-    tables: { title: string; columns: string[]; rows: string[][]; note?: string }[];
+    /**
+     * `activities`: actividades en las que se muestra la tabla («E04» o «E04:B» para una parte).
+     * `rowActivities`: lo mismo por renglón (mismo orden que `rows`; vacío = en todas las de la tabla).
+     * Sin etiquetas, la tabla sale en todas las actividades.
+     */
+    tables: { title: string; columns: string[]; rows: string[][]; note?: string; activities?: string[]; rowActivities?: string[][] }[];
   };
   troubleshooting: [string, string][];
   activities: Activity[];

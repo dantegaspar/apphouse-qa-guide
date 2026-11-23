@@ -3,7 +3,7 @@
 Guía interactiva de pruebas QA de AppHouse. El tester:
 
 - Se identifica (nombre, correo, rol y datos de su celular).
-- Sigue cada actividad por pantallas de 3 o 4 pasos, en una sola tarjeta y un paso a la vez: el paso activo se abre con su captura, los hechos quedan con ✓ y los siguientes atenuados. Cada paso se confirma con «Listo» / «No pude» (y «No me apareció» en los pasos «Si…»). Los pasos se agrupan solos (`screensOf` en `src/lib/guide-utils.ts`) o con el campo `screen` de cada paso.
+- Sigue cada actividad por pantallas de 3 o 4 pasos en una sola tarjeta, cada paso con su captura. «Listo, siguiente» se habilita cuando el tester ya bajó por todos los pasos (antes, el botón lo lleva al siguiente paso). Cada paso tiene «Tuve un problema» (y «No me apareció» en los pasos «Si…»). «Datos» muestra solo lo de la actividad en curso (`activities` / `rowActivities` en las tablas de `reference`). Los pasos se agrupan solos (`screensOf` en `src/lib/guide-utils.ts`) o con el campo `screen` de cada paso.
 - Reporta fallas con descripción y captura de pantalla (o video corto).
 - Hace las actividades **en orden**: solo puede abrir la actividad actual y las ya guardadas quedan cerradas.
 - Si una falla le impide seguir, la actividad queda en pausa y pide ayuda al guía de la prueba. El guía la desbloquea o termina la prueba con su contraseña (`GUIDE_PASSWORD`). Las solicitudes abiertas aparecen arriba en **/admin**.

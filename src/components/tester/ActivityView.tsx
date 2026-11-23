@@ -55,8 +55,8 @@ export default function ActivityView({
   desktop?: boolean;
   /** Texto del botón de datos en los pasos con `dataButton` (título de la hoja de referencia). */
   dataLabel?: string;
-  /** Abre la hoja de referencia (Datos). */
-  onOpenData?: () => void;
+  /** Abre la hoja de referencia (Datos) con lo de esta actividad (y parte, si la hay). */
+  onOpenData?: (part?: string) => void;
   /** Guarda las casillas marcadas de un paso de confirmación. */
   onCheckpoint?: (stepId: string, ticks: Record<string, boolean>) => void;
   /** Guarda en el navegador el borrador del cierre (resultado, casillas, datos y comentarios). */
@@ -88,17 +88,53 @@ export default function ActivityView({
   // Errores del cierre (se muestran después del primer intento de guardar)
   const [tried, setTried] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
-  // Paso abierto para revisarlo (si es null, se muestra el paso activo)
-  const [shot, setShot] = useState<string | null>(null);
+  // Pasos de la pantalla que ya pasaron por la vista (el botón Listo se habilita al ver todos)
+  const [seen, setSeen] = useState<Record<string, boolean>>({});
+  // Lista de pasos de la pantalla actual (al cambiar de pantalla, la anterior sigue un instante en el DOM)
+  const stepsList = () => document.querySelector<HTMLElement>(`[data-steps="${activity.id}-${pos}"]`);
   const closingRef = useRef<HTMLDivElement>(null);
   // Los avisos flotantes van arriba de la barra fija de botones
   useToastOffset(desktop ? 96 : 150);
 
+  useEffect(() => {
+    const root = stepsList();
+    if (!root || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        const ids = entries.filter((e) => e.isIntersecting).map((e) => (e.target.parentElement as HTMLElement).dataset.stepId!);
+        if (ids.length) setSeen((m) => (ids.every((id) => m[id]) ? m : { ...m, ...Object.fromEntries(ids.map((id) => [id, true])) }));
+      },
+      // Cuenta como visto cuando el final del paso aparece arriba de la barra fija de botones
+      { rootMargin: `0px 0px -${desktop ? 0 : 170}px 0px`, threshold: 0 }
+    );
+    root.querySelectorAll<HTMLElement>("[data-step-end]").forEach((el) => io.observe(el));
+    return () => io.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pos, desktop, activity.id]);
+
+  /**
+   * «Ver siguiente paso»: baja al primer paso pendiente que todavía no está a la vista (los de arriba
+   * cuentan como leídos). Si ya se ven todos, baja al final del último.
+   */
+  const showNextStep = (pendingIds: string[]) => {
+    const root = stepsList();
+    if (!root) return;
+    const els = pendingIds.map((id) => root.querySelector<HTMLElement>(`[data-step-id="${CSS.escape(id)}"]`)).filter((e): e is HTMLElement => !!e);
+    const target = els.find((e) => e.getBoundingClientRect().top > window.innerHeight * 0.45);
+    const read = target ? els.slice(0, els.indexOf(target)) : els;
+    if (read.length) setSeen((m) => ({ ...m, ...Object.fromEntries(read.map((e) => [e.dataset.stepId!, true])) }));
+    const behavior = reduce ? "auto" : "smooth";
+    if (target) target.scrollIntoView({ behavior, block: "start" });
+    else els[els.length - 1]?.querySelector("[data-step-end]")?.scrollIntoView({ behavior, block: "center" });
+  };
   const go = (p: number) => {
     setDir(p >= pos ? "next" : "prev");
     setPos(p);
-    setShot(null);
-    window.scrollTo({ top: 0 });
+    setSeen({});
+    // Pantalla nueva: la vista queda al inicio de su contenido, no hasta arriba de la página
+    const el = document.querySelector<HTMLElement>("[data-activity-content]");
+    const top = el ? el.getBoundingClientRect().top + window.scrollY - (desktop && window.innerWidth >= 1024 ? 24 : 150) : 0;
+    if (window.scrollY > top) window.scrollTo({ top: Math.max(0, top) });
   };
   const parts = partsOf(activity);
   const ticksFor = (stepId: string) => state.checkpoints?.[stepKey(activity.id, stepId)] ?? {};
@@ -499,27 +535,17 @@ export default function ActivityView({
   const outcomeOf = (s: Activity["steps"][number]) => state.steps[stepKey(activity.id, s.id)];
   const screenIssues = state.issues.filter((i) => i.activityId === activity.id && screenSteps.some((s) => s.id === i.stepId));
 
-  // Un paso a la vez: el paso activo es el primero sin marcar; los anteriores quedan resumidos con ✓
-  // y los siguientes se ven atenuados (para saber cuántos faltan) pero no se pueden saltar.
-  const activeIdx = screenSteps.findIndex((s) => !outcomeOf(s));
-  const openIdx = shot ? screenSteps.findIndex((s) => s.id === shot) : -1;
-  const current = openIdx >= 0 && (openIdx <= activeIdx || activeIdx < 0) ? openIdx : activeIdx >= 0 ? activeIdx : screenSteps.length - 1;
-  const cur = screenSteps[current];
-  const isActive = current === activeIdx;
-  const lastOfScreen = activeIdx === screenSteps.length - 1 || activeIdx < 0;
-  const curLegend = cur?.caption ? captionLegend(cur.caption) : null;
-
-  /** «Listo»: marca el paso activo; en el último paso de la pantalla, pasa a la siguiente. */
-  const done = (outcome: Outcome = "ok") => {
-    if (activeIdx < 0) return go(pos + 1);
-    onStep(screenSteps[activeIdx].id, outcome);
-    setShot(null);
-    if (activeIdx === screenSteps.length - 1) go(pos + 1);
-    else window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+  // Todos los pasos de la pantalla en una sola tarjeta, cada uno con su captura. «Listo, siguiente»
+  // se habilita cuando el tester ya pasó por todos los pasos; antes, el botón lo lleva al siguiente.
+  const pending = screenSteps.filter((s) => !seen[s.id] && !outcomeOf(s));
+  const cpPending = screenSteps.some((s) => s.checkpoint && !checkpointDone(s));
+  const next = () => {
+    for (const s of screenSteps) if (!outcomeOf(s)) onStep(s.id, "ok");
+    go(pos + 1);
   };
   const openData = () => {
     setDataSeen((m) => ({ ...m, [screen.start]: true }));
-    onOpenData?.();
+    onOpenData?.(parts.of(screen.steps[0].id));
   };
 
   const checklist = (s: Activity["steps"][number]) => {
@@ -527,10 +553,10 @@ export default function ActivityView({
     const ticks = ticksFor(s.id);
     const n = cp.items.filter((_, i) => ticks[String(i)]).length;
     return (
-      <fieldset className="mt-3" data-testid="checkpoint">
+      <fieldset className="mt-1" data-testid="checkpoint">
         <legend className="mb-2 flex w-full items-center justify-between gap-3 text-[15px] font-semibold text-slate-900">
           <span>{cp.title}</span>
-          <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700" aria-live="polite">
+          <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${n === cp.items.length ? "bg-emerald-700 text-white" : "bg-slate-100 text-slate-700"}`} aria-live="polite">
             {n} de {cp.items.length}
           </span>
         </legend>
@@ -544,7 +570,7 @@ export default function ActivityView({
                     type="checkbox"
                     className="mt-0.5 h-6 w-6 shrink-0 accent-emerald-600"
                     checked={on}
-                    disabled={blocked || !isActive}
+                    disabled={blocked}
                     onChange={(e) => onCheckpoint?.(s.id, { ...ticks, [String(i)]: e.target.checked })}
                   />
                   <span className="flex-1 text-slate-800">
@@ -559,38 +585,7 @@ export default function ActivityView({
     );
   };
 
-  /** Captura del paso abierto (en celular va dentro del paso; en escritorio, a la derecha). */
-  const shotOf = (s: Activity["steps"][number], aside: boolean) =>
-    s.image ? (
-      <div className={aside ? "" : "mt-3"} data-testid="screenshots">
-        <Coachmark id="tester-captura-zoom" message="Toca la captura para verla en grande y con zoom." placement="top">
-          <StepImage key={s.image} src={s.image} caption={s.caption} desktop={desktop} captionAside={aside && !!curLegend} flash={!!curLegend?.numbered} />
-        </Coachmark>
-        {aside && curLegend && (
-          <div className="mt-3 rounded-xl bg-white p-3 ring-1 ring-slate-200" data-testid="caption-legend">
-            {curLegend.numbered ? (
-              <ul className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm text-slate-700">
-                {curLegend.items.map(([k, t], i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <span className="mt-px flex h-5 min-w-5 shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-rose-600 px-1.5 text-[11px] font-bold text-white">
-                      {k}
-                    </span>
-                    <span>{t}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-slate-700">{s.caption}</p>
-            )}
-            {curLegend.numbered && curLegend.note && <p className="mt-2 text-xs text-slate-600">{curLegend.note}</p>}
-          </div>
-        )}
-      </div>
-    ) : null;
-
-  const wideShots = desktop && screenSteps.some((s) => s.image);
-
-  // Una sola tarjeta: datos de la actividad (solo en la primera pantalla) y la lista de pasos
+  // Una sola tarjeta: datos de la actividad (solo en la primera pantalla) y los pasos de la pantalla
   const stepsCard = (
     <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200" data-testid="instructions">
       {pos === 0 && (
@@ -621,46 +616,18 @@ export default function ActivityView({
           )}
         </div>
       )}
-      <ol className="divide-y divide-slate-100">
-        {screenSteps.map((s, i) => {
+      <ol data-steps={`${activity.id}-${pos}`} className="divide-y divide-slate-100">
+        {screenSteps.map((s) => {
           const o = outcomeOf(s);
-          const isOpen = i === current;
-          const future = activeIdx >= 0 && i > activeIdx;
-          const canOpen = !future && !isOpen;
-          const badge =
-            o === "fail" ? "bg-rose-600 text-white" : o === "na" ? "bg-slate-500 text-white" : o ? "bg-emerald-600 text-white" : isOpen ? "bg-brand-gradient text-white" : "bg-slate-200 text-slate-600";
-          const head = (
-            <>
-              <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold ${badge}`} aria-hidden="true">
-                {o === "fail" ? "!" : o === "na" ? "–" : o ? "✓" : num(s)}
-              </span>
-              <span className="sr-only">
-                Paso {num(s)}
-                {o === "fail" ? ", con falla" : o === "na" ? ", no apareció" : o ? ", hecho" : ""}.{" "}
-              </span>
-            </>
-          );
-          if (!isOpen)
-            return (
-              <li key={s.id} data-testid="instruction" className={future ? "opacity-45" : ""}>
-                <button
-                  type="button"
-                  disabled={!canOpen}
-                  onClick={() => setShot(s.id)}
-                  className={"flex w-full items-start gap-3 px-4 py-3 text-left disabled:cursor-default" + (canOpen ? " hover:bg-slate-50" : "") + dk("lg:px-5")}
-                >
-                  {head}
-                  <span className="line-clamp-1 min-w-0 flex-1 pt-0.5 text-[15px] text-slate-600">
-                    {s.checkpoint ? s.checkpoint.title : <Rich text={s.text} />}
-                  </span>
-                </button>
-              </li>
-            );
+          const badge = o === "fail" ? "bg-rose-600" : o === "na" ? "bg-slate-500" : o ? "bg-emerald-600" : "bg-brand-gradient";
           return (
-            <li key={s.id} data-testid="instruction" data-current="true" className={"bg-brand-50/40 px-4 py-4" + dk("lg:px-5 lg:py-5")}>
+            <li key={s.id} data-step-id={s.id} data-testid="instruction" className={"scroll-mt-40 px-4 py-4" + dk("lg:scroll-mt-6 lg:px-6 lg:py-5")}>
               <div className="flex items-start gap-3">
-                {head}
+                <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${badge}`} aria-hidden="true">
+                  {o === "fail" ? "!" : o === "na" ? "–" : o ? "✓" : num(s)}
+                </span>
                 <div className="min-w-0 flex-1">
+                  <span className="sr-only">Paso {num(s)}. </span>
                   {!s.checkpoint && (
                     <p className={"text-[16px] leading-relaxed text-slate-900" + dk("lg:text-[17px] lg:leading-7")}>
                       <Rich text={s.text} links />
@@ -673,7 +640,7 @@ export default function ActivityView({
                   )}
                   {s.checkpoint && checklist(s)}
                   {s.dataButton && (
-                    <Coachmark id="tester-datos-sucursal" title={dataLabel} message="Aquí están los nombres, precios y datos exactos que debes escribir." placement="top">
+                    <Coachmark id="tester-datos-sucursal" title={dataLabel} message="Aquí están los nombres, precios y datos exactos de este paso." placement="top">
                       <button
                         type="button"
                         onClick={openData}
@@ -690,15 +657,41 @@ export default function ActivityView({
                     <button
                       type="button"
                       onClick={() => onReport("evidence", s.id)}
-                      className="mt-3 ml-0 inline-flex min-h-11 items-center gap-2 rounded-lg bg-white px-3 py-2 text-[15px] font-medium text-brand-700 ring-1 ring-brand-200 hover:bg-brand-50"
+                      className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-lg bg-white px-3 py-2 text-[15px] font-medium text-brand-700 ring-1 ring-brand-200 hover:bg-brand-50"
                     >
                       📷 Adjuntar la captura que pide este paso
                     </button>
                   )}
-                  {o === "fail" && <p className="mt-2 text-sm font-medium text-rose-700">Reportaste una falla en este paso.</p>}
-                  <div className={desktop ? "lg:hidden" : ""}>{shotOf(s, false)}</div>
+                  {s.image && (
+                    <div className={"mt-3" + dk("lg:max-w-2xl")} data-testid="screenshots">
+                      <StepImage key={s.image} src={s.image} caption={s.caption} desktop={desktop} />
+                    </div>
+                  )}
+                  {!s.checkpoint && !blocked && (
+                    <div className="mt-1 flex flex-wrap gap-x-4 text-sm">
+                      {o === "fail" ? (
+                        <span className="min-h-10 py-2 font-medium text-rose-700">Reportaste una falla en este paso.</span>
+                      ) : (
+                        <button type="button" onClick={() => onReport("issue", s.id, true)} className="min-h-10 py-2 font-medium text-rose-700 hover:underline">
+                          ✗ Tuve un problema
+                        </button>
+                      )}
+                      {s.conditional && o !== "fail" && (
+                        <button
+                          type="button"
+                          aria-pressed={o === "na"}
+                          onClick={() => onStep(s.id, o === "na" ? null : "na")}
+                          data-testid="step-na"
+                          className={`min-h-10 py-2 font-medium ${o === "na" ? "text-slate-900" : "text-slate-600 hover:underline"}`}
+                        >
+                          {o === "na" ? "✓ No me apareció (toca para quitar)" : "No me apareció"}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
+              <div data-step-end aria-hidden="true" className="h-px" />
             </li>
           );
         })}
@@ -711,7 +704,6 @@ export default function ActivityView({
     </div>
   );
 
-  const cpPending = !!cur?.checkpoint && isActive && !checkpointDone(cur);
   const actions = (
     <div
       className={
@@ -721,49 +713,34 @@ export default function ActivityView({
     >
       {blocked ? (
         <p className="mb-2 text-center text-xs font-medium text-rose-700">Actividad en pausa: pide ayuda al guía para continuar.</p>
-      ) : activeIdx < 0 ? (
-        <p className="mb-2 text-center text-sm text-slate-700">Ya marcaste los pasos de esta pantalla.</p>
-      ) : !isActive ? (
-        <p className="mb-2 text-center text-sm text-slate-700">Estás viendo un paso que ya marcaste.</p>
+      ) : pending.length ? (
+        <p className="mb-2 text-center text-sm text-slate-700">
+          Lee los {screenSteps.length} pasos antes de seguir · te {pending.length === 1 ? "falta 1" : `faltan ${pending.length}`}
+        </p>
       ) : cpPending ? (
         <p className="mb-2 text-center text-xs font-medium text-slate-700" id={`cp-hint-${activity.id}-${pos}`}>
           Marca todas las casillas para poder seguir.
         </p>
       ) : (
-        <p className="mb-2 text-center text-sm font-medium text-slate-700">
-          Paso {num(cur)} de {steps.length} · ¿Lo pudiste hacer?
-        </p>
+        <p className="mb-2 text-center text-sm font-medium text-slate-700">¿Hiciste {screenSteps.length > 1 ? "estos pasos" : "este paso"}?</p>
       )}
-      {activeIdx >= 0 && !isActive ? (
-        <Button size="lg" className="w-full" onClick={() => setShot(null)}>
-          Volver al paso {num(screenSteps[activeIdx])}
-        </Button>
-      ) : activeIdx < 0 ? (
-        <Button variant="success" size="lg" className="w-full" disabled={blocked} onClick={() => go(pos + 1)} data-testid="screen-next">
-          Siguiente →
+      {pending.length && !blocked ? (
+        <Button variant="outline" size="lg" className="w-full" onClick={() => showNextStep(pending.map((s) => s.id))} data-testid="screen-more">
+          ↓ Ver siguiente paso
         </Button>
       ) : (
-        <div className={`grid gap-2 ${cur.conditional ? "grid-cols-3" : "grid-cols-2"}`}>
-          <Button variant="danger" size="lg" disabled={blocked} onClick={() => onReport("issue", cur.id, true)}>
-            ✗ No pude
-          </Button>
-          {cur.conditional && (
-            <Button variant="outline" size="lg" disabled={blocked} onClick={() => done("na")} data-testid="step-na">
-              No me apareció
-            </Button>
-          )}
-          <Button
-            variant="success"
-            size="lg"
-            disabled={blocked || cpPending}
-            aria-describedby={cpPending ? `cp-hint-${activity.id}-${pos}` : undefined}
-            pulse={!blocked && !cpPending}
-            onClick={() => done()}
-            data-testid="screen-next"
-          >
-            {lastOfScreen ? "✓ Listo, siguiente" : "✓ Listo"}
-          </Button>
-        </div>
+        <Button
+          variant="success"
+          size="lg"
+          className="w-full"
+          disabled={blocked || cpPending}
+          aria-describedby={cpPending ? `cp-hint-${activity.id}-${pos}` : undefined}
+          pulse={!blocked && !cpPending && !screenDone(screen)}
+          onClick={next}
+          data-testid="screen-next"
+        >
+          {screenDone(screen) ? "Siguiente →" : "✓ Listo, siguiente"}
+        </Button>
       )}
       <div className={"mt-1 flex items-center justify-between text-sm" + dk("lg:mt-2")}>
         <button
@@ -776,7 +753,7 @@ export default function ActivityView({
         </button>
         <button
           type="button"
-          onClick={() => onReport("issue", cur.id)}
+          onClick={() => onReport("issue", screenSteps[screenSteps.length - 1].id)}
           className={"min-h-11 px-2 py-2 font-medium text-rose-700" + dk("lg:rounded-lg lg:hover:bg-rose-50")}
         >
           Reportar otra falla
@@ -789,15 +766,10 @@ export default function ActivityView({
     <>
     {header}
     <StepFrame id={`${activity.id}-p${pos}`} dir={dir}>
-      <section className={"mt-1 space-y-4" + dk("lg:mt-4")}>
+      <section className={"mt-1 space-y-4" + dk("lg:mt-4 lg:max-w-3xl")} data-activity-content>
         {blocked && blockedPanel}
-        <div className={dk(wideShots ? "lg:grid lg:grid-cols-[minmax(380px,460px)_minmax(0,1fr)] lg:items-start lg:gap-6" : "lg:max-w-3xl")}>
-          <div className="space-y-4">
-            {stepsCard}
-            {actions}
-          </div>
-          {wideShots && <div className="hidden lg:sticky lg:top-4 lg:block">{cur && shotOf(cur, true)}</div>}
-        </div>
+        {stepsCard}
+        {actions}
       </section>
     </StepFrame>
     </>
@@ -868,28 +840,6 @@ function FieldPicker({
     default:
       return <TimePicker {...common} />;
   }
-}
-
-/**
- * Convierte «1 = pestaña · 2 = botón · 4 a 7 = datos. Nota final» en una lista numerada (y una nota)
- * para la leyenda de la captura.
- */
-function captionLegend(caption: string): { numbered: boolean; items: [string, string][]; note?: string } {
-  const parts = caption.split(/\s+·\s+/).map((p) => p.trim()).filter(Boolean);
-  let note: string | undefined;
-  const items = parts.map((p, i) => {
-    const m = p.match(/^(\d+(?:\s+a\s+\d+)?|[A-Z])\s*=\s*(.+)$/);
-    let text = m ? m[2] : p;
-    if (i === parts.length - 1) {
-      const dot = text.indexOf(". ");
-      if (dot > 0) {
-        note = text.slice(dot + 2).trim();
-        text = text.slice(0, dot);
-      }
-    }
-    return [m ? m[1] : "", text] as [string, string];
-  });
-  return { numbered: items.length > 0 && items.every(([n]) => n), items, note };
 }
 
 function IssueList({ issues }: { issues: Issue[] }) {

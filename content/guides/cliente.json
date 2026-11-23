@@ -101,7 +101,15 @@
             "Disponible"
           ]
         ],
-        "note": "El menú de la prueba tiene solo 2 pizzas, en la categoría Pizzas. No tienen foto: es normal, no lo reportes como falla. Si en el menú ves otros productos, guíate solo por esta tabla."
+        "note": "El menú de la prueba tiene solo 2 pizzas, en la categoría Pizzas. No tienen foto: es normal, no lo reportes como falla. Si en el menú ves otros productos, guíate solo por esta tabla.",
+        "activities": [
+          "C03",
+          "C04",
+          "C05",
+          "C06",
+          "C07",
+          "C10"
+        ]
       },
       {
         "title": "Datos de prueba",
@@ -137,6 +145,34 @@
           [
             "Ejemplo de cuenta",
             "Pepperoni Mediana con Queso extra ($160) + Hawaiana Chica ($96 con promoción) = Productos $256. Con envío de $25 (hasta 1 km): Total $281, sin contar propina."
+          ]
+        ],
+        "rowActivities": [
+          [
+            "C04",
+            "C05"
+          ],
+          [
+            "C02",
+            "C05",
+            "C06"
+          ],
+          [
+            "C06"
+          ],
+          [
+            "C06"
+          ],
+          [
+            "C06",
+            "C10"
+          ],
+          [
+            "C08"
+          ],
+          [
+            "C05",
+            "C06"
           ]
         ]
       }

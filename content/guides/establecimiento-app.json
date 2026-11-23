@@ -122,6 +122,9 @@
             "Tamaño de pizza",
             "Queso extra pizza"
           ]
+        ],
+        "activities": [
+          "E04:A"
         ]
       },
       {
@@ -152,7 +155,10 @@
             "Queso extra +$20"
           ]
         ],
-        "note": "Cómo leer las tablas: el precio del producto es el de la Chica. La variante es el tamaño con su precio: va en Variantes. Los extras van en Complementos. Con los tamaños quedan: Hawaiana $120 · $150 · $180 y Pepperoni $110 · $140 · $170."
+        "note": "Cómo leer las tablas: el precio del producto es el de la Chica. La variante es el tamaño con su precio: va en Variantes. Los extras van en Complementos. Con los tamaños quedan: Hawaiana $120 · $150 · $180 y Pepperoni $110 · $140 · $170.",
+        "activities": [
+          "E04:A"
+        ]
       },
       {
         "title": "Datos de prueba",
@@ -192,6 +198,32 @@
           [
             "Hoja de pedidos",
             "Un pedido por renglón en la tabla de E07 (botón **Agregar pedido**): folio, llegó (Creado), confirmé, listo para salir, repartidor (hora y nombre), entregado o estado final y notas. Copia las horas de Estado, dentro del pedido. Si un paso no aplicó, déjalo vacío. Ejemplo: 261124-0004 · 5:14 · 5:17 · 5:18 · 5:31 Carlos · Entregado 5:35."
+          ]
+        ],
+        "rowActivities": [
+          [
+            "E02"
+          ],
+          [
+            "E03"
+          ],
+          [
+            "E04:B"
+          ],
+          [
+            "E04:C"
+          ],
+          [
+            "E04:D"
+          ],
+          [
+            "E04:D"
+          ],
+          [
+            "E04:D"
+          ],
+          [
+            "E07"
           ]
         ]
       }

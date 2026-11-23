@@ -49,7 +49,8 @@
           "**Página del panel:** https://logistica-establecimientos.tupide.mx — escríbela en la barra larga de hasta arriba (no en el buscador de Google).",
           "**Usuario:** tu correo electrónico: el mismo que proporcionaste a Mesa de control.",
           "**Contraseña:** la que te enviaron a ese correo.",
-          "**Grabar pantalla:** **iPad:** desliza desde la esquina de arriba a la derecha y toca el círculo con punto · **Windows 11:** abre la **Herramienta Recortes**, elige la cámara de video y toca **Nuevo** · **Mac:** Cmd + Mayús + 5."
+          "**Grabar pantalla:** **iPad:** desliza desde la esquina de arriba a la derecha y toca el círculo con punto · **Windows 11:** abre la **Herramienta Recortes**, elige la cámara de video y toca **Nuevo** · **Mac:** Cmd + Mayús + 5.",
+          "**Tomar una captura:** **iPad:** botón de arriba + botón de subir volumen · **Windows:** tecla Windows + Mayús + S · **Mac:** ⌘ Cmd + Mayús + 4. **Actualizar la página:** **Mac:** ⌘ Cmd + R · **Windows:** Ctrl + R o F5 · **iPad:** flecha circular junto a la dirección."
         ]
       },
       {
@@ -120,6 +121,9 @@
             "Tamaño de pizza",
             "Queso extra pizza"
           ]
+        ],
+        "activities": [
+          "E04:A"
         ]
       },
       {
@@ -150,7 +154,10 @@
             "Queso extra +$20"
           ]
         ],
-        "note": "Cómo leer las tablas: el precio del producto es el de la Chica. La variante es el tamaño con su precio: va en Variaciones. Los extras van en Complementos. Con los tamaños quedan: Hawaiana $120 · $150 · $180 y Pepperoni $110 · $140 · $170."
+        "note": "Cómo leer las tablas: el precio del producto es el de la Chica. La variante es el tamaño con su precio: va en Variaciones. Los extras van en Complementos. Con los tamaños quedan: Hawaiana $120 · $150 · $180 y Pepperoni $110 · $140 · $170.",
+        "activities": [
+          "E04:A"
+        ]
       },
       {
         "title": "Datos de prueba",
@@ -191,6 +198,32 @@
             "Hoja de pedidos",
             "Un pedido por renglón en la tabla de E07 (botón **Agregar pedido**). Copia las horas del Historial del pedido. Si un paso no aplicó, déjalo vacío. Ejemplo: 261123-0002 · llegó 9:32 · confirmé 9:36 · listo para salir 9:37 · repartidor 9:53 Erszébet · Entregado 9:55."
           ]
+        ],
+        "rowActivities": [
+          [
+            "E02"
+          ],
+          [
+            "E03"
+          ],
+          [
+            "E04:B"
+          ],
+          [
+            "E04:C"
+          ],
+          [
+            "E04:D"
+          ],
+          [
+            "E04:D"
+          ],
+          [
+            "E04:D"
+          ],
+          [
+            "E07"
+          ]
         ]
       }
     ]
@@ -210,7 +243,7 @@
     ],
     [
       "Se cortó el internet.",
-      "Reconecta, actualiza la página y vuelve a activar el sonido."
+      "Reconecta, actualiza la página (**Mac:** ⌘ Cmd + R · **Windows:** Ctrl + R o F5) y vuelve a activar el sonido."
     ],
     [
       "No hay repartidores libres.",
@@ -222,7 +255,7 @@
     ],
     [
       "Algo no pasa como dice la guía.",
-      "Toma una captura o un video corto (15 a 30 segundos). Toca **Tuve un problema** y elige el paso, o **Reportar falla**: escribe qué estabas haciendo, qué pasó y el folio del pedido si aplica, y adjunta la captura."
+      "Toma una captura o un video corto (15 a 30 segundos). Toca **Tuve un problema** en ese paso, o **Reportar falla**: escribe qué estabas haciendo, qué pasó y el folio del pedido si aplica, y adjunta la captura."
     ]
   ],
   "activities": [
@@ -332,7 +365,7 @@
         },
         {
           "id": "5",
-          "text": "Revisa el recuadro negro **Así se lee tu horario (2)**: debe decir **Mar 2:00 p.m. – 5:00 p.m.** Actualiza la página (flecha circular de arriba) y revisa que se quedó así.",
+          "text": "Revisa el recuadro negro **Así se lee tu horario (2)**: debe decir **Mar 2:00 p.m. – 5:00 p.m.** Actualiza la página (flecha circular de arriba · **Mac:** ⌘ Cmd + R · **Windows:** Ctrl + R o F5) y revisa que se quedó así.",
           "image": "/guides/establecimiento/m-e02-02-martes.jpg",
           "caption": "2 = así se lee tu horario · 4 = martes Abierto · 5 = abre 02:00 p. m. · 6 = cierra 05:00 p. m."
         },
@@ -381,7 +414,7 @@
         },
         {
           "id": "2",
-          "text": "Sin escribir nada, toca **Dar de alta (2)**. Debe salir «Hay 4 datos por revisar para poder guardar» **(3)** y los campos en rojo. Toma una captura.",
+          "text": "Sin escribir nada, toca **Dar de alta (2)**. Debe salir «Hay 4 datos por revisar para poder guardar» **(3)** y los campos en rojo. Toma una captura (**Mac:** ⌘ Cmd + Mayús + 4 · **Windows:** tecla Windows + Mayús + S).",
           "image": "/guides/establecimiento/w-e03_05_repartidor_faltan.jpg",
           "caption": "2 = Dar de alta · 3 = aviso de datos faltantes · 4 a 7 = datos del repartidor.",
           "evidence": true
@@ -591,7 +624,7 @@
         },
         {
           "id": "B7",
-          "text": "La promoción aparece en la lista con el punto verde **Vigente (15)** y en **Banners de portada** aparece su banner **(16)**. Toma una captura.",
+          "text": "La promoción aparece en la lista con el punto verde **Vigente (15)** y en **Banners de portada** aparece su banner **(16)**. Toma una captura (**Mac:** ⌘ Cmd + Mayús + 4 · **Windows:** tecla Windows + Mayús + S).",
           "image": "/guides/establecimiento/m-e04-16-promo-vigente.jpg",
           "caption": "15 = promoción Vigente · 16 = banner creado.",
           "evidence": true
@@ -626,7 +659,7 @@
         },
         {
           "id": "C3",
-          "text": "Actualiza la página (flecha circular de arriba) y revisa que los números se quedaron. Si después aparece **Activar sonido**, tócalo."
+          "text": "Actualiza la página (flecha circular de arriba · **Mac:** ⌘ Cmd + R · **Windows:** Ctrl + R o F5) y revisa que los números se quedaron. Si después aparece **Activar sonido**, tócalo."
         },
         {
           "id": "C-OK",
@@ -730,7 +763,7 @@
         },
         {
           "id": "2",
-          "text": "Cuando llegue la hora de apertura que pusiste en E02, debe cambiar solo a **Abierta**, sin que toques nada. Si sigue **Cerrada** después de esa hora, actualiza la página; si sigue igual, toca **Tuve un problema**.",
+          "text": "Cuando llegue la hora de apertura que pusiste en E02, debe cambiar solo a **Abierta**, sin que toques nada. Si sigue **Cerrada** después de esa hora, actualiza la página (**Mac:** ⌘ Cmd + R · **Windows:** Ctrl + R o F5); si sigue igual, toca **Tuve un problema**.",
           "image": "/guides/establecimiento/w-e05_18_estado.jpg",
           "caption": "1 = sucursal Abierta y hora de cierre · 2 = Ver horario · 3 = Cerrar ahora (no tocar)."
         },
@@ -743,7 +776,7 @@
         },
         {
           "id": "4",
-          "text": "Si arriba ves **Activar sonido** o la barra de avisos, tócala y sube el volumen. Toma una captura del estado **Abierta**.",
+          "text": "Si arriba ves **Activar sonido** o la barra de avisos, tócala y sube el volumen. Toma una captura del estado **Abierta** (**Mac:** ⌘ Cmd + Mayús + 4 · **Windows:** tecla Windows + Mayús + S).",
           "evidence": true
         },
         {
@@ -841,7 +874,7 @@
       "steps": [
         {
           "id": "1",
-          "text": "Abre el pedido nuevo y toma una captura con los botones **Rechazar** y **Confirmar**.",
+          "text": "Abre el pedido nuevo y toma una captura con los botones **Rechazar** y **Confirmar** (**Mac:** ⌘ Cmd + Mayús + 4 · **Windows:** tecla Windows + Mayús + S).",
           "evidence": true
         },
         {
@@ -856,7 +889,7 @@
         },
         {
           "id": "4",
-          "text": "Cuando esté empacado, toca **Marcar listo (3)** y toma una captura.",
+          "text": "Cuando esté empacado, toca **Marcar listo (3)** y toma una captura (**Mac:** ⌘ Cmd + Mayús + 4 · **Windows:** tecla Windows + Mayús + S).",
           "image": "/guides/establecimiento/m-e07-02-marcar-listo.jpg",
           "caption": "3 = Marcar listo · 4 = el pedido ya está en preparación · 5 = Autorizar entrega sin código (no tocar).",
           "evidence": true,
@@ -899,7 +932,7 @@
         },
         {
           "id": "R2",
-          "text": "Escribe solo **ab (1)** y toca **Rechazar el pedido (3)**. Debe salir el aviso «Falta el motivo (de 3 a 255 caracteres)» **(2)**. Toma una captura.",
+          "text": "Escribe solo **ab (1)** y toca **Rechazar el pedido (3)**. Debe salir el aviso «Falta el motivo (de 3 a 255 caracteres)» **(2)**. Toma una captura (**Mac:** ⌘ Cmd + Mayús + 4 · **Windows:** tecla Windows + Mayús + S).",
           "image": "/guides/establecimiento/m-e08-01-rechazar-ab.jpg",
           "caption": "1 = motivo · 2 = aviso con «ab» · 3 = Rechazar el pedido.",
           "evidence": true
@@ -922,7 +955,7 @@
         },
         {
           "id": "C3",
-          "text": "Escribe **ab** y toca el botón rojo **Confirmar**: debe salir el aviso «Escribe el motivo de la cancelación (de 3 a 255 caracteres)» **(1)**. Toma una captura.",
+          "text": "Escribe **ab** y toca el botón rojo **Confirmar**: debe salir el aviso «Escribe el motivo de la cancelación (de 3 a 255 caracteres)» **(1)**. Toma una captura (**Mac:** ⌘ Cmd + Mayús + 4 · **Windows:** tecla Windows + Mayús + S).",
           "image": "/guides/establecimiento/m-e08-02-cancelar-ab.jpg",
           "caption": "1 = recuadro para cancelar con el aviso de «ab» · 2 = Confirmar.",
           "evidence": true
@@ -982,7 +1015,7 @@
         },
         {
           "id": "3",
-          "text": "Actualiza la página: debe decir **Rechazado** con el motivo «La sucursal no confirmó a tiempo» **(1)** y la hora **(2)**. Toma una captura.",
+          "text": "Actualiza la página (**Mac:** ⌘ Cmd + R · **Windows:** Ctrl + R o F5): debe decir **Rechazado** con el motivo «La sucursal no confirmó a tiempo» **(1)** y la hora **(2)**. Toma una captura (**Mac:** ⌘ Cmd + Mayús + 4 · **Windows:** tecla Windows + Mayús + S).",
           "image": "/guides/establecimiento/w-e09_24_rechazo_auto.jpg",
           "caption": "1 = rechazado, con el motivo que lee el cliente · 2 = hora del rechazo.",
           "evidence": true
