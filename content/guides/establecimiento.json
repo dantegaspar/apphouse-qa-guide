@@ -195,8 +195,8 @@
             "Pedido máximo $1,000.00 · máximo en efectivo $700.00. Los deja listos Mesa de control: solo revísalos (Parte D)."
           ],
           [
-            "Hoja de pedidos",
-            "Un pedido por renglón en la tabla de E07 (botón **Agregar pedido**). Copia las horas del Historial del pedido. Si un paso no aplicó, déjalo vacío. Ejemplo: 261123-0002 · llegó 9:32 · confirmé 9:36 · listo para salir 9:37 · repartidor 9:53 Erszébet · Entregado 9:55."
+            "Conteo de pedidos",
+            "Conteo de pedidos (E07): al terminar la ronda escribe cuántos se entregaron y cuántos no se entregaron por una falla (sin contar los de E08 y E09). De cada uno que falló: folio y por qué falló. Ejemplo: 261124-0007: no se le asignó repartidor."
           ]
         ],
         "rowActivities": [
@@ -897,7 +897,7 @@
         },
         {
           "id": "5",
-          "text": "Anota las horas en la **Hoja de pedidos** (abajo, un pedido por renglón con **Agregar pedido**). Puedes copiarlas del **Historial del pedido** al terminar la ronda."
+          "text": "Al terminar la ronda, abajo anota **cuántos pedidos se entregaron** y **cuántos no se entregaron por una falla** (no cuentes el rechazado y el cancelado de E08 ni el de E09: esos son a propósito). De cada pedido que falló, escribe su folio y **por qué falló**."
         }
       ],
       "expected": [
@@ -908,10 +908,29 @@
       ],
       "fields": [
         {
-          "id": "orderSheet",
-          "label": "Hoja de pedidos",
-          "type": "orders",
-          "required": true
+          "id": "ordersDelivered",
+          "label": "Pedidos que terminaron como Entregado (cuántos)",
+          "type": "number",
+          "required": true,
+          "pattern": "^\\d{1,3}$",
+          "patternHint": "Escribe solo el número, por ejemplo 5.",
+          "maxLength": 3
+        },
+        {
+          "id": "ordersFailed",
+          "label": "Pedidos que NO se entregaron por una falla (cuántos; sin contar los de E08 y E09; 0 si ninguno)",
+          "type": "number",
+          "required": true,
+          "pattern": "^\\d{1,3}$",
+          "patternHint": "Escribe solo el número; 0 si ninguno falló.",
+          "maxLength": 3
+        },
+        {
+          "id": "failedDetail",
+          "label": "¿Por qué falló? Folio y motivo de cada pedido que falló",
+          "placeholder": "Ej. 261124-0007: no se le asignó repartidor; 261124-0009: la app no dejó marcarlo listo",
+          "maxLength": 1000,
+          "requiredWhen": "ordersFailed"
         }
       ]
     },
@@ -1113,7 +1132,7 @@
     "checklist": [
       {
         "id": "resultsMarked",
-        "label": "Revisé que cada actividad tenga marcado su resultado y que la hoja de pedidos (E07) esté completa."
+        "label": "Revisé que cada actividad tenga marcado su resultado y que anoté el conteo de pedidos de E07."
       },
       {
         "id": "surveyDone",

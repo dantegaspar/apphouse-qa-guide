@@ -91,6 +91,9 @@ export function umuxLite(a: number, b: number) {
 }
 
 // ---------------------------------------------------------------- Tipos
+/** Pedidos que un establecimiento reportó como no entregados por una falla, con su «¿Por qué falló?». */
+export type OrderFailure = { runId: string; tester: string; count: number; why: string };
+
 export type CaseStat = {
   guideId: string;
   id: string;
@@ -173,7 +176,7 @@ export type Verdict = {
   openCritical: number;
   activities: ActivityRow[];
   participants: { clientes: number; establecimientos: number };
-  orders: { total: number; completed: number; intentional: number; rate: number | null };
+  orders: { total: number; completed: number; intentional: number; rate: number | null; failures: OrderFailure[] };
   ready: boolean;
   /** Frases cortas: por qué sí o por qué no. */
   reasons: string[];
@@ -514,11 +517,21 @@ export function computeVerdict(): Verdict {
     intentionalFolios.set(a.run_id, set);
   }
   let oTotal = 0, oDone = 0, oIntentional = 0;
+  const failures: OrderFailure[] = [];
   const assignMins: number[] = [];
   for (const a of acts) {
     if (!estRunIds.has(a.run_id)) continue;
     const f = parseRec(a.fields);
-    if (a.activity_id === "E07") {
+    // Conteo (desde 24-nov): entregados + no entregados por falla (sin E08/E09) y por qué fallaron.
+    if (a.activity_id === "E07" && String(f.ordersDelivered ?? "").trim() !== "") {
+      const d = Math.max(0, Math.floor(Number(f.ordersDelivered) || 0));
+      const x = Math.max(0, Math.floor(Number(f.ordersFailed) || 0));
+      oDone += d;
+      oTotal += d + x;
+      oIntentional += intentionalFolios.get(a.run_id)?.size ?? 0;
+      const why = String(f.failedDetail ?? "").trim();
+      if (x) failures.push({ runId: a.run_id, tester: runById.get(a.run_id)?.name ?? "", count: x, why });
+    } else if (a.activity_id === "E07") {
       let rows: OrderRow[] = [];
       try {
         rows = typeof f.orderSheet === "string" ? JSON.parse(f.orderSheet) : Array.isArray(f.orderSheet) ? (f.orderSheet as OrderRow[]) : [];
@@ -555,8 +568,8 @@ export function computeVerdict(): Verdict {
       id: "punta_a_punta",
       label: "Pedidos completados de punta a punta",
       measured: oTotal
-        ? `${oDone} de ${oTotal} pedidos entregados (${pct(e2e)}) según la Hoja de pedidos (E07); ${oIntentional} rechazados o cancelados a propósito no cuentan`
-        : "sin pedidos en la Hoja de pedidos (E07)",
+        ? `${oDone} de ${oTotal} pedidos entregados (${pct(e2e)}) según el conteo de E07; ${oIntentional} rechazados o cancelados a propósito (E08 y E09) no cuentan`
+        : "sin pedidos anotados en E07",
       threshold: `≥ ${pct(T.endToEnd)}`,
       pass: e2e !== null && e2e >= T.endToEnd,
       basis: "Plan de pruebas, criterio 1 (crítico): pedidos completados por usuarios reales.",
@@ -603,7 +616,7 @@ export function computeVerdict(): Verdict {
     openCritical,
     activities,
     participants,
-    orders: { total: oTotal, completed: oDone, intentional: oIntentional, rate: e2e },
+    orders: { total: oTotal, completed: oDone, intentional: oIntentional, rate: e2e, failures },
     ready,
     reasons,
     guides: guideVerdicts,

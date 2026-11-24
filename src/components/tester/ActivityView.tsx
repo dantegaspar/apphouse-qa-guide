@@ -267,6 +267,9 @@ export default function ActivityView({
     const fieldErrors = validateFields((activity.fields ?? []).filter((f) => f.type !== "orders"), draft.fields, requireFilled);
     const errors: Errors = { ...fieldErrors };
     for (const [k, v] of Object.entries(ordersErrs)) if (v) errors[k] = v;
+    for (const f of activity.fields ?? [])
+      if (requireFilled && f.requiredWhen && Number(draft.fields[f.requiredWhen]) > 0 && !String(draft.fields[f.id] ?? "").trim())
+        errors[f.id] = `Falta «${f.label}».`;
     if (!result) errors._result = `Elige cómo te fue en ${activity.id}.`;
     if (draft.notes.trim().length > LIMITS.notes) errors._notes = `Máximo ${LIMITS.notes} caracteres.`;
     const shown: Errors = tried ? errors : {};

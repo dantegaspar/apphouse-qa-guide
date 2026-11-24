@@ -174,8 +174,23 @@ export default async function VerdictPage() {
           <table className="w-full text-sm">
             <tbody>
               <tr className="border-b border-slate-100"><td className={`${TH} text-slate-600`}>Participantes que operaron (clientes / establecimientos)</td><td className={`${TH} font-medium`}>{v.participants.clientes} / {v.participants.establecimientos}</td></tr>
-              <tr className="border-b border-slate-100"><td className={`${TH} text-slate-600`}>Pedidos en la Hoja de pedidos (sin contar rechazos y cancelaciones a propósito)</td><td className={`${TH} font-medium`}>{v.orders.total} (+{v.orders.intentional} rechazados o cancelados)</td></tr>
+              <tr className="border-b border-slate-100"><td className={`${TH} text-slate-600`}>Pedidos anotados en E07 (sin contar rechazos y cancelaciones a propósito)</td><td className={`${TH} font-medium`}>{v.orders.total} (+{v.orders.intentional} rechazados o cancelados)</td></tr>
               <tr className="border-b border-slate-100"><td className={`${TH} text-slate-600`}>Pedidos completados de punta a punta</td><td className={`${TH} font-medium`}>{pct(v.orders.rate)}</td></tr>
+              {v.orders.failures.length > 0 && (
+                <tr className="border-b border-slate-100 align-top">
+                  <td className={`${TH} text-slate-600`}>Pedidos que fallaron y por qué</td>
+                  <td className={`${TH}`}>
+                    <ul className="space-y-1">
+                      {v.orders.failures.map((f) => (
+                        <li key={f.runId}>
+                          <Link href={`/admin/runs/${f.runId}`} className="font-medium text-[#2F5DA8] hover:underline">{f.tester}</Link> · {f.count}:{" "}
+                          <span className="whitespace-pre-wrap text-slate-700">{f.why || "sin motivo"}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </td>
+                </tr>
+              )}
               <tr><td className={`${TH} text-slate-600`}>Hallazgos abiertos (críticos / altos / medios / bajos)</td><td className={`${TH} font-medium`}>{sevOpen("critico")} / {sevOpen("alto")} / {sevOpen("medio")} / {sevOpen("bajo")}</td></tr>
             </tbody>
           </table>

@@ -19,6 +19,8 @@ export type FieldDef = {
   /** Mensaje en lenguaje simple si no cumple el pattern. */
   patternHint?: string;
   maxLength?: number;
+  /** Obligatorio solo cuando el campo numérico con este id es mayor que 0 (p. ej. «¿Por qué falló?»). */
+  requiredWhen?: string;
 };
 
 export type Step = {
