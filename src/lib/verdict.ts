@@ -402,9 +402,23 @@ export function computeVerdict(): Verdict {
       };
     });
 
-  // ---- Criterio 1: Hoja de pedidos (E07) de los establecimientos. Rechazados y cancelados a propósito
-  // (E08 y E09) no cuentan; Entregado = completado de punta a punta.
+  // ---- Criterio 1: Hoja de pedidos (E07) de los establecimientos. Entregado = completado de punta a punta.
+  // Solo se descuentan los rechazados y cancelados A PROPÓSITO: los folios que el establecimiento anotó en
+  // E08 (rechazado y cancelado) y E09 (sin responder). Un rechazado o cancelado con otro folio cuenta como
+  // pedido no completado. Si el establecimiento no anotó folios en E08/E09, se descuentan todos (como antes).
   const estRunIds = new Set(runs.filter((r) => r.guide_id.startsWith("establecimiento")).map((r) => r.id));
+  const normFolio = (v: unknown) => String(v ?? "").split("·")[0].replace(/\s+/g, "").toLowerCase();
+  const intentionalFolios = new Map<string, Set<string>>();
+  for (const a of acts) {
+    if (!estRunIds.has(a.run_id) || (a.activity_id !== "E08" && a.activity_id !== "E09")) continue;
+    const f = parseRec(a.fields);
+    const set = intentionalFolios.get(a.run_id) ?? new Set<string>();
+    for (const k of ["rejectedFolio", "cancelledFolio", "folio"]) {
+      const n = normFolio(f[k]);
+      if (n) set.add(n);
+    }
+    intentionalFolios.set(a.run_id, set);
+  }
   let oTotal = 0, oDone = 0, oIntentional = 0;
   const assignMins: number[] = [];
   for (const a of acts) {
@@ -420,8 +434,11 @@ export function computeVerdict(): Verdict {
       for (const o of rows) {
         if (!o || (!String(o.folio ?? "").trim() && !o.status)) continue;
         if (o.status === "Rechazado" || o.status === "Cancelado") {
-          oIntentional++;
-          continue;
+          const known = intentionalFolios.get(a.run_id);
+          if (!known?.size || known.has(normFolio(o.folio))) {
+            oIntentional++;
+            continue;
+          }
         }
         oTotal++;
         if (o.status === "Entregado") oDone++;
