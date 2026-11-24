@@ -79,6 +79,7 @@ export default async function VerdictReportPage() {
       <section>
         <h2 className="text-lg font-semibold">Veredicto: {v.ready ? "Sí" : "No"}</h2>
         <p>{v.ready ? "El sistema cumple los criterios para pasar a producción." : "El sistema todavía no cumple los criterios para pasar a producción."}</p>
+        {v.override && <p className="mt-2 border-l-4 border-amber-500 pl-3 font-semibold text-amber-900">Con regla de negocio. {v.override}</p>}
         <ul className="mt-1 list-disc pl-5">
           {v.reasons.map((r) => <li key={r}>{r}</li>)}
         </ul>
