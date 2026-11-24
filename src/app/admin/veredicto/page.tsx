@@ -80,7 +80,14 @@ export default async function VerdictPage() {
           <p className="text-sm text-slate-500">Calculado con los criterios de salida fijos de los participantes · {fmtDate(v.generatedAt)}</p>
           {!gate.keyOk && <p className="text-xs text-amber-800">Sin ANTHROPIC_API_KEY en el .env del servidor: se muestra el veredicto sin procesar los reportes con Claude.</p>}
         </div>
-        <LogoutButton />
+        <div className="flex flex-wrap items-center gap-2">
+          {!gate.needed && (
+            <Link href="/admin/veredicto/reporte" className="rounded-lg bg-[#2F5DA8] px-4 py-2 text-sm font-semibold text-white hover:bg-[#264d8c]">
+              Descargar reporte
+            </Link>
+          )}
+          <LogoutButton />
+        </div>
       </header>
 
       {gate.needed ? (

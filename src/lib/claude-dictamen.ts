@@ -99,7 +99,7 @@ const scrub = (s: unknown) =>
     .slice(0, 1500);
 
 const SYSTEM = `Eres el analista de calidad de una prueba de aceptación con usuarios reales (clientes, establecimientos y repartidores) de AppHouse, una app de pedidos de comida.
-El resultado se presenta como «Dictamen según la especificación: ISO/IEC/IEEE 29119»: no te menciones a ti mismo ni a Claude en el texto del dictamen. La prueba califica ÚNICAMENTE el desarrollo (la app y su panel). La encuesta de satisfacción de repartidores es solo informativa (medida de percepción, ambigua): no decide el veredicto ni pesa en él; los problemas de la app que reporten los repartidores sí se clasifican. Los errores de servidor o infraestructura (correo que no llega, caídas, red), de logística (no se asignó repartidor, el repartidor dejó de contestar o apareció sin conexión) y de los testers (no siguieron la guía, se equivocaron de dato, confundieron un paso) NO cuentan contra el desarrollo.
+El resultado se presenta como «Dictamen según la especificación: ISO/IEC/IEEE 29119»: no te menciones a ti mismo ni a Claude en el texto del dictamen. La prueba califica ÚNICAMENTE el desarrollo (la app y su panel). La encuesta de satisfacción de repartidores es solo informativa (medida de percepción, ambigua): no decide el veredicto ni pesa en él; los problemas de la app que reporten los repartidores sí se clasifican. Los errores de servidor o infraestructura (correo que no llega, caídas, red), de logística (no se asignó repartidor, el repartidor dejó de contestar o apareció sin conexión) y de los testers o de la preparación de la prueba (no siguieron la guía, se equivocaron de dato, confundieron un paso, datos o permisos configurados así por los usuarios, versión desactualizada de la app, o un comportamiento que es el que pide el requerimiento) NO cuentan contra el desarrollo.
 Responde en español de México, claro y breve. Basa todo en los datos que recibes; no inventes datos.`;
 
 function client() {
@@ -127,7 +127,7 @@ async function ask<T>(schema: z.ZodType<T>, prompt: string, effort: "medium" | "
 }
 
 type RunRow = { id: string; guide_id: string; status: string };
-type IssueRow = { id: string; run_id: string; activity_id: string; severity: string; triage: string; description: string; expected: string };
+type IssueRow = { id: string; run_id: string; activity_id: string; severity: string; triage: string; description: string; expected: string; triage_note?: string };
 
 export async function runDictamen(): Promise<DictamenRow> {
   const db = getDb();
@@ -141,7 +141,7 @@ export async function runDictamen(): Promise<DictamenRow> {
 
   // ---- Paso 1: clasificar lo pendiente
   const pending = db
-    .prepare("SELECT id, run_id, activity_id, severity, triage, description, expected FROM issues WHERE kind = 'issue' AND triage = 'pendiente'")
+    .prepare("SELECT id, run_id, activity_id, severity, triage, description, expected, triage_note FROM issues WHERE kind = 'issue' AND triage = 'pendiente'")
     .all() as IssueRow[];
   // Hallazgos del desarrollo que Mesa ya revisó pero todavía no tienen tipo de bug
   const untyped = db
@@ -170,6 +170,7 @@ export async function runDictamen(): Promise<DictamenRow> {
           severidadDelTester: i.severity,
           queEsperaba: scrub(i.expected),
           queOcurrio: scrub(i.description),
+          ...(i.triage_note ? { notaDeMesa: scrub(i.triage_note) } : {}),
         };
       }),
       reportesConfirmadosSinTipo: untyped.map((i) => ({
@@ -187,13 +188,20 @@ export async function runDictamen(): Promise<DictamenRow> {
 - "desarrollo": falla de la app o del panel (pantallas, botones, cálculos, estados del pedido, cobros, notificaciones de la app).
 - "servidor": infraestructura (correo de acceso o verificación que nunca llega, caída, lentitud del servidor, error 5xx, red).
 - "logistica": operación de reparto ajena al software (no hubo repartidor disponible, el repartidor dejó de contestar o apareció sin conexión).
-- "tester": el tester se equivocó o no siguió la guía (dato mal escrito, paso saltado, confusión), sin falla real.
+- "tester": el tester o la preparación de la prueba, sin falla real de la app. Incluye:
+  · se equivocó o no siguió la guía (dato mal escrito, paso saltado, confusión);
+  · configuración o datos capturados por los usuarios: precios, productos, tamaños o promociones que la sucursal escribió así, o permisos del rol de la cuenta de prueba (p. ej. un mensaje de que solo otro rol puede editar algo);
+  · usaba una versión desactualizada de la app;
+  · el comportamiento que reporta es el que pide el requerimiento o la especificación (el tester esperaba otra cosa).
+Para elegir "tester" por configuración, versión o requerimiento, el reporte o la nota de Mesa deben dar indicios de eso; no lo supongas.
+Sigue siendo "desarrollo": lo que la app no guarda o no muestra después de guardarlo, pantallas que se ven distintas o se cortan con la versión vigente, estados o cálculos equivocados que no vienen de un dato capturado, y cualquier falla cuya causa no se identifica.
+Si un reporte mezcla algo de configuración con una falla de la app, es "desarrollo".
 Si hay duda razonable entre desarrollo y otra causa, elige "desarrollo".
 Para cada reporte da también el TIPO de bug (ISO/IEC 25010:2023; aunque el origen no sea desarrollo, elige el más cercano):
 ${(Object.keys(BUG_TYPES) as BugType[]).map((k) => `- "${k}" (${BUG_TYPES[k]}): ${BUG_TYPE_HINT[k]}.`).join("\n")}
 En "tipos" da el tipo de cada reporte de «reportesConfirmadosSinTipo» (con su id exacto).
 Para cada reporte da también la severidad del Plan: "critico" solo si hay pedidos o cobros perdidos o duplicados, o datos expuestos; "alto" si no se pudo seguir; "medio" si el flujo sigue pero el resultado está mal; "bajo" para texto o apariencia.
-En "pedidos", por cada prueba con pedidos fallados di cuántos (ajenos) NO son del desarrollo según su «por qué falló» (0 si todos son del desarrollo).
+En "pedidos", por cada prueba con pedidos fallados di cuántos (ajenos) NO son del desarrollo según su «por qué falló» (0 si todos son del desarrollo). Un pedido fallado sin motivo o con causa sin identificar es del desarrollo: no lo descartes.
 Devuelve una entrada por cada reporte (con su id exacto), por cada prueba con pedidos fallados y por cada problema de repartidor.
 
 Datos (JSON):
