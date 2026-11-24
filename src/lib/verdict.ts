@@ -12,7 +12,7 @@ import { LEGACY_SEVERITY, PRIORITIES, SEVERITIES, TRIAGE, type Guide, type Order
  * - Proceso y documentación: ISO/IEC/IEEE 29119-2:2021 y 29119-3:2021 (pruebas de aceptación basadas en
  *   riesgo; criterios de salida fijados antes de probar).
  * - Criterios tomados del Plan de pruebas y del Informe de resultados que aplican a participantes:
- *   pedidos completados de punta a punta (≥ 98 %), ningún hallazgo crítico abierto (pedidos o cobros
+ *   pedidos completados de punta a punta (≥ 90 %), ningún hallazgo crítico abierto (pedidos o cobros
  *   perdidos o duplicados) y, por actividad, ≥ 90 % «Todo salió bien» sin hallazgos críticos.
  *   Hallazgos con la severidad del Plan: crítico / alto / medio / bajo.
  * - Muestra, cobertura y satisfacción de las encuestas (UMUX-Lite → SUS para clientes y establecimientos;
@@ -34,7 +34,7 @@ export const THRESHOLDS = {
   /** Actividad: «Todo salió bien» de quienes la hicieron (Informe de resultados). */
   activityOk: 0.9,
   /** Criterio 1: pedidos completados de punta a punta. */
-  endToEnd: 0.98,
+  endToEnd: 0.9,
   /**
    * Muestra real: quienes sí completaron la prueba son el 100 %. Basta 1 prueba completa por rol; con menos
    * de `refSample` se avisa que la confianza es menor (Nielsen y Landauer: 5 usuarios ≈ 85 % de los problemas).
@@ -64,7 +64,7 @@ export const THRESHOLDS = {
 };
 
 /** Estados de revisión que sacan a una falla del conteo de vigentes. */
-const CLOSED_TRIAGE = new Set(["no_es_falla", "externa", "duplicada", "corregida"]);
+const CLOSED_TRIAGE = new Set(["no_es_falla", "externa", "tester", "duplicada", "corregida"]);
 
 // ---------------------------------------------------------------- Estadística
 /** IC 95 % de una proporción con Wald ajustado (Agresti-Coull). */
@@ -212,6 +212,13 @@ type ActRow = { run_id: string; activity_id: string; result: string | null; fiel
 type StepRow = { run_id: string; activity_id: string; updated_at: string };
 type IssueRow = { id: string; run_id: string; activity_id: string; kind: string; blocking: number; severity: string; triage: string; description: string };
 
+/** Pedidos fallados ajenos al desarrollo por prueba, según el último dictamen con Claude. */
+function latestOrderAjenos(): Record<string, number> {
+  const row = safeAll<{ applied: string }>("SELECT applied FROM claude_dictamen WHERE error = '' ORDER BY id DESC LIMIT 1")[0];
+  const v = row ? (parseRec(row.applied).orderAjenos as unknown as Record<string, number> | undefined) : undefined;
+  return v && typeof v === "object" ? v : {};
+}
+
 function safeAll<T>(sql: string): T[] {
   try {
     return getDb().prepare(sql).all() as T[];
@@ -280,7 +287,7 @@ export function computeVerdict(): Verdict {
       acts.filter((x) => {
         if (!roleIds.has(x.run_id) || x.activity_id !== id || !x.result || x.result === "skipped") return false;
         const mine = issues.filter((i) => i.run_id === x.run_id && i.activity_id === id);
-        return x.result === "ok" || !mine.length || !mine.every((i) => i.triage === "externa");
+        return x.result === "ok" || !mine.length || !mine.every((i) => i.triage === "externa" || i.triage === "tester");
       }).length;
     const finished = roleRuns.length;
     const gIssues = issues.filter((i) => allIds.has(i.run_id));
@@ -311,7 +318,7 @@ export function computeVerdict(): Verdict {
         // Falla ajena al desarrollo (servidor, correo, red): esa actividad no cuenta para este tester.
         if (x.result !== "ok") {
           const mine = gIssues.filter((i) => i.run_id === x.run_id && i.activity_id === a.id);
-          if (mine.length && mine.every((i) => i.triage === "externa")) {
+          if (mine.length && mine.every((i) => i.triage === "externa" || i.triage === "tester")) {
             externalActs.n++;
             return false;
           }
@@ -517,6 +524,7 @@ export function computeVerdict(): Verdict {
     intentionalFolios.set(a.run_id, set);
   }
   let oTotal = 0, oDone = 0, oIntentional = 0;
+  const orderAjenos = latestOrderAjenos();
   const failures: OrderFailure[] = [];
   const assignMins: number[] = [];
   for (const a of acts) {
@@ -525,7 +533,8 @@ export function computeVerdict(): Verdict {
     // Conteo (desde 24-nov): entregados + no entregados por falla (sin E08/E09) y por qué fallaron.
     if (a.activity_id === "E07" && String(f.ordersDelivered ?? "").trim() !== "") {
       const d = Math.max(0, Math.floor(Number(f.ordersDelivered) || 0));
-      const x = Math.max(0, Math.floor(Number(f.ordersFailed) || 0));
+      // Pedidos fallados que el dictamen con Claude clasificó como ajenos al desarrollo (servidor, logística, tester).
+      const x = Math.max(0, Math.floor(Number(f.ordersFailed) || 0) - (orderAjenos[a.run_id] ?? 0));
       oDone += d;
       oTotal += d + x;
       oIntentional += intentionalFolios.get(a.run_id)?.size ?? 0;

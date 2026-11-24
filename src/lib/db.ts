@@ -186,6 +186,18 @@ const MIGRATIONS: string[] = [
   ALTER TABLE courier_feedback ADD COLUMN verdict_scope TEXT NOT NULL DEFAULT '';
   ALTER TABLE courier_feedback ADD COLUMN verdict_scope_note TEXT NOT NULL DEFAULT '';
   `,
+  // 10: dictámenes con Claude (clasificación de errores y dictamen sobre los criterios fijos).
+  `
+  CREATE TABLE claude_dictamen (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at TEXT NOT NULL,
+    model TEXT NOT NULL DEFAULT '',
+    classification TEXT NOT NULL DEFAULT '{}',
+    dictamen TEXT NOT NULL DEFAULT '{}',
+    applied TEXT NOT NULL DEFAULT '{}',
+    error TEXT NOT NULL DEFAULT ''
+  );
+  `,
 ];
 
 function migrate(db: Database.Database) {

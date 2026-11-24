@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Revisión de una falla por Mesa de control: cambia la gravedad y/o el estado de revisión.
- * Cuerpo: { severity?: critico|alto|medio|bajo, triage?: pendiente|confirmada|no_es_falla|externa|duplicada|corregida, note?: string }.
+ * Cuerpo: { severity?: critico|alto|medio|bajo, triage?: pendiente|confirmada|no_es_falla|externa|tester|duplicada|corregida, note?: string }.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await isAdmin())) return err("No autorizado", 401);

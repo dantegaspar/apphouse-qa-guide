@@ -125,6 +125,7 @@ export const TRIAGE = {
   confirmada: "Confirmada",
   no_es_falla: "No es falla",
   externa: "Ajena al desarrollo (servidor, correo, red, logística)",
+  tester: "Error del tester (no es falla)",
   duplicada: "Duplicada",
   corregida: "Corregida",
 } as const;
