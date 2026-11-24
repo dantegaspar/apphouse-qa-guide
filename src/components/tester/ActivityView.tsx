@@ -96,19 +96,37 @@ export default function ActivityView({
   // Los avisos flotantes van arriba de la barra fija de botones
   useToastOffset(desktop ? 96 : 150);
 
+  // «Llegó al final»: el fondo de la lista de pasos queda arriba de la barra fija de botones. Solo se
+  // cuenta cuando las capturas ya cargaron (antes, la página mide menos y parecería que ya llegó).
   useEffect(() => {
     const root = stepsList();
-    if (!root || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        const ids = entries.filter((e) => e.isIntersecting).map((e) => (e.target.parentElement as HTMLElement).dataset.stepId!);
-        if (ids.length) setSeen((m) => (ids.every((id) => m[id]) ? m : { ...m, ...Object.fromEntries(ids.map((id) => [id, true])) }));
-      },
-      // Cuenta como visto cuando el final del paso aparece arriba de la barra fija de botones
-      { rootMargin: `0px 0px -${desktop ? 0 : 170}px 0px`, threshold: 0 }
-    );
-    root.querySelectorAll<HTMLElement>("[data-step-end]").forEach((el) => io.observe(el));
-    return () => io.disconnect();
+    if (!root) return;
+    const lastId = root.querySelector<HTMLElement>("[data-step-id]:last-of-type")?.dataset.stepId;
+    if (!lastId) return;
+    let raf = 0;
+    const check = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const imgs = Array.from(root.querySelectorAll("img"));
+        if (imgs.some((im) => !im.complete)) return;
+        const bar = document.querySelector<HTMLElement>("[data-step-actions]");
+        const barTop = bar ? bar.getBoundingClientRect().top : window.innerHeight;
+        const limit = Math.min(window.innerHeight, barTop) + 8;
+        if (root.getBoundingClientRect().bottom <= limit) setSeen((m) => (m[lastId] ? m : { ...m, [lastId]: true }));
+      });
+    };
+    // Primera revisión cuando terminó la animación de entrada de la pantalla
+    const t = setTimeout(check, 450);
+    window.addEventListener("scroll", check, { passive: true });
+    window.addEventListener("resize", check);
+    root.addEventListener("load", check, true);
+    return () => {
+      clearTimeout(t);
+      cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", check);
+      window.removeEventListener("resize", check);
+      root.removeEventListener("load", check, true);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pos, desktop, activity.id]);
 
@@ -685,6 +703,7 @@ export default function ActivityView({
 
   const actions = (
     <div
+      data-step-actions
       className={
         "pb-safe sticky bottom-0 z-10 -mx-4 bg-[#f4f6fa]/95 px-4 pt-2 backdrop-blur" +
         dk("lg:bottom-4 lg:mx-0 lg:rounded-2xl lg:bg-white/95 lg:p-4 lg:shadow-md lg:ring-1 lg:ring-slate-200")
