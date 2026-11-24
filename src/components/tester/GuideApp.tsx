@@ -496,9 +496,40 @@ export default function GuideApp({
                 <strong>{pendingIds.join(", ")}</strong>.
               </p>
               <p className="mt-1">
-                Cuando Mesa de control dé por terminada la prueba, entra a cada actividad que no te tocó, marca <strong>«No me tocó»</strong> y guárdala.
-                Así aparece el botón para contestar la encuesta.
+                Cuando Mesa de control dé por terminada la prueba, marca las que no te tocaron como <strong>«No me tocó»</strong> con este botón y
+                se abre la encuesta.
               </p>
+              <Button
+                variant="outline"
+                className="mt-3 w-full sm:w-auto"
+                data-testid="skip-pending"
+                onClick={async () => {
+                  const ok = await confirm({
+                    title: `¿Marcar ${pendingIds.join(", ")} como «No me tocó»?`,
+                    message:
+                      "Hazlo solo cuando Mesa de control haya terminado la prueba. Lo que no alcanzaste a hacer queda como «No me tocó» y no cuenta en tu contra. Puedes abrir y corregir cualquiera hasta que envíes la encuesta final.",
+                    confirmLabel: "Sí, marcar",
+                    cancelLabel: "Todavía no",
+                  });
+                  if (!ok) return;
+                  const ids = [...pendingIds];
+                  update(
+                    (s) => {
+                      const activities = { ...s.activities };
+                      for (const id of ids)
+                        activities[id] = { result: "skipped", checks: {}, fields: {}, notes: activities[id]?.notes ?? "", done: true };
+                      return { ...s, activities };
+                    },
+                    ids.map((id) => ({
+                      type: "activity",
+                      payload: { activityId: id, result: "skipped", checks: {}, fields: {}, notes: state.activities[id]?.notes ?? "" },
+                    }))
+                  );
+                  toast.success("Ya puedes contestar la encuesta final.", { title: `${ids.length === 1 ? "1 actividad marcada" : `${ids.length} actividades marcadas`} como «No me tocó»` });
+                }}
+              >
+                Marcar las pendientes como «No me tocó»
+              </Button>
             </div>
           );
         })()}

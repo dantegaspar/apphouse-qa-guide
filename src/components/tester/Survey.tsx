@@ -178,14 +178,11 @@ export default function Survey({
         </motion.div>
         <h1 className="mt-4 text-2xl font-bold">¡Prueba terminada!</h1>
         <p className="mt-2 max-w-sm text-slate-600" role="status">
-          Gracias por tu ayuda. Tus resultados, reportes y respuestas ya se recibieron en Mesa de control. Avisa en el grupo que terminaste.
+          Gracias por tu ayuda. Tus resultados, reportes y respuestas ya se recibieron en Mesa de control.
         </p>
         <div className="mt-6 flex gap-2">
           <Button variant="outline" onClick={onBack}>
             Ver resumen
-          </Button>
-          <Button variant="ghost" onClick={() => setSent(false)}>
-            Editar respuestas
           </Button>
         </div>
       </div>

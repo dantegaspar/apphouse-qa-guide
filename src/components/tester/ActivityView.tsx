@@ -281,12 +281,12 @@ export default function ActivityView({
         focusFirstError(closingRef.current);
         return;
       }
-      // Guardar cierra la actividad para siempre: con «No pude hacerla» se pide confirmación
+      // Guardar cierra la actividad (se puede reabrir hasta enviar la encuesta): con «No pude hacerla» se pide confirmación
       if (
         result === "blocked" &&
         !(await confirm({
           title: `¿Guardar ${activity.id} como «${ACTIVITY_RESULTS.blocked}»?`,
-          message: "Al guardar, la actividad se cierra y ya no podrás cambiarla. Si fue una falla, revisa que la hayas reportado con «No pude».",
+          message: "Al guardar, la actividad se cierra. La puedes reabrir desde el resumen hasta que envíes la encuesta final. Si fue una falla, revisa que la hayas reportado con «No pude».",
           confirmLabel: "Sí, guardar",
           cancelLabel: "Revisar",
         }))

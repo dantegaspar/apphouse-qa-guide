@@ -60,7 +60,7 @@
           "Tu sucursal se abre sola con el horario que configuraste en E02 (E05).",
           "Después llegan los pedidos de los clientes: E06, E07 y E11 con cada uno.",
           "Con 3 pedidos que tú elijas: rechaza uno, confirma y luego cancela otro, y deja uno sin responder (E08 y E09). Los demás, atiéndelos normal.",
-          "Al final, cuando Mesa de control dé por terminada la prueba, revisa **Al terminar la prueba** y toca **Terminar**."
+          "Al final, cuando Mesa de control dé por terminada la prueba, revisa **Al terminar la prueba**, contesta la encuesta y toca **Enviar encuesta y terminar**."
         ]
       }
     ],
