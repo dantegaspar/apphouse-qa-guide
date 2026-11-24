@@ -750,23 +750,17 @@
         }
       ],
       "expected": [
-        "Creé la categoría Pizzas una sola vez.",
-        "Las 2 pizzas están en Pizzas, con sus 3 tamaños y sus extras.",
-        "La Pepperoni usa el mismo grupo «Tamaño de pizza» que la Hawaiana; no hay grupos repetidos.",
-        "La promoción Pizza Hawaiana 20 % quedó guardada y aparece como Vigente.",
-        "Radio de 3 km y tarifas de $25 / $35 / $45.",
-        "Envío gratis vacío («No aplica»).",
-        "Después de salir y volver a entrar, los valores del envío se conservaron.",
-        "Tiempo para aceptar: 5 minutos.",
-        "Pago con tarjeta activo.",
-        "Pedido máximo de $1,000 y máximo en efectivo de $700.",
-        "El horario de hoy cubre toda la prueba."
+        "Parte A · El menú quedó completo: categoría Pizzas, 2 pizzas con sus 3 tamaños y extras, sin grupos repetidos.",
+        "Parte B · La promoción Pizza Hawaiana 20 % aparece como Vigente.",
+        "Parte C · El envío quedó en 3 km con $25 / $35 / $45, sin envío gratis, y se conservó al salir y volver a entrar.",
+        "Parte D · Tu sucursal quedó lista: 5 minutos para aceptar, pago con tarjeta, topes de $1,000 y $700, y el horario cubre la prueba."
       ],
       "fields": [
         {
           "id": "pending",
-          "label": "¿Quedó algo pendiente? ¿Qué?",
-          "maxLength": 500
+          "label": "¿Quedó algo pendiente? (opcional)",
+          "maxLength": 500,
+          "required": false
         },
         {
           "id": "readyTime",
