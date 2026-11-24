@@ -214,7 +214,7 @@ type IssueRow = { id: string; run_id: string; activity_id: string; kind: string;
 
 /** Pedidos fallados ajenos al desarrollo por prueba, según el último dictamen con Claude. */
 function latestOrderAjenos(): Record<string, number> {
-  const row = safeAll<{ applied: string }>("SELECT applied FROM claude_dictamen WHERE error = '' ORDER BY id DESC LIMIT 1")[0];
+  const row = safeAll<{ applied: string }>("SELECT applied FROM claude_dictamen ORDER BY id DESC LIMIT 1")[0];
   const v = row ? (parseRec(row.applied).orderAjenos as unknown as Record<string, number> | undefined) : undefined;
   return v && typeof v === "object" ? v : {};
 }

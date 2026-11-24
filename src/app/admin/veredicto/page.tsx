@@ -6,6 +6,10 @@ import { PRIORITIES, SEVERITIES, SEVERITY_CLASS as SEV_CLASS, TRIAGE, type Sever
 import { computeVerdict, EXCLUSION_LABEL, THRESHOLDS, type Criterion } from "@/lib/verdict";
 import { LogoutButton } from "@/components/admin/LogoutButton";
 import { AutoRefresh } from "@/components/admin/AutoRefresh";
+import ClaudeDictamenButton from "@/components/admin/ClaudeDictamenButton";
+import { hasClaudeKey, latestDictamen } from "@/lib/claude-dictamen";
+
+const ORIGIN_LABEL: Record<string, string> = { desarrollo: "Desarrollo", servidor: "Servidor", logistica: "Logística", tester: "Tester" };
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +62,9 @@ export default async function VerdictPage() {
   if (!(await isAdmin())) redirect("/admin/login");
   const v = computeVerdict();
   const sevOpen = (s: Severity) => v.defectTotals[s].open;
+  const cd = latestDictamen();
+  const keyOk = hasClaudeKey();
+  const originCount = (o: string) => cd?.classification?.reportes.filter((r) => r.origen === o).length ?? 0;
 
   return (
     <main className="mx-auto max-w-6xl space-y-8 p-4 sm:p-6">
@@ -85,6 +92,69 @@ export default async function VerdictPage() {
         <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-slate-800">
           {v.reasons.map((r) => <li key={r}>{r}</li>)}
         </ul>
+      </section>
+
+      <section data-testid="claude-section" className="rounded-xl bg-white p-5 text-sm shadow-sm ring-1 ring-slate-200">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Dictamen con Claude</h2>
+            <p className="text-slate-600">
+              1) Claude clasifica cada reporte pendiente, cada «¿Por qué falló?» y cada problema de repartidor: desarrollo, servidor, logística o tester.
+              Lo que no es del desarrollo se cierra y sale del cálculo. 2) Con los resultados ya limpios, revisa los criterios fijos con ISO/IEC/IEEE
+              29119-2 y 29119-3:2021 y redacta el dictamen. Las decisiones de Mesa no se tocan y se pueden corregir después.
+            </p>
+          </div>
+          <ClaudeDictamenButton disabled={!keyOk} />
+        </div>
+        {!keyOk && <p className="mt-2 text-amber-800">Para usarlo, agrega ANTHROPIC_API_KEY al .env del servidor y reinicia el contenedor.</p>}
+        {cd && (
+          <div className="mt-4 space-y-3 border-t border-slate-100 pt-4">
+            <p className="text-xs text-slate-500">
+              Último dictamen: {fmtDate(cd.created_at)} · {cd.applied?.reportes ?? 0} reportes clasificados · {cd.applied?.pedidosAjenos ?? 0} pedidos fallados ajenos al desarrollo
+            </p>
+            {cd.classification && (
+              <p className="text-slate-700">
+                Origen de los reportes: {["desarrollo", "servidor", "logistica", "tester"].map((o) => `${ORIGIN_LABEL[o]} ${originCount(o)}`).join(" · ")}
+              </p>
+            )}
+            {cd.error && <p className="text-red-700">No se completó: {cd.error}</p>}
+            {cd.dictamen && (
+              <>
+                <div className="flex flex-wrap items-baseline gap-3">
+                  <span className={`text-3xl font-bold ${cd.dictamen.veredicto === "Sí" ? "text-emerald-700" : "text-red-700"}`}>{cd.dictamen.veredicto}</span>
+                  <span className="text-slate-800">{cd.dictamen.resumen}</span>
+                </div>
+                {(cd.dictamen.veredicto === "Sí") !== v.ready && (
+                  <p className="rounded-lg bg-amber-50 p-2 text-amber-900 ring-1 ring-amber-200">
+                    El dictamen de Claude no coincide con el cálculo fijo de arriba. Manda el cálculo fijo; revisa los datos o vuelve a dictaminar.
+                  </p>
+                )}
+                <ul className="space-y-1">
+                  {cd.dictamen.criterios.map((c) => (
+                    <li key={c.criterio}>
+                      <span className={c.cumple ? "text-emerald-700" : "text-red-700"}>{c.cumple ? "✓" : "✗"}</span> <strong>{c.criterio}:</strong> {c.comentario}
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-slate-700"><strong>ISO/IEC/IEEE 29119:</strong> {cd.dictamen.justificacion29119}</p>
+                <div>
+                  <strong>Errores por origen</strong>
+                  <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                    {Object.entries(cd.dictamen.erroresPorOrigen).map(([k, t]) => (
+                      <li key={k}><strong>{ORIGIN_LABEL[k] ?? k}:</strong> {t}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <strong>Recomendaciones</strong>
+                  <ol className="mt-1 list-decimal space-y-0.5 pl-5">
+                    {cd.dictamen.recomendaciones.map((r) => <li key={r}>{r}</li>)}
+                  </ol>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </section>
 
       <section data-testid="population" className="rounded-xl bg-white p-4 text-sm shadow-sm ring-1 ring-slate-200">

@@ -30,6 +30,7 @@ services:
       GUIDE_PASSWORD: "${GUIDE_PASSWORD:-}"
       SESSION_SECRET: "${SESSION_SECRET:-}"
       MAX_UPLOAD_MB: "${MAX_UPLOAD_MB:-15}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
       # Fijadas dentro del contenedor: no las cambies aquí, porque deben coincidir con los volúmenes
       # y con el puerto interno. Anulan cualquier valor distinto que venga de .env.
       PORT: "3000"
