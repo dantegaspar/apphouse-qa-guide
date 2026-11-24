@@ -38,6 +38,30 @@ const ClassificationSchema = z.object({
 });
 export type Classification = z.infer<typeof ClassificationSchema>;
 
+/** Normas y versiones en que se basa el veredicto (se citan siempre en el dictamen). */
+export const NORMAS = [
+  "ISO/IEC/IEEE 29119-2:2021 · Procesos de prueba: criterios de salida fijados en el plan antes de probar.",
+  "ISO/IEC/IEEE 29119-3:2021 · Documentación de prueba: informe de finalización y resultados por actividad.",
+  "Plan de pruebas PP-APPHOUSE-ESTRES-001 v1.1 (sección 7.5) e Informe de resultados (plantilla de ISO/IEC/IEEE 29119-3): criterios de participantes.",
+  "ISO 9241-11:2018 · Usabilidad (satisfacción): UMUX-Lite (Lewis, Utesch y Maher, 2013) convertido a SUS; 68 = promedio (Sauro, 2011).",
+  "Intervalos de confianza del 95 % con Wald ajustado (Agresti-Coull), informativos.",
+];
+
+/** Porcentajes y umbrales de aprobación vigentes (salen de THRESHOLDS, no del modelo). */
+export function umbralesAprobacion() {
+  const T = THRESHOLDS;
+  const p = (x: number) => `${Math.round(x * 100)} %`;
+  return [
+    { criterio: "Pedidos completados de punta a punta (Plan, criterio 1, crítico)", umbral: `≥ ${p(T.endToEnd)}` },
+    { criterio: "Pedidos o cobros perdidos o duplicados / hallazgos críticos abiertos (Plan, criterio 2, crítico)", umbral: "0" },
+    { criterio: "Cada actividad de los manuales (Informe)", umbral: `≥ ${p(T.activityOk)} «Todo salió bien» y sin hallazgos críticos` },
+    { criterio: "Muestra real por rol", umbral: `≥ ${T.minFinished} prueba completa; quienes completan = 100 % de la base` },
+    { criterio: "Cobertura de casos por rol", umbral: `≥ ${p(T.coverage)} de los casos; cada caso crítico ≥ ${T.minCriticalRuns} ejecuciones (o todas las pruebas si son menos)` },
+    { criterio: "Satisfacción de clientes y establecimientos (SUS equivalente)", umbral: `≥ ${T.sus}` },
+    { criterio: "Satisfacción de repartidores (0–100)", umbral: `≥ ${T.courier}` },
+  ];
+}
+
 const DictamenSchema = z.object({
   veredicto: z.enum(["Sí", "No"]),
   resumen: z.string(),
@@ -45,6 +69,10 @@ const DictamenSchema = z.object({
   justificacion29119: z.string(),
   erroresPorOrigen: z.object({ desarrollo: z.string(), servidor: z.string(), logistica: z.string(), tester: z.string() }),
   recomendaciones: z.array(z.string()),
+  /** Normas y versiones citadas por Claude. */
+  normasCitadas: z.array(z.string()),
+  /** Porcentajes de aprobación citados por Claude. */
+  umbralesCitados: z.array(z.object({ criterio: z.string(), umbral: z.string() })),
 });
 export type Dictamen = z.infer<typeof DictamenSchema>;
 
@@ -190,6 +218,8 @@ ${JSON.stringify(data)}`,
     const clean = {
       veredictoDelCalculoFijo: v.ready ? "Sí" : "No",
       umbrales: THRESHOLDS,
+      umbralesDeAprobacion: umbralesAprobacion(),
+      normasYVersiones: NORMAS,
       base: { pruebasQueCuentan: v.population.valid, registradas: v.population.total, fueraPor: v.population.counts, actividadesAjenas: v.population.externalActs },
       criteriosDeSalida: [...v.criteria, ...v.guides.filter((g) => !g.guide.hidden).flatMap((g) => g.criteria), ...(v.courier.criterion ? [v.courier.criterion] : [])].map(
         (c) => ({ criterio: c.label, medicion: c.measured, umbral: c.threshold, cumple: c.pass })
@@ -217,6 +247,7 @@ Reglas:
 - En "justificacion29119" explica en 3–5 frases cómo se aplicó la norma (criterios de salida fijos, evaluación, informe).
 - En "erroresPorOrigen" resume en una frase cada origen: desarrollo, servidor, logística y tester.
 - En "recomendaciones" da de 3 a 6 acciones concretas para el equipo de desarrollo, priorizadas.
+- SIEMPRE cita las bases: en "normasCitadas" copia cada norma con su versión de "normasYVersiones"; en "umbralesCitados" copia cada criterio con su porcentaje o umbral de aprobación de "umbralesDeAprobacion". En cada comentario de "criterios" menciona la medición y el umbral (por ejemplo «92 % frente a ≥ 90 %»), y en "resumen" y "justificacion29119" nombra las normas con su año.
 
 Resultados limpios (JSON):
 ${JSON.stringify(clean)}`,

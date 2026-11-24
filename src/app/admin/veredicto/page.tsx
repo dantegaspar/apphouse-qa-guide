@@ -7,7 +7,7 @@ import { computeVerdict, EXCLUSION_LABEL, THRESHOLDS, type Criterion } from "@/l
 import { LogoutButton } from "@/components/admin/LogoutButton";
 import { AutoRefresh } from "@/components/admin/AutoRefresh";
 import ClaudeDictamenButton from "@/components/admin/ClaudeDictamenButton";
-import { dictamenGate, latestDictamen } from "@/lib/claude-dictamen";
+import { dictamenGate, latestDictamen, NORMAS, umbralesAprobacion } from "@/lib/claude-dictamen";
 
 const ORIGIN_LABEL: Record<string, string> = { desarrollo: "Desarrollo", servidor: "Servidor", logistica: "Logística", tester: "Tester" };
 
@@ -153,6 +153,23 @@ export default async function VerdictPage() {
               <ol className="mt-1 list-decimal space-y-0.5 pl-5">
                 {cd.dictamen.recomendaciones.map((r) => <li key={r}>{r}</li>)}
               </ol>
+            </div>
+            <div data-testid="claude-bases" className="rounded-lg bg-white/70 p-3 ring-1 ring-slate-200">
+              <strong>Bases del dictamen</strong>
+              <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Porcentajes y umbrales de aprobación</p>
+              <ul className="mt-0.5 list-disc space-y-0.5 pl-5">
+                {umbralesAprobacion().map((u) => (
+                  <li key={u.criterio}>
+                    {u.criterio}: <strong>{u.umbral}</strong>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Normas y versiones</p>
+              <ul className="mt-0.5 list-disc space-y-0.5 pl-5">
+                {NORMAS.map((n) => (
+                  <li key={n}>{n}</li>
+                ))}
+              </ul>
             </div>
             <p className="text-xs text-slate-500">
               Dictaminado {fmtDate(cd.created_at)} con {cd.model} · {cd.applied?.reportes ?? 0} reportes clasificados ·{" "}
