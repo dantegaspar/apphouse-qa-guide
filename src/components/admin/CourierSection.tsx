@@ -2,6 +2,7 @@ import { deviceSummary, fmtDate, isImage, parseRec } from "@/lib/admin-data";
 import { COURIER_QUESTIONS, FACES, faceOf } from "@/lib/courier";
 import { answerOf, courierStats, isCourierNa, loadCourier } from "@/lib/courier-data";
 import { ExportButton } from "@/components/admin/ExportButton";
+import VerdictScope from "@/components/admin/VerdictScope";
 import { Bars, ChartCard, COLORS, Columns, Empty, fmt, Kpi } from "@/components/admin/charts/Charts";
 
 /** Encuesta de repartidores en el panel y en las gráficas (no depende del filtro de guía). */
@@ -132,6 +133,10 @@ export function CourierAdminSection() {
                   })}
                 </div>
                 {f.comment && <p className="mt-2 whitespace-pre-wrap text-sm text-slate-800">“{f.comment}”</p>}
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                  <span>¿Cuenta para el veredicto?</span>
+                  <VerdictScope courierId={f.id} scope={f.verdict_scope ?? ""} note={f.verdict_scope_note ?? ""} />
+                </div>
                 {its.length > 0 && (
                   <ul className="mt-3 space-y-2">
                     {its.map((i) => (

@@ -95,6 +95,10 @@ export default async function VerdictPage() {
           repartidor asignado o sin comunicación con él)
           {v.population.counts.mesa ? ` y ${v.population.counts.mesa} excluidas por Mesa de control` : ""}. Los hallazgos críticos cuentan de todas.
         </p>
+        <p className="mt-1 text-slate-700">
+          Solo se califica el desarrollo. Los reportes marcados «Ajena al desarrollo» (servidor, correo que no llega, red) no cuentan como falla
+          {v.population.externalActs ? `, y ${v.population.externalActs} actividades donde pasó eso quedaron fuera del cálculo` : ""}.
+        </p>
         {v.population.excluded.some((e) => e.reason !== "sin_terminar") && (
           <ul className="mt-2 space-y-1">
             {v.population.excluded
@@ -244,6 +248,8 @@ export default async function VerdictPage() {
         <p className="mt-2">
           Todos los porcentajes se calculan solo con las pruebas completas: no cuentan quienes abandonaron o no terminaron, ni quienes tuvieron un
           problema de logística (no les asignaron repartidor o no pudieron comunicarse con él), según su encuesta o la decisión de Mesa de control.
+          La prueba califica únicamente el desarrollo: las fallas de servidor, de correo o de red se marcan «Ajena al desarrollo» y no cuentan ni
+          como falla ni como actividad ejecutada; lo mismo con las encuestas de repartidores que no pudieron entrar por esas causas.
         </p>
         <p className="mt-2">Los criterios de salida se fijaron antes de la prueba y no se ajustan después: el veredicto es «Sí» solo si se cumplen todos.</p>
       </section>

@@ -23,6 +23,10 @@ import { LEGACY_SEVERITY, PRIORITIES, SEVERITIES, TRIAGE, type Guide, type Order
  *   repartidor o no pudieron comunicarse con él: pregunta «logistica» de la encuesta). Mesa de control
  *   puede incluir o excluir una prueba a mano desde su detalle. Los hallazgos críticos abiertos cuentan
  *   de todas las pruebas: una falla grave existe aunque el tester no haya terminado (se descarta en la revisión).
+ * - Solo se califica el DESARROLLO. Un reporte que Mesa marca «Ajena al desarrollo» (servidor, correo que no
+ *   llega, red) se cierra, y la actividad donde ocurrió no cuenta para ese tester (ni a favor ni en contra).
+ *   Las encuestas de repartidores afectados por algo ajeno (p. ej. no pudieron entrar porque el correo nunca
+ *   llegó) se pueden excluir desde el panel.
  */
 
 // ---------------------------------------------------------------- Umbrales (criterios de salida)
@@ -56,7 +60,7 @@ export const THRESHOLDS = {
 };
 
 /** Estados de revisión que sacan a una falla del conteo de vigentes. */
-const CLOSED_TRIAGE = new Set(["no_es_falla", "duplicada", "corregida"]);
+const CLOSED_TRIAGE = new Set(["no_es_falla", "externa", "duplicada", "corregida"]);
 
 // ---------------------------------------------------------------- Estadística
 /** IC 95 % de una proporción con Wald ajustado (Agresti-Coull). */
@@ -186,10 +190,17 @@ export type ExclusionReason = "sin_terminar" | "logistica" | "mesa";
 export const EXCLUSION_LABEL: Record<ExclusionReason, string> = {
   sin_terminar: "No terminó (abandonó o sigue en curso)",
   logistica: "Problema de logística",
-  mesa: "Excluida por Mesa de control",
+  mesa: "Excluida por Mesa de control (problema ajeno al desarrollo)",
 };
 export type ExcludedRun = { runId: string; guideId: string; name: string; reason: ExclusionReason; detail: string };
-export type Population = { total: number; valid: number; excluded: ExcludedRun[]; counts: Record<ExclusionReason, number> };
+export type Population = {
+  total: number;
+  valid: number;
+  excluded: ExcludedRun[];
+  counts: Record<ExclusionReason, number>;
+  /** Actividades que no cuentan porque su falla fue ajena al desarrollo. */
+  externalActs: number;
+};
 type ActRow = { run_id: string; activity_id: string; result: string | null; fields: string; updated_at: string };
 type StepRow = { run_id: string; activity_id: string; updated_at: string };
 type IssueRow = { id: string; run_id: string; activity_id: string; kind: string; blocking: number; severity: string; triage: string; description: string };
@@ -240,13 +251,14 @@ export function computeVerdict(): Verdict {
   const validIds = new Set(validRuns.map((r) => r.id));
   const counts = { sin_terminar: 0, logistica: 0, mesa: 0 } as Record<ExclusionReason, number>;
   for (const e of excluded) counts[e.reason]++;
-  const population: Population = { total: runs.length, valid: validRuns.length, excluded, counts };
+  const population: Population = { total: runs.length, valid: validRuns.length, excluded, counts, externalActs: 0 };
 
   // Las guías ocultas (p. ej. la variante de la app móvil del establecimiento) entran si alguien las usó.
   const guides = GUIDES.filter((g) => !g.hidden || runs.some((r) => r.guide_id === g.id));
   const defects: DefectItem[] = [];
   const defectTotals = Object.fromEntries(Object.keys(SEVERITIES).map((k) => [k, { open: 0, closed: 0 }])) as Verdict["defectTotals"];
 
+  const externalActs = { n: 0 };
   const guideVerdicts: GuideVerdict[] = guides.map((g) => {
     const gRuns = runs.filter((r) => r.guide_id === g.id);
     // Las fallas se revisan de todas las pruebas; los porcentajes, solo de las pruebas válidas.
@@ -257,7 +269,12 @@ export function computeVerdict(): Verdict {
     const roleRuns = roleAll.filter((r) => validIds.has(r.id));
     const roleIds = new Set(roleRuns.map((r) => r.id));
     const roleOut = (k: ExclusionReason) => excluded.filter((e) => e.reason === k && roleAll.some((r) => r.id === e.runId)).length;
-    const execOf = (id: string) => acts.filter((x) => roleIds.has(x.run_id) && x.activity_id === id && x.result && x.result !== "skipped").length;
+    const execOf = (id: string) =>
+      acts.filter((x) => {
+        if (!roleIds.has(x.run_id) || x.activity_id !== id || !x.result || x.result === "skipped") return false;
+        const mine = issues.filter((i) => i.run_id === x.run_id && i.activity_id === id);
+        return x.result === "ok" || !mine.length || !mine.every((i) => i.triage === "externa");
+      }).length;
     const finished = roleRuns.length;
     const gIssues = issues.filter((i) => allIds.has(i.run_id));
 
@@ -282,7 +299,18 @@ export function computeVerdict(): Verdict {
     }
 
     const cases: CaseStat[] = g.activities.map((a) => {
-      const rows = acts.filter((x) => ids.has(x.run_id) && x.activity_id === a.id && x.result && x.result !== "skipped");
+      const rows = acts.filter((x) => {
+        if (!ids.has(x.run_id) || x.activity_id !== a.id || !x.result || x.result === "skipped") return false;
+        // Falla ajena al desarrollo (servidor, correo, red): esa actividad no cuenta para este tester.
+        if (x.result !== "ok") {
+          const mine = gIssues.filter((i) => i.run_id === x.run_id && i.activity_id === a.id);
+          if (mine.length && mine.every((i) => i.triage === "externa")) {
+            externalActs.n++;
+            return false;
+          }
+        }
+        return true;
+      });
       let passed = 0, passedWithNotes = 0, failed = 0, blocked = 0, allOk = 0;
       const mins: number[] = [];
       for (const r of rows) {
@@ -409,17 +437,23 @@ export function computeVerdict(): Verdict {
   });
 
   // Repartidores (formulario aparte, caritas 1–5). answerOf descarta «No me tocó» ("na"): no cuenta en el promedio.
-  const { feedback, issues: cIssues } = loadCourier();
+  const { feedback: allFeedback, issues: allCIssues } = loadCourier();
+  // Encuestas excluidas por Mesa de control (problema ajeno al desarrollo, p. ej. el correo nunca llegó).
+  const feedback = allFeedback.filter((f) => f.verdict_scope !== "excluir");
+  const courierOut = allFeedback.length - feedback.length;
+  const cIssues = allCIssues.filter((i) => feedback.some((f) => f.id === i.feedback_id));
   const vals = feedback.flatMap((f) => {
     const a = parseRec(f.answers);
     return COURIER_QUESTIONS.map((q) => answerOf(a, q.id)).filter((v): v is number => v !== null);
   });
   const courierScore = vals.length ? ((vals.reduce((s, v) => s + v, 0) / vals.length - 1) / 4) * 100 : null;
-  const courierCriterion: Criterion | null = feedback.length
+  const courierCriterion: Criterion | null = allFeedback.length
     ? {
         id: "repartidores",
         label: "Satisfacción · Repartidores",
-        measured: `${courierScore === null ? "—" : Math.round(courierScore)} / 100 con ${feedback.length} respuestas; ${cIssues.length} problemas reportados`,
+        measured: `${courierScore === null ? "—" : Math.round(courierScore)} / 100 con ${feedback.length} respuestas; ${cIssues.length} problemas reportados${
+          courierOut ? `; ${courierOut} encuestas excluidas por problemas ajenos al desarrollo` : ""
+        }`,
         threshold: `≥ ${T.courier} con ≥ ${T.minSurvey} respuestas`,
         pass: feedback.length >= T.minSurvey && courierScore !== null && courierScore >= T.courier,
         basis: "Escala Likert de 5 puntos llevada a 0–100; 70 equivale a «fácil» en promedio.",
@@ -568,7 +602,7 @@ export function computeVerdict(): Verdict {
     reasons,
     guides: guideVerdicts,
     courier: { n: feedback.length, score: courierScore, issues: cIssues.length, criterion: courierCriterion },
-    population,
+    population: { ...population, externalActs: externalActs.n },
     defects,
     defectTotals,
     generatedAt: new Date().toISOString(),

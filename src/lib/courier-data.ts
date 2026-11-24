@@ -13,6 +13,8 @@ export type CourierFeedbackRow = {
   comment: string;
   created_at: string;
   updated_at: string;
+  verdict_scope?: string;
+  verdict_scope_note?: string;
 };
 export type CourierIssueRow = { id: string; feedback_id: string; description: string; created_at: string };
 export type CourierAttachmentRow = { id: string; feedback_id: string; issue_id: string; original_name: string; mime: string; size: number };
@@ -38,7 +40,9 @@ export const isCourierNa = (answers: Record<string, unknown>, id: string) => ans
 
 export function loadCourier() {
   const db = getDb();
-  const feedback = db.prepare("SELECT id, name, phone, device, answers, comment, created_at, updated_at FROM courier_feedback ORDER BY created_at DESC").all() as CourierFeedbackRow[];
+  const feedback = db
+    .prepare("SELECT id, name, phone, device, answers, comment, created_at, updated_at, verdict_scope, verdict_scope_note FROM courier_feedback ORDER BY created_at DESC")
+    .all() as CourierFeedbackRow[];
   const issues = db.prepare("SELECT * FROM courier_issues ORDER BY created_at").all() as CourierIssueRow[];
   const attachments = db
     .prepare("SELECT id, feedback_id, issue_id, original_name, mime, size FROM courier_attachments ORDER BY created_at")

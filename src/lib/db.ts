@@ -181,6 +181,11 @@ const MIGRATIONS: string[] = [
   ALTER TABLE runs ADD COLUMN verdict_scope TEXT NOT NULL DEFAULT '';
   ALTER TABLE runs ADD COLUMN verdict_scope_note TEXT NOT NULL DEFAULT '';
   `,
+  // 9: lo mismo para las encuestas de repartidores (p. ej. no pudo entrar porque el correo nunca llegó).
+  `
+  ALTER TABLE courier_feedback ADD COLUMN verdict_scope TEXT NOT NULL DEFAULT '';
+  ALTER TABLE courier_feedback ADD COLUMN verdict_scope_note TEXT NOT NULL DEFAULT '';
+  `,
 ];
 
 function migrate(db: Database.Database) {
