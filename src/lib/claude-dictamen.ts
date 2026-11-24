@@ -20,6 +20,10 @@ import { computeVerdict, THRESHOLDS } from "./verdict";
  */
 
 export const CLAUDE_MODEL = "claude-opus-5-5";
+/** Precio de lista de Claude Opus 5.5 (USD por millón de tokens) para estimar el costo de cada dictamen. */
+const PRICE_IN = 4;
+const PRICE_OUT = 20;
+const usage = { input: 0, output: 0 };
 
 const ORIGINS = ["desarrollo", "servidor", "logistica", "tester"] as const;
 const Origin = z.enum(ORIGINS);
@@ -52,6 +56,8 @@ export type DictamenRow = {
   dictamen: Dictamen | null;
   applied: { reportes: number; pedidosAjenos: number; orderAjenos: Record<string, number> } | null;
   error: string;
+  /** Costo aproximado en USD (precio de lista), o null si no se registraron tokens. */
+  costUsd: number | null;
 };
 
 /** Quita correos y teléfonos del texto libre antes de mandarlo. */
@@ -80,6 +86,9 @@ async function ask<T>(schema: z.ZodType<T>, prompt: string, effort: "medium" | "
     output_config: { effort, format: betaZodOutputFormat(schema) },
     messages: [{ role: "user", content: prompt }],
   });
+  const u = res.usage;
+  usage.input += (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0);
+  usage.output += u.output_tokens ?? 0;
   if (res.stop_reason === "refusal") throw new Error("Claude no quiso procesar estos datos.");
   if (res.stop_reason === "max_tokens") throw new Error("La respuesta de Claude quedó incompleta; vuelve a intentarlo.");
   if (!res.parsed_output) throw new Error("Claude no devolvió el formato esperado.");
@@ -91,6 +100,8 @@ type IssueRow = { id: string; run_id: string; activity_id: string; severity: str
 
 export async function runDictamen(): Promise<DictamenRow> {
   const db = getDb();
+  usage.input = 0;
+  usage.output = 0;
   const runs = db.prepare("SELECT id, guide_id, status FROM runs ORDER BY created_at").all() as RunRow[];
   const ref = new Map(runs.map((r, i) => [r.id, `T${i + 1}`]));
   const byRef = new Map(runs.map((r, i) => [`T${i + 1}`, r.id]));
@@ -215,13 +226,14 @@ ${JSON.stringify(clean)}`,
   } catch (e) {
     db.prepare("UPDATE claude_dictamen SET error = ? WHERE id = ?").run(e instanceof Error ? e.message : String(e), rowId);
   }
+  db.prepare("UPDATE claude_dictamen SET input_tokens = ?, output_tokens = ? WHERE id = ?").run(usage.input, usage.output, rowId);
   return latestDictamen()!;
 }
 
 export function latestDictamen(): DictamenRow | null {
   try {
     const r = getDb().prepare("SELECT * FROM claude_dictamen ORDER BY id DESC LIMIT 1").get() as
-      | { id: number; created_at: string; model: string; classification: string; dictamen: string; applied: string; error: string }
+      | { id: number; created_at: string; model: string; classification: string; dictamen: string; applied: string; error: string; input_tokens?: number; output_tokens?: number }
       | undefined;
     if (!r) return null;
     const j = (s: string) => {
@@ -232,10 +244,37 @@ export function latestDictamen(): DictamenRow | null {
         return null;
       }
     };
-    return { id: r.id, created_at: r.created_at, model: r.model, classification: j(r.classification), dictamen: j(r.dictamen), applied: j(r.applied), error: r.error };
+    const cost = r.input_tokens || r.output_tokens ? ((r.input_tokens ?? 0) * PRICE_IN + (r.output_tokens ?? 0) * PRICE_OUT) / 1e6 : null;
+    return { id: r.id, created_at: r.created_at, model: r.model, classification: j(r.classification), dictamen: j(r.dictamen), applied: j(r.applied), error: r.error, costUsd: cost };
   } catch {
     return null;
   }
 }
 
 export const hasClaudeKey = () => !!process.env.ANTHROPIC_API_KEY;
+
+/**
+ * ¿Hay que dictaminar con Claude antes de mostrar el veredicto? Sí, si hay pruebas y todavía no hay un
+ * dictamen completo, o si después del último llegaron reportes sin revisar, pedidos fallados o problemas
+ * de repartidores. Sin ANTHROPIC_API_KEY no se bloquea: se muestra el veredicto del cálculo fijo.
+ */
+export function dictamenGate() {
+  const db = getDb();
+  const keyOk = hasClaudeKey();
+  const last = latestDictamen();
+  const since = last && !last.error && last.dictamen ? last.created_at : "";
+  const one = (sql: string, ...a: unknown[]) => {
+    try {
+      return (db.prepare(sql).get(...a) as { n: number }).n;
+    } catch {
+      return 0;
+    }
+  };
+  const runs = one("SELECT COUNT(*) AS n FROM runs");
+  const pendingReports = one("SELECT COUNT(*) AS n FROM issues WHERE kind = 'issue' AND triage = 'pendiente'");
+  const e07 = db.prepare("SELECT fields, updated_at FROM activity_results WHERE activity_id = 'E07'").all() as { fields: string; updated_at: string }[];
+  const newOrders = e07.filter((a) => Number(parseRec(a.fields).ordersFailed) > 0 && (!since || a.updated_at > since)).length;
+  const newCourier = since ? one("SELECT COUNT(*) AS n FROM courier_issues WHERE created_at > ?", since) : one("SELECT COUNT(*) AS n FROM courier_issues");
+  const needed = keyOk && runs > 0 && (!since || pendingReports > 0 || newOrders > 0 || newCourier > 0);
+  return { needed, keyOk, pendingReports, newOrders, newCourier };
+}

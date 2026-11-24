@@ -7,7 +7,7 @@ import { computeVerdict, EXCLUSION_LABEL, THRESHOLDS, type Criterion } from "@/l
 import { LogoutButton } from "@/components/admin/LogoutButton";
 import { AutoRefresh } from "@/components/admin/AutoRefresh";
 import ClaudeDictamenButton from "@/components/admin/ClaudeDictamenButton";
-import { hasClaudeKey, latestDictamen } from "@/lib/claude-dictamen";
+import { dictamenGate, latestDictamen } from "@/lib/claude-dictamen";
 
 const ORIGIN_LABEL: Record<string, string> = { desarrollo: "Desarrollo", servidor: "Servidor", logistica: "Logística", tester: "Tester" };
 
@@ -63,7 +63,7 @@ export default async function VerdictPage() {
   const v = computeVerdict();
   const sevOpen = (s: Severity) => v.defectTotals[s].open;
   const cd = latestDictamen();
-  const keyOk = hasClaudeKey();
+  const gate = dictamenGate();
   const originCount = (o: string) => cd?.classification?.reportes.filter((r) => r.origen === o).length ?? 0;
 
   return (
@@ -74,10 +74,33 @@ export default async function VerdictPage() {
           <Link href="/admin" className="text-sm text-[#2F5DA8] hover:underline">← Volver al panel</Link>
           <h1 className="mt-1 text-2xl font-semibold text-slate-900">¿Listo para producción?</h1>
           <p className="text-sm text-slate-500">Calculado con los criterios de salida fijos de los participantes · {fmtDate(v.generatedAt)}</p>
+          {!gate.keyOk && <p className="text-xs text-amber-800">Sin ANTHROPIC_API_KEY en el .env del servidor: se muestra el veredicto sin el dictamen con Claude.</p>}
         </div>
         <LogoutButton />
       </header>
 
+      {gate.needed ? (
+      <section data-testid="claude-gate" className="rounded-2xl bg-white p-6 text-sm shadow-sm ring-1 ring-slate-200">
+        <h2 className="text-xl font-semibold text-slate-900">Primero: dictaminar con Claude</h2>
+        <p className="mt-2 text-slate-700">
+          Antes de ver el veredicto, Claude revisa los reportes y los clasifica: <strong>desarrollo, servidor, logística o tester</strong>. Lo que
+          no es del desarrollo se cierra y sale del cálculo. Con los resultados ya limpios revisa los criterios fijos (ISO/IEC/IEEE 29119-2 y
+          29119-3:2021) y entonces aparece el veredicto.
+        </p>
+        <p className="mt-3 text-slate-800">
+          Por dictaminar: <strong>{gate.pendingReports}</strong> reportes sin revisar · <strong>{gate.newOrders}</strong> pruebas con pedidos
+          fallados nuevos · <strong>{gate.newCourier}</strong> problemas de repartidores nuevos
+        </p>
+        <div className="mt-4">
+          <ClaudeDictamenButton />
+        </div>
+        {cd?.error && <p className="mt-3 text-red-700">El último intento no se completó: {cd.error}</p>}
+        <p className="mt-3 text-xs text-slate-500">
+          Tarda de 1 a 3 minutos. A Claude no se le mandan nombres, correos ni teléfonos. Lo que Mesa ya revisó no se toca.
+        </p>
+      </section>
+      ) : (
+        <>
       <section
         data-testid="verdict"
         className={`rounded-2xl p-6 ring-1 ${v.ready ? "bg-emerald-50 ring-emerald-200" : "bg-red-50 ring-red-200"}`}
@@ -92,67 +115,49 @@ export default async function VerdictPage() {
         <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-slate-800">
           {v.reasons.map((r) => <li key={r}>{r}</li>)}
         </ul>
-      </section>
-
-      <section data-testid="claude-section" className="rounded-xl bg-white p-5 text-sm shadow-sm ring-1 ring-slate-200">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">Dictamen con Claude</h2>
-            <p className="text-slate-600">
-              1) Claude clasifica cada reporte pendiente, cada «¿Por qué falló?» y cada problema de repartidor: desarrollo, servidor, logística o tester.
-              Lo que no es del desarrollo se cierra y sale del cálculo. 2) Con los resultados ya limpios, revisa los criterios fijos con ISO/IEC/IEEE
-              29119-2 y 29119-3:2021 y redacta el dictamen. Las decisiones de Mesa no se tocan y se pueden corregir después.
+        {cd?.dictamen && (
+          <div data-testid="claude-result" className="mt-5 space-y-3 border-t border-slate-300/60 pt-4 text-sm text-slate-800">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Dictamen de Claude · ISO/IEC/IEEE 29119</h2>
+            <p>
+              <strong>{cd.dictamen.veredicto}.</strong> {cd.dictamen.resumen}
             </p>
-          </div>
-          <ClaudeDictamenButton disabled={!keyOk} />
-        </div>
-        {!keyOk && <p className="mt-2 text-amber-800">Para usarlo, agrega ANTHROPIC_API_KEY al .env del servidor y reinicia el contenedor.</p>}
-        {cd && (
-          <div className="mt-4 space-y-3 border-t border-slate-100 pt-4">
-            <p className="text-xs text-slate-500">
-              Último dictamen: {fmtDate(cd.created_at)} · {cd.applied?.reportes ?? 0} reportes clasificados · {cd.applied?.pedidosAjenos ?? 0} pedidos fallados ajenos al desarrollo
-            </p>
-            {cd.classification && (
-              <p className="text-slate-700">
-                Origen de los reportes: {["desarrollo", "servidor", "logistica", "tester"].map((o) => `${ORIGIN_LABEL[o]} ${originCount(o)}`).join(" · ")}
+            {(cd.dictamen.veredicto === "Sí") !== v.ready && (
+              <p className="rounded-lg bg-amber-50 p-2 text-amber-900 ring-1 ring-amber-200">
+                El dictamen de Claude no coincide con el cálculo fijo. Manda el cálculo fijo; revisa los datos.
               </p>
             )}
-            {cd.error && <p className="text-red-700">No se completó: {cd.error}</p>}
-            {cd.dictamen && (
-              <>
-                <div className="flex flex-wrap items-baseline gap-3">
-                  <span className={`text-3xl font-bold ${cd.dictamen.veredicto === "Sí" ? "text-emerald-700" : "text-red-700"}`}>{cd.dictamen.veredicto}</span>
-                  <span className="text-slate-800">{cd.dictamen.resumen}</span>
-                </div>
-                {(cd.dictamen.veredicto === "Sí") !== v.ready && (
-                  <p className="rounded-lg bg-amber-50 p-2 text-amber-900 ring-1 ring-amber-200">
-                    El dictamen de Claude no coincide con el cálculo fijo de arriba. Manda el cálculo fijo; revisa los datos o vuelve a dictaminar.
-                  </p>
-                )}
-                <ul className="space-y-1">
-                  {cd.dictamen.criterios.map((c) => (
-                    <li key={c.criterio}>
-                      <span className={c.cumple ? "text-emerald-700" : "text-red-700"}>{c.cumple ? "✓" : "✗"}</span> <strong>{c.criterio}:</strong> {c.comentario}
-                    </li>
-                  ))}
-                </ul>
-                <p className="text-slate-700"><strong>ISO/IEC/IEEE 29119:</strong> {cd.dictamen.justificacion29119}</p>
-                <div>
-                  <strong>Errores por origen</strong>
-                  <ul className="mt-1 list-disc space-y-0.5 pl-5">
-                    {Object.entries(cd.dictamen.erroresPorOrigen).map(([k, t]) => (
-                      <li key={k}><strong>{ORIGIN_LABEL[k] ?? k}:</strong> {t}</li>
-                    ))}
-                  </ul>
-                </div>
-                <div>
-                  <strong>Recomendaciones</strong>
-                  <ol className="mt-1 list-decimal space-y-0.5 pl-5">
-                    {cd.dictamen.recomendaciones.map((r) => <li key={r}>{r}</li>)}
-                  </ol>
-                </div>
-              </>
-            )}
+            <ul className="space-y-1">
+              {cd.dictamen.criterios.map((c) => (
+                <li key={c.criterio}>
+                  <span className={c.cumple ? "text-emerald-700" : "text-red-700"}>{c.cumple ? "✓" : "✗"}</span> <strong>{c.criterio}:</strong> {c.comentario}
+                </li>
+              ))}
+            </ul>
+            <p>{cd.dictamen.justificacion29119}</p>
+            <div>
+              <strong>Errores por origen</strong>
+              <span className="text-slate-500">
+                {" "}
+                (reportes: {["desarrollo", "servidor", "logistica", "tester"].map((o) => `${ORIGIN_LABEL[o]} ${originCount(o)}`).join(" · ")})
+              </span>
+              <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                {Object.entries(cd.dictamen.erroresPorOrigen).map(([k, t]) => (
+                  <li key={k}>
+                    <strong>{ORIGIN_LABEL[k] ?? k}:</strong> {t}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <strong>Recomendaciones</strong>
+              <ol className="mt-1 list-decimal space-y-0.5 pl-5">
+                {cd.dictamen.recomendaciones.map((r) => <li key={r}>{r}</li>)}
+              </ol>
+            </div>
+            <p className="text-xs text-slate-500">
+              Dictaminado {fmtDate(cd.created_at)} con {cd.model} · {cd.applied?.reportes ?? 0} reportes clasificados ·{" "}
+              {cd.applied?.pedidosAjenos ?? 0} pedidos fallados ajenos{cd.costUsd != null ? ` · costo ≈ USD ${cd.costUsd.toFixed(2)}` : ""}
+            </p>
           </div>
         )}
       </section>
@@ -338,6 +343,8 @@ export default async function VerdictPage() {
         </p>
         <p className="mt-2">Los criterios de salida se fijaron antes de la prueba y no se ajustan después: el veredicto es «Sí» solo si se cumplen todos.</p>
       </section>
+        </>
+      )}
     </main>
   );
 }

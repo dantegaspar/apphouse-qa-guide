@@ -198,6 +198,11 @@ const MIGRATIONS: string[] = [
     error TEXT NOT NULL DEFAULT ''
   );
   `,
+  // 11: tokens y costo aproximado de cada dictamen con Claude.
+  `
+  ALTER TABLE claude_dictamen ADD COLUMN input_tokens INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE claude_dictamen ADD COLUMN output_tokens INTEGER NOT NULL DEFAULT 0;
+  `,
 ];
 
 function migrate(db: Database.Database) {
