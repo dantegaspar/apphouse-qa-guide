@@ -560,7 +560,7 @@ export function computeVerdict(): Verdict {
         if (o.status === "Entregado") oDone++;
       }
     }
-    if (a.activity_id === "E11") {
+    if (a.activity_id === "E10" || a.activity_id === "E11") {
       const m = Number(f.assignMinutes);
       if (Number.isFinite(m) && m >= 0) assignMins.push(m);
     }
@@ -595,7 +595,7 @@ export function computeVerdict(): Verdict {
       id: "actividades",
       label: "Actividades que cumplen",
       measured: `${executedActs.length - actFail.length} de ${executedActs.length} actividades con datos${actFail.length ? `; no cumplen: ${actFail.map((a) => `${a.id} ${pct(a.okRate)}`).join(", ")}` : ""}${
-        assignMed !== null ? ` · asignación de repartidor (E11): mediana ${Math.round(assignMed * 10) / 10} min` : ""
+        assignMed !== null ? ` · asignación de repartidor (E10): mediana ${Math.round(assignMed * 10) / 10} min` : ""
       }`,
       threshold: `todas: ≥ ${pct(T.activityOk)} «Todo salió bien» y sin hallazgos críticos`,
       pass: executedActs.length > 0 && actFail.length === 0,

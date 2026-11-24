@@ -1,6 +1,6 @@
 {
   "id": "establecimiento-app",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "role": "Establecimiento",
   "hidden": true,
   "title": "Manual del Establecimiento · App móvil",
@@ -9,7 +9,7 @@
   "source": "Manual_Establecimiento_App.pdf",
   "notice": "Haz toda la prueba desde la app AppHouse Establecimientos de tu celular. No uses el panel web en la computadora al mismo tiempo.",
   "glossary": "**Toca** = tocar con el dedo · **Escribe** = escribir letras o números · **Toma una captura** = foto de la pantalla del celular · **El grupo** = el grupo de WhatsApp de la prueba.",
-  "sequentialUntil": "E04",
+  "sequentialUntil": "E04-D",
   "reportExample": "Ej. Toqué Confirmar pedido y el pedido no cambió de estado.",
   "orderExample": "Ej. 261124-0004",
   "tester": {
@@ -36,7 +36,10 @@
         "id": "system",
         "label": "Sistema",
         "type": "text",
-        "options": ["Android", "iPhone"],
+        "options": [
+          "Android",
+          "iPhone"
+        ],
         "required": true
       }
     ]
@@ -59,7 +62,7 @@
         "items": [
           "**Primero preparas tu sucursal (E01 a E04).** Al terminar, manda al grupo de WhatsApp: **Sucursal (nombre de tu sucursal) lista**. Es el único mensaje que mandas en toda la prueba.",
           "Tu sucursal se abre sola con el horario que configuraste en E02 (E05).",
-          "Después llegan los pedidos de los clientes: E06, E07 y E11 con cada uno.",
+          "Después llegan los pedidos de los clientes: E06, E07 y E10 con cada uno.",
           "Con 3 pedidos que tú elijas: rechaza uno, confirma y luego cancela otro, y deja uno sin responder (E08 y E09). Los demás, atiéndelos normal.",
           "**Al final:** cuando Mesa de control dé por terminada la prueba, revisa la lista «Al terminar la prueba», contesta la encuesta y toca **Enviar encuesta y terminar**."
         ]
@@ -99,7 +102,7 @@
     "intro": "Hoja de consulta: no necesitas memorizarla. Vas a crear 1 categoría (Pizzas), 2 pizzas y 3 grupos: 1 de variantes y 2 de complementos. Primero la categoría y después las pizzas. Cada cosa se crea una sola vez.",
     "tables": [
       {
-        "title": "Categoría y productos que debes crear (E04 · Parte A)",
+        "title": "Categoría y productos que debes crear (E04-A)",
         "columns": [
           "Categoría",
           "Producto",
@@ -124,11 +127,11 @@
           ]
         ],
         "activities": [
-          "E04:A"
+          "E04-A"
         ]
       },
       {
-        "title": "Grupos de variantes y complementos (E04 · Parte A)",
+        "title": "Grupos de variantes y complementos (E04-A)",
         "columns": [
           "Grupo",
           "Tipo",
@@ -157,7 +160,7 @@
         ],
         "note": "Cómo leer las tablas: el precio del producto es el de la Chica. La variante es el tamaño con su precio: va en Variantes. Los extras van en Complementos. Con los tamaños quedan: Hawaiana $120 · $150 · $180 y Pepperoni $110 · $140 · $170.",
         "activities": [
-          "E04:A"
+          "E04-A"
         ]
       },
       {
@@ -208,19 +211,19 @@
             "E03"
           ],
           [
-            "E04:B"
+            "E04-B"
           ],
           [
-            "E04:C"
+            "E04-C"
           ],
           [
-            "E04:D"
+            "E04-D"
           ],
           [
-            "E04:D"
+            "E04-D"
           ],
           [
-            "E04:D"
+            "E04-D"
           ],
           [
             "E07"
@@ -252,7 +255,7 @@
     ],
     [
       "No hay repartidores libres.",
-      "Si un pedido pasa más de 3 minutos en cola, toca **Tuve un problema** en E11 y escribe el folio."
+      "Si un pedido pasa más de 3 minutos en cola, toca **Tuve un problema** en E10 y escribe el folio."
     ],
     [
       "Un pedido con tarjeta rechazado dice **reembolsado**.",
@@ -457,7 +460,7 @@
         },
         {
           "id": "7",
-          "text": "Cuando cada repartidor entre a su app y toque **Disponible**, debe subir **Disponibles ahora (2)**. Si todavía no entran, sigue con E04 y revísalo después.",
+          "text": "Cuando cada repartidor entre a su app y toque **Disponible**, debe subir **Disponibles ahora (2)**. Si todavía no entran, sigue con E04-A y revísalo después.",
           "image": "/guides/establecimiento-app/m-e03-02-repartidores.jpg",
           "caption": "2 = Activos y Disponibles ahora · 3 = Dar de alta",
           "conditional": true
@@ -485,17 +488,20 @@
       ]
     },
     {
-      "id": "E04",
-      "title": "Prepara tu sucursal",
+      "id": "E04-A",
+      "title": "Prepara tu sucursal · Crea tu menú",
       "priority": "critica",
       "quality": "Adecuación funcional",
-      "estMin": 25,
-      "when": "Después de E03. Tiene 4 partes (A a D). Al terminar mandas el único mensaje de la prueba.",
-      "where": "Barra de abajo de la app: **Menú › pestaña Sucursal** (Parte A), **Más › Mi app › Promociones y banners** (Parte B), **Más › Configuración de sucursal › Envío y zona de entrega** (Parte C) y **Más › Configuración de sucursal › Reglas de pedidos y pagos** (Parte D).",
+      "estMin": 12,
+      "when": "Después de E03.",
+      "where": "Barra de abajo de la app › **Menú › pestaña Sucursal**",
       "warnings": [
         "Tu sucursal empieza **sin nada creado**: no hay categorías, productos, variantes ni complementos. En **Menú › Sucursal** debe decir «Aún no hay productos. Agrega el primero.». Si ya ves productos o categorías, **no los borres**: toca **Reportar falla** y crea solo lo que falte."
       ],
       "notes": "**Cómo leer las tablas** (en **Datos para tu sucursal**): el precio del producto es el de la Chica. La variante es el tamaño con su precio: va en **Variantes**. Los extras van en **Complementos**. Con los tamaños quedan: Hawaiana $120 · $150 · $180 y Pepperoni $110 · $140 · $170.",
+      "expected": [
+        "El menú quedó completo: categoría Pizzas, 2 pizzas con sus 3 tamaños y extras, sin grupos repetidos."
+      ],
       "steps": [
         {
           "id": "A1",
@@ -504,7 +510,7 @@
         },
         {
           "id": "A2",
-          "text": "**Paso 1 · Crea la categoría Pizzas.** En **Menú**, toca la pestaña **Sucursal (1)** y luego **Agregar (2)**, abajo a la derecha.",
+          "text": "**Crea la categoría Pizzas.** En **Menú**, toca la pestaña **Sucursal (1)** y luego **Agregar (2)**, abajo a la derecha.",
           "image": "/guides/establecimiento-app/m-e04-01-menu-agregar.jpg",
           "caption": "1 = pestaña Sucursal · 2 = Agregar · 3 = Nueva categoría propia · 4 = Agregar producto"
         },
@@ -522,7 +528,7 @@
         },
         {
           "id": "A5",
-          "text": "**Paso 2 · Crea la Pizza Hawaiana con su variante y su complemento.** Toca **Agregar › Agregar producto (4)**.",
+          "text": "**Crea la Pizza Hawaiana con su variante y su complemento.** Toca **Agregar › Agregar producto (4)**.",
           "image": "/guides/establecimiento-app/m-e04-01-menu-agregar.jpg",
           "caption": "1 = pestaña Sucursal · 2 = Agregar · 3 = Nueva categoría propia · 4 = Agregar producto"
         },
@@ -567,7 +573,7 @@
         },
         {
           "id": "A12",
-          "text": "**Paso 3 · Crea la Pizza Pepperoni.** Toca **Agregar › Agregar producto**. Escribe el **Nombre** «Pizza Pepperoni» y el **Precio** 110, deja encendido **Disponible hoy** y en **Categoría** elige «Pizzas».",
+          "text": "**Crea la Pizza Pepperoni.** Toca **Agregar › Agregar producto**. Escribe el **Nombre** «Pizza Pepperoni» y el **Precio** 110, deja encendido **Disponible hoy** y en **Categoría** elige «Pizzas».",
           "dataButton": true
         },
         {
@@ -601,7 +607,21 @@
               "La Pepperoni usa el mismo grupo «Tamaño de pizza» que la Hawaiana; no hay grupos repetidos."
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "id": "E04-B",
+      "title": "Prepara tu sucursal · Crea la promoción",
+      "priority": "critica",
+      "quality": "Adecuación funcional",
+      "estMin": 5,
+      "when": "Después de E04-A.",
+      "where": "Barra de abajo de la app › **Más › Mi app › Promociones y banners**",
+      "expected": [
+        "La promoción Pizza Hawaiana 20 % aparece como Vigente."
+      ],
+      "steps": [
         {
           "id": "B1",
           "text": "**Parte B · Crea la promoción Pizza Hawaiana 20 %** (hazlo después de crear las pizzas de la Parte A). Ruta: barra de abajo › **Más** › **Mi app** › **Promociones y banners**. Toca **Agregar (1)** y luego **Promoción (2)**.",
@@ -661,7 +681,21 @@
               "La promoción Pizza Hawaiana 20 % quedó guardada y aparece como Vigente."
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "id": "E04-C",
+      "title": "Prepara tu sucursal · Escribe el costo de envío",
+      "priority": "critica",
+      "quality": "Adecuación funcional",
+      "estMin": 4,
+      "when": "Después de E04-B.",
+      "where": "Barra de abajo de la app › **Más › Configuración de sucursal › Envío y zona de entrega**",
+      "expected": [
+        "El envío quedó en 3 km con $25 / $35 / $45, sin envío gratis, y se conservó al salir y volver a entrar."
+      ],
+      "steps": [
         {
           "id": "C1",
           "text": "**Parte C · Escribe el costo de envío.** Ruta: barra de abajo › **Más** › **Configuración de sucursal** › **Envío y zona de entrega**. Escribe: **Tarifa base** 25 **(1)**, **Kilómetros incluidos** 1 **(2)** y **Cada kilómetro adicional** 10 **(3)**.",
@@ -704,7 +738,21 @@
               "Al salir y volver a entrar, los valores se conservaron."
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "id": "E04-D",
+      "title": "Prepara tu sucursal · Revisa pagos, topes y horario",
+      "priority": "critica",
+      "quality": "Adecuación funcional",
+      "estMin": 4,
+      "when": "Después de E04-C. Al terminar mandas el único mensaje de la prueba.",
+      "where": "Barra de abajo de la app › **Más › Configuración de sucursal › Reglas de pedidos y pagos**",
+      "expected": [
+        "Tu sucursal quedó lista: 5 minutos para aceptar, pago con tarjeta, topes de $1,000 y $700, y el horario cubre la prueba."
+      ],
+      "steps": [
         {
           "id": "D1",
           "text": "**Parte D · Revisa tiempo para confirmar, pagos, topes y horario.** Ruta: barra de abajo › **Más** › **Configuración de sucursal** › **Reglas de pedidos y pagos**. Baja hasta **En tu app › Pagos**: **Aceptar pago con tarjeta en tu app (1)** debe estar encendido. Lo deja listo el representante legal: solo revísalo.",
@@ -736,7 +784,7 @@
         },
         {
           "id": "D-OK",
-          "text": "Para cerrar E04, confirma que terminaste la Parte D.",
+          "text": "Para cerrar, confirma que tu sucursal quedó lista.",
           "checkpoint": {
             "title": "Parte D · Tu sucursal quedó lista",
             "items": [
@@ -748,12 +796,6 @@
             ]
           }
         }
-      ],
-      "expected": [
-        "Parte A · El menú quedó completo: categoría Pizzas, 2 pizzas con sus 3 tamaños y extras, sin grupos repetidos.",
-        "Parte B · La promoción Pizza Hawaiana 20 % aparece como Vigente.",
-        "Parte C · El envío quedó en 3 km con $25 / $35 / $45, sin envío gratis, y se conservó al salir y volver a entrar.",
-        "Parte D · Tu sucursal quedó lista: 5 minutos para aceptar, pago con tarjeta, topes de $1,000 y $700, y el horario cubre la prueba."
       ],
       "fields": [
         {
@@ -779,7 +821,7 @@
       "priority": "alta",
       "quality": "Adecuación funcional",
       "estMin": 3,
-      "when": "Después de E04.",
+      "when": "Después de E04-D.",
       "where": "Estado de la sucursal, arriba en cualquier pantalla de la app.",
       "steps": [
         {
@@ -890,7 +932,7 @@
       "pairWith": "Cliente: C06 y C08",
       "when": "Con cada pedido, excepto los 3 que elijas para E08 y E09.",
       "where": "Barra de abajo de la app › **Pedidos**.",
-      "notes": "Qué haces según lo que dice el pedido: **Esperando tu respuesta**: tocas **Confirmar** antes de 5 minutos y eliges el tiempo de preparación. **En la cocina / En preparación**: cocinas; al terminar de empacar tocas **Marcar listo**. **En cola**: espera repartidor; no hay que tocar nada (E11). **Asignado · En ruta · Entregado**: lo mueve el repartidor; no toques **Reasignar** ni **Quitar asignación**.",
+      "notes": "Qué haces según lo que dice el pedido: **Esperando tu respuesta**: tocas **Confirmar** antes de 5 minutos y eliges el tiempo de preparación. **En la cocina / En preparación**: cocinas; al terminar de empacar tocas **Marcar listo**. **En cola**: espera repartidor; no hay que tocar nada (E10). **Asignado · En ruta · Entregado**: lo mueve el repartidor; no toques **Reasignar** ni **Quitar asignación**.",
       "steps": [
         {
           "id": "1",
@@ -1110,7 +1152,7 @@
       ]
     },
     {
-      "id": "E11",
+      "id": "E10",
       "title": "Revisa la asignación de repartidor",
       "priority": "critica",
       "quality": "Adecuación funcional",
@@ -1118,7 +1160,6 @@
       "pairWith": "Cliente: C08 · Repartidor",
       "when": "Con cada pedido que marques como listo.",
       "where": "Barra de abajo de la app › **Pedidos**.",
-      "notes": "La actividad sigue llamándose E11 aunque ya no hay E10: así se mantiene la numeración de la prueba.",
       "steps": [
         {
           "id": "1",

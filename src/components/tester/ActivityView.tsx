@@ -88,52 +88,13 @@ export default function ActivityView({
   // Errores del cierre (se muestran después del primer intento de guardar)
   const [tried, setTried] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
-  // Pasos de la pantalla que ya pasaron por la vista (el botón Listo se habilita al ver todos)
-  const [seen, setSeen] = useState<Record<string, boolean>>({});
-  // Lista de pasos de la pantalla actual (al cambiar de pantalla, la anterior sigue un instante en el DOM)
-  const stepsList = () => document.querySelector<HTMLElement>(`[data-steps="${activity.id}-${pos}"]`);
   const closingRef = useRef<HTMLDivElement>(null);
-  // Los avisos flotantes van arriba de la barra fija de botones
-  useToastOffset(desktop ? 96 : 150);
-
-  // «Llegó al final»: el fondo de la lista de pasos queda arriba de la barra fija de botones. Solo se
-  // cuenta cuando las capturas ya cargaron (antes, la página mide menos y parecería que ya llegó).
-  useEffect(() => {
-    const root = stepsList();
-    if (!root) return;
-    const lastId = root.querySelector<HTMLElement>("[data-step-id]:last-of-type")?.dataset.stepId;
-    if (!lastId) return;
-    let raf = 0;
-    const check = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        const imgs = Array.from(root.querySelectorAll("img"));
-        if (imgs.some((im) => !im.complete)) return;
-        const bar = document.querySelector<HTMLElement>("[data-step-actions]");
-        const barTop = bar ? bar.getBoundingClientRect().top : window.innerHeight;
-        const limit = Math.min(window.innerHeight, barTop) + 8;
-        if (root.getBoundingClientRect().bottom <= limit) setSeen((m) => (m[lastId] ? m : { ...m, [lastId]: true }));
-      });
-    };
-    // Primera revisión cuando terminó la animación de entrada de la pantalla
-    const t = setTimeout(check, 450);
-    window.addEventListener("scroll", check, { passive: true });
-    window.addEventListener("resize", check);
-    root.addEventListener("load", check, true);
-    return () => {
-      clearTimeout(t);
-      cancelAnimationFrame(raf);
-      window.removeEventListener("scroll", check);
-      window.removeEventListener("resize", check);
-      root.removeEventListener("load", check, true);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pos, desktop, activity.id]);
+  // Los avisos flotantes van arriba de la barra fija de botones (una sola fila en celular)
+  useToastOffset(desktop ? 96 : 90);
 
   const go = (p: number) => {
     setDir(p >= pos ? "next" : "prev");
     setPos(p);
-    setSeen({});
     // Pantalla nueva: la vista queda al inicio de su contenido, no hasta arriba de la página
     const el = document.querySelector<HTMLElement>("[data-activity-content]");
     const top = el ? el.getBoundingClientRect().top + window.scrollY - (desktop && window.innerWidth >= 1024 ? 24 : 150) : 0;
@@ -252,8 +213,20 @@ export default function ActivityView({
   // Pantalla de cierre de la actividad
   if (pos >= screens.length) {
     const failed = steps.some((s) => state.steps[stepKey(activity.id, s.id)] === "fail");
-    const allChecked = activity.expected.every((_, i) => draft.checks[String(i)] !== undefined);
-    const anyNo = activity.expected.some((_, i) => draft.checks[String(i)] === false);
+    // Lo ya confirmado en las casillas de cada parte se marca solo como «Sí» (una casilla de confirmación por punto)
+    const cps = steps.filter((s) => s.checkpoint);
+    const auto: Record<string, boolean> = {};
+    if (!failed && cps.length === activity.expected.length)
+      cps.forEach((s, i) => {
+        if (checkpointDone(s)) auto[String(i)] = true;
+      });
+    const checks: ActivityState["checks"] = { ...auto, ...draft.checks };
+    const autoUsed = Object.keys(auto).some((k) => draft.checks[k] === undefined);
+    const allChecked = activity.expected.every((_, i) => checks[String(i)] !== undefined);
+    const anyNo = activity.expected.some((_, i) => checks[String(i)] === false);
+    const allReportChoices = steps.filter((s) => !s.checkpoint).map((s) => s.id);
+    const openFailReport = () =>
+      allReportChoices.length > 1 ? onReport("issue", undefined, false, allReportChoices) : onReport("issue", allReportChoices[0], false);
     // El resultado se sugiere solo (con falla si algún paso o punto salió mal); el tester lo puede cambiar
     const suggested: ActivityResult | undefined = failed || anyNo ? "issue" : allChecked ? "ok" : undefined;
     const result = draft.result ?? suggested;
@@ -292,7 +265,21 @@ export default function ActivityView({
         }))
       )
         return;
-      onSave({ ...draft, result, fields: trimAll(draft.fields), notes: draft.notes.trim(), done: true });
+      // «Tuvo alguna falla» sin reporte: se ofrece abrir el reporte ya con la actividad
+      if (result === "issue" && issuesFor().filter((i) => i.kind === "issue").length === 0) {
+        const report = await confirm({
+          title: "¿Reportas la falla?",
+          message: `Marcaste «${ACTIVITY_RESULTS.issue}» pero no hay ningún reporte en ${activity.id}. Cuéntanos qué pasó para que el equipo la pueda revisar.`,
+          confirmLabel: "Reportar la falla",
+          cancelLabel: "Guardar sin reporte",
+        });
+        if (report) {
+          setDraft({ ...draft, checks, result });
+          openFailReport();
+          return;
+        }
+      }
+      onSave({ ...draft, checks, result, fields: trimAll(draft.fields), notes: draft.notes.trim(), done: true });
     };
     return (
       <>
@@ -311,12 +298,14 @@ export default function ActivityView({
               <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <h2 className={"font-semibold" + dk("lg:text-lg")}>Resultado esperado</h2>
-                  <p className="text-sm text-slate-600">¿Pasó lo que dice cada punto?</p>
+                  <p className="text-sm text-slate-600">
+                    ¿Pasó lo que dice cada punto?{autoUsed ? " Marcamos «Sí» en lo que ya confirmaste en las casillas; cámbialo si no fue así." : ""}
+                  </p>
                 </div>
               </div>
               <ul className="divide-y divide-slate-100">
                 {activity.expected.map((item, i) => {
-                  const v = draft.checks[String(i)];
+                  const v = checks[String(i)];
                   const e = expectedText(item);
                   const cond = expectedConditional(item);
                   return (
@@ -340,7 +329,7 @@ export default function ActivityView({
                             key={label as string}
                             type="button"
                             aria-pressed={v === val}
-                            onClick={() => setDraft({ ...draft, checks: { ...draft.checks, [String(i)]: val } })}
+                            onClick={() => setDraft({ ...draft, checks: { ...checks, [String(i)]: val } })}
                             whileTap={reduce ? { opacity: 0.8 } : { scale: 0.92 }}
                             animate={v === val && !reduce ? { scale: [1, 1.08, 1] } : { scale: 1 }}
                             transition={{ duration: 0.25 }}
@@ -452,7 +441,11 @@ export default function ActivityView({
                       key={r}
                       type="button"
                       aria-pressed={result === r}
-                      onClick={() => setDraft({ ...draft, result: r })}
+                      onClick={() => {
+                        setDraft({ ...draft, result: r });
+                        // «Tuvo alguna falla» abre el reporte ya con la actividad, si todavía no hay uno
+                        if (r === "issue" && result !== "issue" && !issuesFor().some((i) => i.kind === "issue")) openFailReport();
+                      }}
                       whileHover={reduce ? undefined : { x: 2 }}
                       whileTap={reduce ? { opacity: 0.8 } : { scale: 0.96 }}
                       animate={result === r && !reduce ? { scale: [1, 1.04, 1] } : { scale: 1 }}
@@ -497,7 +490,7 @@ export default function ActivityView({
 
               {issuesFor().length > 0 && (
                 <div className={card}>
-                  <IssueList issues={issuesFor()} />
+                  <IssueList issues={issuesFor()} steps={steps} />
                 </div>
               )}
             </div>
@@ -541,10 +534,9 @@ export default function ActivityView({
   const outcomeOf = (s: Activity["steps"][number]) => state.steps[stepKey(activity.id, s.id)];
   const screenIssues = state.issues.filter((i) => i.activityId === activity.id && screenSteps.some((s) => s.id === i.stepId));
 
-  // Todos los pasos de la pantalla en una sola tarjeta, cada uno con su captura. «Listo, siguiente»
-  // se habilita cuando el tester llegó al final de la sección (o ya la había marcado).
+  // Todos los pasos de la pantalla en una sola tarjeta, cada uno con su captura (pequeña en celular).
+  // «Listo, siguiente» se puede tocar sin bajar hasta el final.
   const lastStep = screenSteps[screenSteps.length - 1];
-  const atEnd = !!seen[lastStep.id] || screenDone(screen);
   const reportChoices = screenSteps.filter((s) => !s.checkpoint).map((s) => s.id);
   const cpPending = screenSteps.some((s) => s.checkpoint && !checkpointDone(s));
   const next = () => {
@@ -672,7 +664,7 @@ export default function ActivityView({
                   )}
                   {s.image && (
                     <div className={"mt-3" + dk("lg:max-w-2xl")} data-testid="screenshots">
-                      <StepImage key={s.image} src={s.image} caption={s.caption} desktop={desktop} />
+                      <StepImage key={s.image} src={s.image} caption={s.caption} desktop={desktop} compact />
                     </div>
                   )}
                   {o === "fail" && <p className="mt-2 text-sm font-medium text-rose-700">Reportaste una falla en este paso.</p>}
@@ -698,7 +690,7 @@ export default function ActivityView({
       </ol>
       {screenIssues.length > 0 && (
         <div className="border-t border-slate-100 p-4">
-          <IssueList issues={screenIssues} />
+          <IssueList issues={screenIssues} steps={steps} />
         </div>
       )}
     </div>
@@ -713,50 +705,47 @@ export default function ActivityView({
       }
     >
       {blocked ? (
-        <p className="mb-2 text-center text-xs font-medium text-rose-700">Actividad en pausa: pide ayuda al guía para continuar.</p>
-      ) : !atEnd ? (
-        <p className="mb-2 text-center text-sm font-medium text-slate-700" id={`end-hint-${activity.id}-${pos}`}>
-          ↓ Baja hasta el final de las instrucciones para seguir
-        </p>
+        <p className="mb-1.5 text-center text-xs font-medium text-rose-700">Actividad en pausa: pide ayuda al guía para continuar.</p>
       ) : cpPending ? (
-        <p className="mb-2 text-center text-xs font-medium text-slate-700" id={`cp-hint-${activity.id}-${pos}`}>
+        <p className="mb-1.5 text-center text-xs font-medium text-slate-700" id={`cp-hint-${activity.id}-${pos}`}>
           Marca todas las casillas para poder seguir.
         </p>
-      ) : (
-        <p className="mb-2 text-center text-sm font-medium text-slate-700">¿Hiciste {screenSteps.length > 1 ? "estos pasos" : "este paso"}?</p>
-      )}
-      <Button
-        variant="success"
-        size="lg"
-        className="w-full"
-        disabled={blocked || cpPending || !atEnd}
-        aria-describedby={!atEnd ? `end-hint-${activity.id}-${pos}` : cpPending ? `cp-hint-${activity.id}-${pos}` : undefined}
-        pulse={!blocked && !cpPending && atEnd && !screenDone(screen)}
-        onClick={next}
-        data-testid="screen-next"
-      >
-        {screenDone(screen) ? "Siguiente →" : "✓ Listo, siguiente"}
-      </Button>
-      <div className={"mt-1 flex items-center justify-between text-sm" + dk("lg:mt-2")}>
-        <button
-          type="button"
+      ) : null}
+      <div className={"flex items-center gap-2" + dk("lg:gap-3")}>
+        <Button
+          variant="outline"
+          size="lg"
           disabled={pos === 0}
           onClick={() => go(pos - 1)}
-          className={"min-h-11 px-2 py-2 text-slate-600 disabled:opacity-30" + dk("lg:rounded-lg lg:hover:bg-slate-100 lg:hover:text-slate-800")}
+          aria-label="Pantalla anterior"
+          className="shrink-0 px-3 disabled:opacity-30"
         >
-          ← Pantalla anterior
-        </button>
-        <button
-          type="button"
+          ←
+        </Button>
+        <Button
+          variant="success"
+          size="lg"
+          className="min-w-0 flex-1"
+          disabled={blocked || cpPending}
+          aria-describedby={cpPending ? `cp-hint-${activity.id}-${pos}` : undefined}
+          pulse={!blocked && !cpPending && !screenDone(screen)}
+          onClick={next}
+          data-testid="screen-next"
+        >
+          {screenDone(screen) ? "Siguiente →" : "✓ Listo, siguiente"}
+        </Button>
+        <Button
+          variant="outline"
+          size="lg"
           disabled={blocked}
           onClick={() =>
             reportChoices.length > 1 ? onReport("issue", undefined, true, reportChoices) : onReport("issue", reportChoices[0] ?? lastStep.id, reportChoices.length === 1)
           }
-          className={"min-h-11 px-2 py-2 font-semibold text-rose-700 disabled:opacity-30" + dk("lg:rounded-lg lg:hover:bg-rose-50")}
+          className={"w-[108px] shrink-0 px-2 text-xs font-semibold leading-tight text-rose-700 ring-rose-200 disabled:opacity-30" + dk("lg:w-auto lg:px-4 lg:text-sm")}
           data-testid="screen-problem"
         >
           ✗ Tuve un problema
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -841,7 +830,7 @@ function FieldPicker({
   }
 }
 
-function IssueList({ issues }: { issues: Issue[] }) {
+function IssueList({ issues, steps }: { issues: Issue[]; steps: Activity["steps"] }) {
   if (!issues.length) return null;
   return (
     <ul className="space-y-2">
@@ -854,7 +843,7 @@ function IssueList({ issues }: { issues: Issue[] }) {
         >
           <div className="font-medium">
             {i.kind === "issue" ? "Falla reportada" : "Captura adjunta"}
-            {i.stepId ? ` · paso ${i.stepId}` : ""}
+            {i.stepId ? ` · paso ${steps.findIndex((s) => s.id === i.stepId) + 1 || i.stepId}` : ""}
             {i.attachments.length > 0 && ` · ${i.attachments.length} archivo(s)`}
           </div>
           {i.description && <p className="mt-0.5 text-slate-700">{i.description}</p>}

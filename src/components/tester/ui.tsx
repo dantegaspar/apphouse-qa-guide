@@ -228,6 +228,7 @@ export function StepImage({
   desktop = false,
   captionAside = false,
   flash = false,
+  compact = false,
 }: {
   src: string;
   caption?: string;
@@ -236,6 +237,8 @@ export function StepImage({
   captionAside?: boolean;
   /** Resalta un instante la leyenda (al cambiar de paso). */
   flash?: boolean;
+  /** En celular la captura se muestra pequeña con «Ver captura» (en la guía de escritorio, grande desde lg). */
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState<null | "tap" | "button">(null);
   const [wide, setWide] = useState(false);
@@ -249,7 +252,8 @@ export function StepImage({
     : wide
       ? "w-full"
       : "mx-auto w-full max-w-[280px]";
-  return (
+  const lightbox = open && <Lightbox src={src} caption={caption} nativeFullscreen={open === "button"} onClose={() => setOpen(null)} />;
+  const full = (
     <figure className={`${box} ${desktop ? "group relative" : ""}`} data-wide={wide ? "true" : "false"}>
       <button
         type="button"
@@ -292,8 +296,35 @@ export function StepImage({
           </figcaption>
         )
       )}
-      {open && <Lightbox src={src} caption={caption} nativeFullscreen={open === "button"} onClose={() => setOpen(null)} />}
     </figure>
+  );
+  if (!compact)
+    return (
+      <>
+        {full}
+        {lightbox}
+      </>
+    );
+  return (
+    <>
+      <div className={desktop ? "lg:hidden" : ""}>
+        <button
+          type="button"
+          onClick={() => setOpen("tap")}
+          className="flex w-full items-center gap-3 rounded-xl bg-slate-50 p-2 text-left ring-1 ring-slate-200 hover:bg-slate-100"
+          data-testid="step-image-compact"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={src} alt="" className="h-14 w-14 shrink-0 rounded-lg bg-white object-cover object-top ring-1 ring-slate-200" loading="lazy" />
+          <span className="min-w-0 flex-1 text-sm">
+            <span className="font-semibold text-brand-700">🔍 Ver captura</span>
+            {caption && <span className="block text-xs text-slate-600">{caption}</span>}
+          </span>
+        </button>
+      </div>
+      {desktop && <div className="hidden lg:block">{full}</div>}
+      {lightbox}
+    </>
   );
 }
 

@@ -597,7 +597,7 @@
       "priority": "critica",
       "quality": "Adecuación funcional",
       "estMin": 15,
-      "pairWith": "Establecimiento: E07 y E11 · Repartidor",
+      "pairWith": "Establecimiento: E07 y E10 · Repartidor",
       "when": "Con el pedido que pagaste en C06.",
       "where": "Menú de abajo › **Pedidos**.",
       "steps": [

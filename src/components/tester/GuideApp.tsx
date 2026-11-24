@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import type { Guide } from "@/lib/types";
@@ -93,7 +93,6 @@ export default function GuideApp({
   }, [saved]);
   const [report, setReport] = useState<{ kind: "issue" | "evidence"; activityId: string; stepId?: string; markFail?: boolean; choices?: string[] } | null>(null);
 
-  const totalSteps = useMemo(() => guide.activities.reduce((n, a) => n + a.steps.length, 0), [guide]);
   // Guía de escritorio: en pantallas ≥1024 px (lg) usa barra lateral y vistas anchas
   const desktop = guide.layout === "desktop";
   const dk = (c: string) => (desktop ? " " + c : "");
@@ -213,11 +212,9 @@ export default function GuideApp({
   if (!state || state.guideVersion === undefined)
     return <Identify guide={guide} desktop={desktop} variantCtl={variantCtl} onDone={(s) => commit(s)} />;
 
-  const answered = guide.activities.reduce(
-    (n, a) => n + a.steps.filter((s) => state.steps[stepKey(a.id, s.id)]).length,
-    0
-  );
   const doneActs = guide.activities.filter((a) => state.activities[a.id]?.done).length;
+  // Una sola medida de avance (actividades guardadas) y el tiempo que falta, según los minutos de cada actividad
+  const minsLeft = guide.activities.filter((a) => !state.activities[a.id]?.done).reduce((n, a) => n + (a.estMin ?? 0), 0);
   const failCount = state.issues.filter((i) => i.kind === "issue").length;
 
   const topbar = (
@@ -430,9 +427,9 @@ export default function GuideApp({
             <span>
               {doneActs} de {guide.activities.length} actividades
             </span>
-            <CountUp value={Math.round((answered / totalSteps) * 100)} suffix="%" className="text-base font-bold tabular-nums" />
+            <span className="font-semibold" data-testid="time-left">{minsLeft > 0 ? `Faltan unos ${minsLeft} min` : "¡Todas guardadas!"}</span>
           </div>
-          <ProgressBar value={answered / totalSteps} className="mt-1.5" trackClassName="bg-white/30" barClassName="bg-white" />
+          <ProgressBar value={doneActs / guide.activities.length} className="mt-1.5" trackClassName="bg-white/30" barClassName="bg-white" />
           {failCount > 0 && <p className="mt-3 text-sm opacity-90">Has reportado {failCount} falla(s). ¡Gracias!</p>}
         </section>
 
@@ -560,8 +557,8 @@ export default function GuideApp({
             title={flexible ? "Las primeras van en orden" : "Las actividades van en orden"}
             message={
               flexible
-                ? `Haz en orden hasta ${guide.sequentialUntil}. Después se abren todas y eliges la que te toque. 🔒 quiere decir que todavía no toca.`
-                : "Solo se abre la actividad que sigue. 🔒 quiere decir que todavía no toca o que ya la guardaste."
+                ? `Haz en orden hasta ${guide.sequentialUntil}. Después se abren todas y eliges la que te toque. 🔒 = todavía no toca · ✓ = ya la guardaste.`
+                : "Solo se abre la actividad que sigue. 🔒 = todavía no toca · ✓ = ya la guardaste."
             }
           >
             <h2 className="px-1 text-sm font-semibold uppercase tracking-wide text-slate-600">Actividades</h2>
@@ -596,7 +593,7 @@ export default function GuideApp({
                       : "Pendiente";
               const inner = (
                 <>
-                  <span className="mt-0.5 w-10 shrink-0 text-sm font-bold text-teal-ink">{a.id}</span>
+                  <span className="mt-0.5 w-14 shrink-0 text-sm font-bold text-teal-ink">{a.id}</span>
                     <span className="min-w-0 flex-1">
                       <span className="block font-medium leading-snug">{a.title}</span>
                       <span className="mt-0.5 block text-xs text-slate-600">
@@ -609,8 +606,8 @@ export default function GuideApp({
                       {fails > 0 && <span className="text-xs text-rose-600">{fails} ✗</span>}
                       {open && st?.done && <span className="text-xs font-medium text-brand-700">✎ Corregir</span>}
                       {!open && (
-                        <span className="text-xs text-slate-500" aria-label={st?.done ? "Completada, cerrada" : "Bloqueada"}>
-                          🔒 {st?.done ? "Completada" : ""}
+                        <span className="text-xs text-slate-500" aria-label={st?.done ? "Guardada" : "Todavía no toca"}>
+                          {st?.done ? "✓ Guardada" : "🔒"}
                         </span>
                       )}
                     </span>
@@ -677,8 +674,7 @@ export default function GuideApp({
             currentId={currentAct?.id}
             isOpen={isOpen}
             canFinish={canFinish}
-            answered={answered}
-            totalSteps={totalSteps}
+            minsLeft={minsLeft}
             doneActs={doneActs}
             nav={nav}
             fresh={fresh}
@@ -705,7 +701,7 @@ export default function GuideApp({
         allowedMime={allowedMime}
         reportExample={guide.reportExample}
         orderExample={guide.orderExample}
-        context={reportActivity ? `${reportActivity.id} · ${reportActivity.title}${report?.stepId && !report.choices ? ` · Paso ${report.stepId}` : ""}` : ""}
+        context={reportActivity ? `${reportActivity.id} · ${reportActivity.title}${report?.stepId && !report.choices ? ` · Paso ${reportActivity.steps.findIndex((x) => x.id === report.stepId) + 1}` : ""}` : ""}
         steps={
           reportActivity && report?.choices
             ? report.choices.map((id) => {
@@ -814,8 +810,7 @@ function Sidebar({
   view,
   currentId,
   canFinish,
-  answered,
-  totalSteps,
+  minsLeft,
   doneActs,
   nav,
   fresh = [],
@@ -830,12 +825,10 @@ function Sidebar({
   view: View;
   currentId?: string;
   canFinish: boolean;
-  answered: number;
-  totalSteps: number;
+  minsLeft: number;
   doneActs: number;
   nav: (v: View) => void;
 }) {
-  const pct = Math.round((answered / totalSteps) * 100);
   const reduce = useReducedMotion();
   const item = (active: boolean) =>
     `flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm transition ${
@@ -851,9 +844,9 @@ function Sidebar({
             <span>
               {doneActs} de {guide.activities.length} actividades
             </span>
-            <CountUp value={pct} suffix="%" className="font-semibold tabular-nums text-slate-700" />
+            <span className="font-semibold text-slate-700">{minsLeft > 0 ? `Faltan ~${minsLeft} min` : "Todas guardadas"}</span>
           </div>
-          <ProgressBar value={answered / totalSteps} className="mt-1.5" />
+          <ProgressBar value={doneActs / guide.activities.length} className="mt-1.5" />
         </div>
 
         <nav className="min-h-0 flex-1 overflow-y-auto p-2">
@@ -883,7 +876,7 @@ function Sidebar({
               const inner = (
                 <>
                   <span
-                    className={`flex h-6 w-9 shrink-0 items-center justify-center rounded-md text-[11px] font-bold ${
+                    className={`flex h-6 w-12 shrink-0 items-center justify-center rounded-md text-[11px] font-bold ${
                       active ? "bg-brand-500 text-white" : open ? "bg-brand-100 text-brand-700" : "bg-slate-100 text-slate-600"
                     }`}
                   >
@@ -895,14 +888,14 @@ function Sidebar({
                       {done ? (
                         <>
                           <span className={`mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle ${RESULT_DOT[st.result ?? "ok"]}`} />
-                          {open ? "Guardada · ✎ corregir" : "🔒 Completada"}
+                          {open ? "✓ Guardada · ✎ corregir" : "✓ Guardada"}
                         </>
                       ) : paused ? (
                         <span className="font-medium text-rose-600">En pausa</span>
                       ) : open ? (
                         n > 0 ? `En curso · ${n}/${a.steps.length} pasos` : `${isCurrent ? "Siguiente" : "Abierta"} · ${a.steps.length} pasos`
                       ) : (
-                        `🔒 ${state.ended ? "No realizada" : "Bloqueada"}`
+                        state.ended ? "No realizada" : "🔒 Todavía no toca"
                       )}
                     </span>
                   </span>
@@ -1321,7 +1314,12 @@ function Summary({
       <h1 className={"text-2xl font-bold" + dk("lg:text-3xl")}>Resumen de tu prueba</h1>
       <motion.div {...staggerList()} className={"grid grid-cols-3 gap-2 text-center" + dk("lg:gap-4")}>
         <Stat n={guide.activities.length - pending.length} label="Actividades listas" />
-        <Stat n={Object.values(state.steps).filter((o) => o === "ok").length} label="Pasos logrados" />
+        <Stat
+          n={guide.activities
+            .filter((a) => ["ok", "issue"].includes(state.activities[a.id]?.result ?? ""))
+            .reduce((n, a) => n + a.steps.filter((s) => state.steps[stepKey(a.id, s.id)] === "ok").length, 0)}
+          label="Pasos logrados"
+        />
         <Stat n={issues.length} label="Fallas reportadas" tone={issues.length ? "warn" : undefined} />
       </motion.div>
       {state.ended && (
@@ -1341,15 +1339,18 @@ function Summary({
           return (
             <motion.li key={a.id} {...staggerItem(reduce)}>
               <div className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm">
-                <span className="w-9 font-bold text-teal-ink">{a.id}</span>
+                <span className="w-14 shrink-0 font-bold text-teal-ink">{a.id}</span>
                 {desktop && <span className="hidden w-56 shrink-0 truncate text-slate-600 lg:block">{a.title}</span>}
                 <span className="flex-1">
                   <span className="block font-medium">{st.done && st.result ? ACTIVITY_RESULTS[st.result] : state.ended ? "No realizada" : "Pendiente"}</span>
                   <span className="text-xs text-slate-600">
-                    ✓ {ok} · ✗ {fail} de {a.steps.length} pasos{nIssues ? ` · ${nIssues} reporte(s)` : ""}
+                    {st.result === "skipped" || st.result === "blocked"
+                      ? `${ok + fail} de ${a.steps.length} pasos vistos`
+                      : `✓ ${ok} logrados · ✗ ${fail} de ${a.steps.length} pasos`}
+                    {nIssues ? ` · ${nIssues} reporte(s)` : ""}
                   </span>
                 </span>
-                <span className="text-slate-500" aria-label="Cerrada">🔒</span>
+                {st.done && <span className="text-emerald-700" aria-label="Guardada">✓</span>}
               </div>
             </motion.li>
           );
@@ -1364,7 +1365,7 @@ function Summary({
               <li key={i.id} className="rounded-xl bg-white p-3 text-sm shadow-sm ring-1 ring-slate-200">
                 <div className="text-xs font-semibold text-rose-700">
                   {i.activityId}
-                  {i.stepId ? ` · paso ${i.stepId}` : ""} {i.blocking ? "· impide seguir" : i.severity === "bajo" ? "· detalle" : ""}
+                  {i.stepId ? ` · paso ${(guide.activities.find((a) => a.id === i.activityId)?.steps.findIndex((x) => x.id === i.stepId) ?? -1) + 1 || i.stepId}` : ""} {i.blocking ? "· impide seguir" : i.severity === "bajo" ? "· detalle" : ""}
                 </div>
                 <p className="mt-0.5">{i.description}</p>
                 {i.attachments.length > 0 && <p className="mt-1 text-xs text-slate-600">📎 {i.attachments.length} archivo(s)</p>}
