@@ -1135,7 +1135,26 @@ function Identify({
           </FormField>
           {guide.tester.fields.map((f) => (
             <FormField key={f.id} id={`t-${f.id}`} label={`${f.label}${f.required ? " *" : ""}`} error={shown[f.id]} hint={f.patternHint}>
-              {(p) => (
+              {(p) =>
+                f.options ? (
+                  <div id={p.id} role="radiogroup" aria-invalid={p["aria-invalid"]} aria-describedby={p["aria-describedby"]} className="flex gap-2">
+                    {f.options.map((o) => (
+                      <button
+                        key={o}
+                        type="button"
+                        role="radio"
+                        aria-checked={fields[f.id] === o}
+                        onClick={() => setFields({ ...fields, [f.id]: o })}
+                        className={
+                          "min-h-11 flex-1 rounded-xl px-4 text-sm font-semibold ring-1 transition " +
+                          (fields[f.id] === o ? "bg-brand-600 text-white ring-brand-600" : "bg-white text-slate-800 ring-slate-300 hover:bg-slate-50")
+                        }
+                      >
+                        {o}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
                 <input
                   {...p}
                   type={f.type === "email" ? "email" : "text"}
@@ -1145,7 +1164,8 @@ function Identify({
                   value={fields[f.id] ?? ""}
                   onChange={(e) => setFields({ ...fields, [f.id]: e.target.value })}
                 />
-              )}
+                )
+              }
             </FormField>
           ))}
           <p className="text-xs text-slate-600">Tu navegador, sistema y tamaño de pantalla se registran automáticamente.</p>

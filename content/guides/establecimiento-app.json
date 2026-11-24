@@ -34,9 +34,9 @@
       },
       {
         "id": "system",
-        "label": "Sistema (Android o iPhone)",
+        "label": "Sistema",
         "type": "text",
-        "placeholder": "Ej. Android",
+        "options": ["Android", "iPhone"],
         "required": true
       }
     ]
@@ -298,7 +298,7 @@
       ],
       "expected": [
         "Entré y vi la pantalla Inicio de mi sucursal.",
-        "La pantalla no se movió mientras escribía.",
+        "La pantalla se quedó fija mientras escribía.",
         {
           "text": "Si mi contraseña era temporal, la app me pidió cambiarla antes de dejarme seguir.",
           "conditional": true
@@ -464,7 +464,7 @@
         }
       ],
       "expected": [
-        "Con los datos vacíos, la app no me dejó guardar y marcó los campos que faltan.",
+        "Con los datos vacíos, la app bloqueó el guardado y marcó los campos que faltan.",
         "Cada repartidor aparece en la lista con su nombre, correo y teléfono correctos.",
         "Activos muestra cuántos repartidores di de alta.",
         {
@@ -931,10 +931,10 @@
         }
       ],
       "expected": [
-        "Cada cambio se guardó al momento y el pedido no regresó al estado anterior.",
+        "Cada cambio se guardó al momento y el pedido se quedó en el estado nuevo.",
         "Los botones salieron en orden: «Marcar listo» apareció hasta después de confirmar el pedido.",
         "El pedido marcado como listo pasó a la asignación de repartidor.",
-        "El pedido en preparación que el cliente intentó cancelar no me llegó como cancelado."
+        "El pedido en preparación que el cliente intentó cancelar siguió activo en mi lista."
       ],
       "fields": [
         {
@@ -1022,7 +1022,7 @@
         }
       ],
       "expected": [
-        "Con «ab», la app no permitió confirmar y explicó el motivo.",
+        "Con «ab», la app bloqueó la confirmación y explicó el motivo.",
         "Con el motivo válido, el pedido quedó como Rechazado o Cancelado.",
         "El motivo quedó guardado en el pedido."
       ],
