@@ -6,6 +6,7 @@ import { GUIDES } from "./guides";
 import { loadCourier } from "./courier-data";
 import { parseRec } from "./admin-data";
 import { computeVerdict, THRESHOLDS } from "./verdict";
+import { BUG_TYPE_HINT, BUG_TYPES, type BugType } from "./types";
 
 /**
  * Dictamen con Claude, en dos pasos:
@@ -28,9 +29,12 @@ const usage = { input: 0, output: 0 };
 const ORIGINS = ["desarrollo", "servidor", "logistica", "tester"] as const;
 const Origin = z.enum(ORIGINS);
 const Sev = z.enum(["critico", "alto", "medio", "bajo"]);
+const BugTypeEnum = z.enum(Object.keys(BUG_TYPES) as [BugType, ...BugType[]]);
 
 const ClassificationSchema = z.object({
-  reportes: z.array(z.object({ id: z.string(), origen: Origin, severidad: Sev, motivo: z.string() })),
+  reportes: z.array(z.object({ id: z.string(), origen: Origin, severidad: Sev, tipo: BugTypeEnum, motivo: z.string() })),
+  /** Tipo de bug de hallazgos ya confirmados por Mesa que todavía no tienen tipo. */
+  tipos: z.array(z.object({ id: z.string(), tipo: BugTypeEnum })),
   pedidos: z.array(
     z.object({ ref: z.string(), ajenos: z.number().int(), origenes: z.array(Origin), motivo: z.string() })
   ),
@@ -139,6 +143,10 @@ export async function runDictamen(): Promise<DictamenRow> {
   const pending = db
     .prepare("SELECT id, run_id, activity_id, severity, triage, description, expected FROM issues WHERE kind = 'issue' AND triage = 'pendiente'")
     .all() as IssueRow[];
+  // Hallazgos del desarrollo que Mesa ya revisó pero todavía no tienen tipo de bug
+  const untyped = db
+    .prepare("SELECT id, run_id, activity_id, severity, triage, description, expected FROM issues WHERE kind = 'issue' AND triage IN ('confirmada', 'corregida') AND bug_type = ''")
+    .all() as IssueRow[];
   const runOf = new Map(runs.map((r) => [r.id, r]));
   const e07 = db.prepare("SELECT run_id, fields FROM activity_results WHERE activity_id = 'E07'").all() as { run_id: string; fields: string }[];
   const failedOrders = e07
@@ -149,8 +157,8 @@ export async function runDictamen(): Promise<DictamenRow> {
   const cRef = new Map(feedback.map((f, i) => [f.id, `R${i + 1}`]));
   const courier = cIssues.map((i) => ({ ref: cRef.get(i.feedback_id) ?? "", problema: scrub(i.description) }));
 
-  let classification: Classification = { reportes: [], pedidos: [], repartidores: [] };
-  if (pending.length || failedOrders.length || courier.length) {
+  let classification: Classification = { reportes: [], tipos: [], pedidos: [], repartidores: [] };
+  if (pending.length || untyped.length || failedOrders.length || courier.length) {
     const data = {
       reportes: pending.map((i) => {
         const r = runOf.get(i.run_id);
@@ -164,6 +172,12 @@ export async function runDictamen(): Promise<DictamenRow> {
           queOcurrio: scrub(i.description),
         };
       }),
+      reportesConfirmadosSinTipo: untyped.map((i) => ({
+        id: i.id,
+        actividad: `${i.activity_id} ${titleOf(runOf.get(i.run_id)?.guide_id ?? "", i.activity_id)}`,
+        queEsperaba: scrub(i.expected),
+        queOcurrio: scrub(i.description),
+      })),
       pedidosFallados: failedOrders,
       repartidores: courier,
     };
@@ -175,6 +189,9 @@ export async function runDictamen(): Promise<DictamenRow> {
 - "logistica": operación de reparto ajena al software (no hubo repartidor disponible, el repartidor dejó de contestar o apareció sin conexión).
 - "tester": el tester se equivocó o no siguió la guía (dato mal escrito, paso saltado, confusión), sin falla real.
 Si hay duda razonable entre desarrollo y otra causa, elige "desarrollo".
+Para cada reporte da también el TIPO de bug (ISO/IEC 25010:2023; aunque el origen no sea desarrollo, elige el más cercano):
+${(Object.keys(BUG_TYPES) as BugType[]).map((k) => `- "${k}" (${BUG_TYPES[k]}): ${BUG_TYPE_HINT[k]}.`).join("\n")}
+En "tipos" da el tipo de cada reporte de «reportesConfirmadosSinTipo» (con su id exacto).
 Para cada reporte da también la severidad del Plan: "critico" solo si hay pedidos o cobros perdidos o duplicados, o datos expuestos; "alto" si no se pudo seguir; "medio" si el flujo sigue pero el resultado está mal; "bajo" para texto o apariencia.
 En "pedidos", por cada prueba con pedidos fallados di cuántos (ajenos) NO son del desarrollo según su «por qué falló» (0 si todos son del desarrollo).
 Devuelve una entrada por cada reporte (con su id exacto), por cada prueba con pedidos fallados y por cada problema de repartidor.
@@ -187,15 +204,18 @@ ${JSON.stringify(data)}`,
 
   // Aplicar: solo a reportes todavía pendientes; Mesa puede cambiarlo después.
   const ids = new Set(pending.map((i) => i.id));
-  const upd = db.prepare("UPDATE issues SET triage = ?, severity = ?, triage_note = ?, triage_at = ? WHERE id = ? AND triage = 'pendiente'");
+  const upd = db.prepare("UPDATE issues SET triage = ?, severity = ?, triage_note = ?, triage_at = ?, bug_type = ? WHERE id = ? AND triage = 'pendiente'");
+  const updType = db.prepare("UPDATE issues SET bug_type = ? WHERE id = ? AND bug_type = ''");
+  const untypedIds = new Set(untyped.map((i) => i.id));
   let applied = 0;
   const ts = now();
   db.transaction(() => {
     for (const c of classification.reportes) {
       if (!ids.has(c.id)) continue;
       const triage = c.origen === "desarrollo" ? "confirmada" : c.origen === "tester" ? "tester" : "externa";
-      applied += upd.run(triage, c.severidad, `Claude (${c.origen}): ${c.motivo}`.slice(0, 1000), ts, c.id).changes;
+      applied += upd.run(triage, c.severidad, `Claude (${c.origen}): ${c.motivo}`.slice(0, 1000), ts, c.tipo, c.id).changes;
     }
+    for (const t of classification.tipos ?? []) if (untypedIds.has(t.id)) updType.run(t.tipo, t.id);
   })();
   const orderAjenos: Record<string, number> = {};
   for (const p of classification.pedidos) {
@@ -302,9 +322,11 @@ export function dictamenGate() {
   };
   const runs = one("SELECT COUNT(*) AS n FROM runs");
   const pendingReports = one("SELECT COUNT(*) AS n FROM issues WHERE kind = 'issue' AND triage = 'pendiente'");
+  // Hallazgos confirmados por Mesa sin tipo de bug: también se mandan a clasificar
+  const untypedBugs = one("SELECT COUNT(*) AS n FROM issues WHERE kind = 'issue' AND triage IN ('confirmada', 'corregida') AND bug_type = ''");
   const e07 = db.prepare("SELECT fields, updated_at FROM activity_results WHERE activity_id = 'E07'").all() as { fields: string; updated_at: string }[];
   const newOrders = e07.filter((a) => Number(parseRec(a.fields).ordersFailed) > 0 && (!since || a.updated_at > since)).length;
   const newCourier = since ? one("SELECT COUNT(*) AS n FROM courier_issues WHERE created_at > ?", since) : one("SELECT COUNT(*) AS n FROM courier_issues");
-  const needed = keyOk && runs > 0 && (!since || pendingReports > 0 || newOrders > 0 || newCourier > 0);
-  return { needed, keyOk, pendingReports, newOrders, newCourier };
+  const needed = keyOk && runs > 0 && (!since || pendingReports > 0 || untypedBugs > 0 || newOrders > 0 || newCourier > 0);
+  return { needed, keyOk, pendingReports, untypedBugs, newOrders, newCourier };
 }

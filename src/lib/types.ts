@@ -133,6 +133,29 @@ export const TRIAGE = {
 } as const;
 export type Triage = keyof typeof TRIAGE;
 
+/**
+ * Tipo de bug de los hallazgos del desarrollo (características de calidad de ISO/IEC 25010:2023 y
+ * clases de IEEE 1044-2009). Lo asigna Claude al procesar los reportes; '' = sin clasificar.
+ */
+export const BUG_TYPES = {
+  diseno: "Diseño o interfaz",
+  funcional: "Funcional (lógica)",
+  datos: "Datos o cálculos",
+  rendimiento: "Rendimiento",
+  compatibilidad: "Compatibilidad o dispositivo",
+  contenido: "Textos o contenido",
+} as const;
+export type BugType = keyof typeof BUG_TYPES;
+/** Qué entra en cada tipo (se muestra en el veredicto y se le da a Claude para clasificar). */
+export const BUG_TYPE_HINT: Record<BugType, string> = {
+  diseno: "se ve mal o confunde: botones encimados, pantalla cortada, colores, navegación poco clara",
+  funcional: "algo no hace lo que debe: un botón no responde, el pedido no cambia de estado, un flujo se corta",
+  datos: "datos o números incorrectos: precios, totales, promociones, horarios, información que no se guarda",
+  rendimiento: "lentitud o congelamiento de la app (no del servidor)",
+  compatibilidad: "falla solo en cierto celular, sistema o navegador",
+  contenido: "textos, ortografía, traducciones o mensajes equivocados",
+};
+
 export type SurveyQuestion = {
   id: string;
   type: "scale" | "nps" | "choice" | "text";

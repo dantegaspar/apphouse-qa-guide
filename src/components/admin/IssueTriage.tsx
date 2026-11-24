@@ -2,17 +2,18 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { LEGACY_SEVERITY, SEVERITIES, SEVERITY_CLASS as SEV_CLASS, TRIAGE, type Severity, type Triage } from "@/lib/types";
+import { BUG_TYPES, LEGACY_SEVERITY, SEVERITIES, SEVERITY_CLASS as SEV_CLASS, TRIAGE, type BugType, type Severity, type Triage } from "@/lib/types";
 
 /** Severidad y revisión de una falla (Mesa de control). Cuentan para el veredicto. */
-export default function IssueTriage({ id, severity, triage }: { id: string; severity: string; triage: string }) {
+export default function IssueTriage({ id, severity, triage, bugType = "" }: { id: string; severity: string; triage: string; bugType?: string }) {
   const router = useRouter();
   const [sev, setSev] = useState<Severity>((severity in SEVERITIES ? severity : LEGACY_SEVERITY[severity] ?? "medio") as Severity);
   const [tri, setTri] = useState<Triage>((triage in TRIAGE ? triage : "pendiente") as Triage);
+  const [bug, setBug] = useState<BugType | "">((bugType in BUG_TYPES ? bugType : "") as BugType | "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const save = async (patch: { severity?: Severity; triage?: Triage }) => {
+  const save = async (patch: { severity?: Severity; triage?: Triage; bugType?: BugType | "" }) => {
     setBusy(true);
     setError(null);
     try {
@@ -55,6 +56,22 @@ export default function IssueTriage({ id, severity, triage }: { id: string; seve
         className="rounded bg-white px-1.5 py-0.5 text-xs ring-1 ring-slate-300"
       >
         {Object.entries(TRIAGE).map(([k, l]) => (
+          <option key={k} value={k}>{l}</option>
+        ))}
+      </select>
+      <select
+        aria-label="Tipo de bug"
+        disabled={busy}
+        value={bug}
+        onChange={(e) => {
+          const v = e.target.value as BugType | "";
+          setBug(v);
+          save({ bugType: v });
+        }}
+        className="rounded bg-white px-1.5 py-0.5 text-xs ring-1 ring-slate-300"
+      >
+        <option value="">Tipo: sin clasificar</option>
+        {Object.entries(BUG_TYPES).map(([k, l]) => (
           <option key={k} value={k}>{l}</option>
         ))}
       </select>

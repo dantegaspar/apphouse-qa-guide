@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { isAdmin } from "@/lib/auth";
 import { fmtDate } from "@/lib/admin-data";
-import { PRIORITIES, SEVERITIES, SEVERITY_CLASS as SEV_CLASS, TRIAGE, type Severity } from "@/lib/types";
+import { BUG_TYPE_HINT, BUG_TYPES, PRIORITIES, SEVERITIES, SEVERITY_CLASS as SEV_CLASS, TRIAGE, type Severity } from "@/lib/types";
 import { computeVerdict, EXCLUSION_LABEL, THRESHOLDS, type Criterion } from "@/lib/verdict";
 import { LogoutButton } from "@/components/admin/LogoutButton";
 import { AutoRefresh } from "@/components/admin/AutoRefresh";
@@ -92,7 +92,7 @@ export default async function VerdictPage() {
           29119-3:2021) y aparece el dictamen según la especificación ISO/IEC/IEEE 29119.
         </p>
         <p className="mt-3 text-slate-800">
-          Por procesar: <strong>{gate.pendingReports}</strong> reportes sin revisar · <strong>{gate.newOrders}</strong> pruebas con pedidos
+          Por procesar: <strong>{gate.pendingReports}</strong> reportes sin revisar · <strong>{gate.untypedBugs}</strong> bugs confirmados sin tipo · <strong>{gate.newOrders}</strong> pruebas con pedidos
           fallados nuevos · <strong>{gate.newCourier}</strong> problemas de repartidores nuevos
         </p>
         <div className="mt-4">
@@ -293,6 +293,63 @@ export default async function VerdictPage() {
         </div>
       </section>
 
+      <section data-testid="bug-types">
+        <h2 className="mb-1 text-lg font-semibold text-slate-900">Tipos de bugs encontrados</h2>
+        <p className="mb-3 text-sm text-slate-600">
+          Solo bugs del desarrollo (sin revisar, confirmados o corregidos). Clasificación por característica de calidad de ISO/IEC 25010:2023 y
+          clase de defecto de IEEE 1044-2009.
+        </p>
+        {v.bugTypes.length === 0 ? (
+          <p className="text-sm text-slate-500">Todavía no hay bugs del desarrollo.</p>
+        ) : (
+          <div className="overflow-x-auto rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className={TH}>Tipo</th>
+                  <th className={TH}>Bugs</th>
+                  <th className={TH}>Abiertos</th>
+                  <th className={TH}>Por severidad</th>
+                  <th className={TH}>Ejemplos</th>
+                </tr>
+              </thead>
+              <tbody>
+                {v.bugTypes.map((b) => (
+                  <tr key={b.type || "none"} className="border-t border-slate-100 align-top">
+                    <td className={TH}>
+                      <div className="font-medium text-slate-900">{b.label}</div>
+                      <div className="text-xs text-slate-500">{b.type ? BUG_TYPE_HINT[b.type] : "Mesa los confirmó; se clasifican al procesar con Claude."}</div>
+                    </td>
+                    <td className={`${TH} font-semibold`}>{b.total}</td>
+                    <td className={TH}>{b.open}</td>
+                    <td className={TH}>
+                      <div className="flex flex-wrap gap-1">
+                        {(Object.keys(SEVERITIES) as Severity[]).filter((s) => b.bySeverity[s] > 0).map((s) => (
+                          <span key={s} className={`rounded px-1.5 py-0.5 text-xs font-medium ${SEV_CLASS[s]}`}>
+                            {SEVERITIES[s]}: {b.bySeverity[s]}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className={`${TH} text-xs text-slate-700`}>
+                      <ul className="space-y-1">
+                        {b.examples.slice(0, 3).map((e) => (
+                          <li key={e.id}>
+                            <Link className="font-medium text-[#2F5DA8] hover:underline" href={`/admin/runs/${e.runId}`}>{e.activityId}</Link>{" "}
+                            {e.description.length > 120 ? e.description.slice(0, 118) + "…" : e.description}
+                          </li>
+                        ))}
+                        {b.examples.length > 3 && <li className="text-slate-500">y {b.examples.length - 3} más</li>}
+                      </ul>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
       <section>
         <h2 className="mb-3 text-lg font-semibold text-slate-900">Hallazgos abiertos ({v.defects.length})</h2>
         <div className="mb-3 flex flex-wrap gap-2 text-sm">
@@ -310,6 +367,7 @@ export default async function VerdictPage() {
               <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className={TH}>Severidad</th>
+                  <th className={TH}>Tipo</th>
                   <th className={TH}>Actividad</th>
                   <th className={TH}>Prioridad</th>
                   <th className={TH}>Qué pasó</th>
@@ -321,6 +379,7 @@ export default async function VerdictPage() {
                 {v.defects.map((d) => (
                   <tr key={d.id} className="border-t border-slate-100 align-top">
                     <td className={TH}><span className={`rounded px-1.5 py-0.5 text-xs font-medium ${SEV_CLASS[d.severity]}`}>{SEVERITIES[d.severity]}</span></td>
+                    <td className={`${TH} text-xs`}>{d.bugType ? BUG_TYPES[d.bugType] : "—"}</td>
                     <td className={`${TH} whitespace-nowrap`}>{d.activityId} {d.activityTitle}</td>
                     <td className={TH}>{PRIORITIES[d.priority]}</td>
                     <td className={`${TH} text-slate-700`}>{d.description}</td>

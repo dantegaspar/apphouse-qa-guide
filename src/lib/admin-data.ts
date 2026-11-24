@@ -39,6 +39,8 @@ export type IssueRow = {
   /** Revisión de Mesa de control (ver TRIAGE). */
   triage: string;
   triage_note: string;
+  /** Tipo de bug del desarrollo (ver BUG_TYPES); '' = sin clasificar. */
+  bug_type?: string;
   order_number: string;
   created_at: string;
 };

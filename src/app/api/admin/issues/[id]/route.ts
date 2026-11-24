@@ -1,13 +1,14 @@
 import { getDb, now } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
 import { err, json, readJsonObject, str } from "@/lib/http";
-import { SEVERITIES, TRIAGE } from "@/lib/types";
+import { BUG_TYPES, SEVERITIES, TRIAGE } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 /**
  * Revisión de una falla por Mesa de control: cambia la gravedad y/o el estado de revisión.
- * Cuerpo: { severity?: critico|alto|medio|bajo, triage?: pendiente|confirmada|no_es_falla|externa|tester|duplicada|corregida, note?: string }.
+ * Cuerpo: { severity?: critico|alto|medio|bajo, triage?: pendiente|confirmada|no_es_falla|externa|tester|duplicada|corregida,
+ *   bugType?: diseno|funcional|datos|rendimiento|compatibilidad|contenido|"", note?: string }.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await isAdmin())) return err("No autorizado", 401);
@@ -29,6 +30,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (typeof body.triage !== "string" || !(body.triage in TRIAGE)) return err("Estado inválido");
     sets.push("triage = ?");
     vals.push(body.triage);
+  }
+  if (body.bugType !== undefined) {
+    if (typeof body.bugType !== "string" || (body.bugType !== "" && !(body.bugType in BUG_TYPES))) return err("Tipo de bug inválido");
+    sets.push("bug_type = ?");
+    vals.push(body.bugType);
   }
   if (body.note !== undefined) {
     sets.push("triage_note = ?");

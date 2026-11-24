@@ -207,7 +207,7 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
               <div key={i.id} className="mt-3 rounded-lg border border-red-200 bg-red-50/50 p-3 text-sm">
                 <div className="flex flex-wrap gap-2 text-xs text-slate-500">
                   <span className="font-semibold text-slate-700">{i.kind === "evidence" ? "Evidencia" : "Reporte"}{i.step_id ? ` · paso ${i.step_id}` : ""}</span>
-                  {i.kind === "issue" && <IssueTriage id={i.id} severity={i.severity} triage={i.triage} />}
+                  {i.kind === "issue" && <IssueTriage id={i.id} severity={i.severity} triage={i.triage} bugType={i.bug_type ?? ""} />}
                   {i.order_number && <span>pedido {i.order_number}</span>}
                   <span>{fmtDate(i.created_at)}</span>
                 </div>

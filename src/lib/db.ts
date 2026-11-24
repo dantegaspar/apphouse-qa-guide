@@ -203,6 +203,10 @@ const MIGRATIONS: string[] = [
   ALTER TABLE claude_dictamen ADD COLUMN input_tokens INTEGER NOT NULL DEFAULT 0;
   ALTER TABLE claude_dictamen ADD COLUMN output_tokens INTEGER NOT NULL DEFAULT 0;
   `,
+  // 12: tipo de bug de cada hallazgo del desarrollo (diseño, funcional, datos…; ver BUG_TYPES).
+  `
+  ALTER TABLE issues ADD COLUMN bug_type TEXT NOT NULL DEFAULT '';
+  `,
 ];
 
 function migrate(db: Database.Database) {

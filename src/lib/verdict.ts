@@ -3,7 +3,7 @@ import { GUIDES } from "./guides";
 import { answerOf, loadCourier } from "./courier-data";
 import { COURIER_QUESTIONS } from "./courier";
 import { parseRec } from "./admin-data";
-import { LEGACY_SEVERITY, PRIORITIES, SEVERITIES, TRIAGE, type Guide, type OrderRow, type Priority, type Severity } from "./types";
+import { BUG_TYPES, LEGACY_SEVERITY, PRIORITIES, SEVERITIES, TRIAGE, type BugType, type Guide, type OrderRow, type Priority, type Severity } from "./types";
 
 /**
  * Veredicto «¿Listo para producción?» con criterios de salida fijos, solo con lo que miden los
@@ -161,6 +161,17 @@ export type DefectItem = {
   description: string;
   runId: string;
   tester: string;
+  bugType: BugType | "";
+};
+
+/** Bugs del desarrollo por tipo (sin revisar, confirmados o corregidos; no cuenta lo ajeno, del tester ni duplicados). */
+export type BugTypeRow = {
+  type: BugType | "";
+  label: string;
+  total: number;
+  open: number;
+  bySeverity: Record<Severity, number>;
+  examples: { id: string; activityId: string; description: string; severity: Severity; open: boolean; runId: string }[];
 };
 
 export type GuideVerdict = {
@@ -187,6 +198,7 @@ export type Verdict = {
   /** Quiénes entran en el cálculo (pruebas completas sin problema de logística). */
   population: Population;
   defects: DefectItem[];
+  bugTypes: BugTypeRow[];
   defectTotals: Record<Severity, { open: number; closed: number }>;
   generatedAt: string;
 };
@@ -212,7 +224,7 @@ export type Population = {
 };
 type ActRow = { run_id: string; activity_id: string; result: string | null; fields: string; updated_at: string };
 type StepRow = { run_id: string; activity_id: string; updated_at: string };
-type IssueRow = { id: string; run_id: string; activity_id: string; kind: string; blocking: number; severity: string; triage: string; description: string };
+type IssueRow = { id: string; run_id: string; activity_id: string; kind: string; blocking: number; severity: string; triage: string; description: string; bug_type?: string };
 
 /** Pedidos fallados ajenos al desarrollo por prueba, según el último dictamen con Claude. */
 function latestOrderAjenos(): Record<string, number> {
@@ -240,7 +252,7 @@ export function computeVerdict(): Verdict {
   const acts = safeAll<ActRow>("SELECT run_id, activity_id, result, fields, updated_at FROM activity_results");
   const steps = safeAll<StepRow>("SELECT run_id, activity_id, updated_at FROM step_results");
   const issues = safeAll<IssueRow>(
-    "SELECT id, run_id, activity_id, kind, blocking, severity, triage, description FROM issues WHERE kind = 'issue'"
+    "SELECT id, run_id, activity_id, kind, blocking, severity, triage, description, bug_type FROM issues WHERE kind = 'issue'"
   );
   const surveys = safeAll<{ run_id: string; answers: string }>("SELECT run_id, answers FROM survey_responses WHERE is_draft = 0");
   const runById = new Map(runs.map((r) => [r.id, r]));
@@ -272,6 +284,7 @@ export function computeVerdict(): Verdict {
   // Las guías ocultas (p. ej. la variante de la app móvil del establecimiento) entran si alguien las usó.
   const guides = GUIDES.filter((g) => !g.hidden || runs.some((r) => r.guide_id === g.id));
   const defects: DefectItem[] = [];
+  const bugTypeMap = new Map<string, BugTypeRow>();
   const defectTotals = Object.fromEntries(Object.keys(SEVERITIES).map((k) => [k, { open: 0, closed: 0 }])) as Verdict["defectTotals"];
 
   const externalActs = { n: 0 };
@@ -299,6 +312,18 @@ export function computeVerdict(): Verdict {
       const sev = sevOf(i);
       const open = !CLOSED_TRIAGE.has(i.triage);
       defectTotals[sev][open ? "open" : "closed"]++;
+      if (i.triage === "pendiente" || i.triage === "confirmada" || i.triage === "corregida" || !(i.triage in TRIAGE)) {
+        const t = (i.bug_type && i.bug_type in BUG_TYPES ? i.bug_type : "") as BugType | "";
+        let row = bugTypeMap.get(t);
+        if (!row) {
+          row = { type: t, label: t ? BUG_TYPES[t] : "Sin clasificar", total: 0, open: 0, bySeverity: { critico: 0, alto: 0, medio: 0, bajo: 0 }, examples: [] };
+          bugTypeMap.set(t, row);
+        }
+        row.total++;
+        if (open) row.open++;
+        row.bySeverity[sev]++;
+        row.examples.push({ id: i.id, activityId: i.activity_id, description: i.description, severity: sev, open, runId: i.run_id });
+      }
       if (open)
         defects.push({
           id: i.id,
@@ -311,6 +336,7 @@ export function computeVerdict(): Verdict {
           description: i.description,
           runId: i.run_id,
           tester: runById.get(i.run_id)?.name ?? "",
+          bugType: (i.bug_type && i.bug_type in BUG_TYPES ? i.bug_type : "") as BugType | "",
         });
     }
 
@@ -635,6 +661,10 @@ export function computeVerdict(): Verdict {
     courier: { n: feedback.length, score: courierScore, issues: cIssues.length, criterion: courierCriterion },
     population: { ...population, externalActs: externalActs.n },
     defects,
+    bugTypes: [...(Object.keys(BUG_TYPES) as BugType[]), "" as const]
+      .map((t) => bugTypeMap.get(t))
+      .filter((r): r is BugTypeRow => !!r)
+      .sort((a, b) => (a.type === "" ? 1 : b.type === "" ? -1 : b.total - a.total)),
     defectTotals,
     generatedAt: new Date().toISOString(),
   };

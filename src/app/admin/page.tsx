@@ -286,7 +286,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                   <span>· {i.activity_id} {act?.title}{i.step_id ? ` · paso ${i.step_id}` : ""}</span>
                   <span>· {fmtDate(i.created_at)}</span>
                   {i.kind === "evidence" && <span className="rounded bg-sky-100 px-1.5 py-0.5 text-sky-800">evidencia</span>}
-                  {i.kind === "issue" && <IssueTriage id={i.id} severity={i.severity} triage={i.triage} />}
+                  {i.kind === "issue" && <IssueTriage id={i.id} severity={i.severity} triage={i.triage} bugType={i.bug_type ?? ""} />}
                   {i.order_number && <span>· pedido {i.order_number}</span>}
                 </div>
                 {i.description && <p className="mt-2 whitespace-pre-wrap text-sm text-slate-800">{i.description}</p>}
