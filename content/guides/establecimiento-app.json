@@ -1171,7 +1171,7 @@
   },
   "survey": {
     "title": "Encuesta del Establecimiento",
-    "intro": "Son 4 preguntas cortas; toma 1 minuto.",
+    "intro": "Son 5 preguntas cortas; toma 1 minuto.",
     "questions": [
       {
         "id": "umux1",
@@ -1191,6 +1191,17 @@
         "minLabel": "Totalmente en desacuerdo",
         "maxLabel": "Totalmente de acuerdo",
         "label": "La app es fácil de usar.",
+        "required": true
+      },
+      {
+        "id": "logistica",
+        "type": "choice",
+        "label": "¿Tuviste algún problema con los repartidores?",
+        "options": [
+          "No, todo bien con los repartidores",
+          "A mis pedidos no se les asignó repartidor",
+          "No pude comunicarme con el repartidor"
+        ],
         "required": true
       },
       {

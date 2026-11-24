@@ -176,6 +176,11 @@ const MIGRATIONS: string[] = [
   `
   UPDATE issues SET severity = CASE severity WHEN 'bloqueante' THEN 'alto' WHEN 'mayor' THEN 'medio' WHEN 'menor' THEN 'bajo' ELSE severity END;
   `,
+  // 8: Mesa de control decide si una prueba cuenta para el veredicto ('' = automático, 'excluir', 'incluir').
+  `
+  ALTER TABLE runs ADD COLUMN verdict_scope TEXT NOT NULL DEFAULT '';
+  ALTER TABLE runs ADD COLUMN verdict_scope_note TEXT NOT NULL DEFAULT '';
+  `,
 ];
 
 function migrate(db: Database.Database) {

@@ -19,6 +19,8 @@ export type RunRow = {
   finished_at: string | null;
   ended_reason: string;
   ended_at: string | null;
+  verdict_scope?: string;
+  verdict_scope_note?: string;
 };
 /** outcome "na" = «No me apareció» (paso condicional). */
 export type StepRow = { run_id: string; activity_id: string; step_id: string; outcome: "ok" | "fail" | "na" };

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { isAdmin } from "@/lib/auth";
 import { fmtDate } from "@/lib/admin-data";
 import { PRIORITIES, SEVERITIES, SEVERITY_CLASS as SEV_CLASS, TRIAGE, type Severity } from "@/lib/types";
-import { computeVerdict, THRESHOLDS, type Criterion } from "@/lib/verdict";
+import { computeVerdict, EXCLUSION_LABEL, THRESHOLDS, type Criterion } from "@/lib/verdict";
 import { LogoutButton } from "@/components/admin/LogoutButton";
 import { AutoRefresh } from "@/components/admin/AutoRefresh";
 
@@ -85,6 +85,29 @@ export default async function VerdictPage() {
         <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-slate-800">
           {v.reasons.map((r) => <li key={r}>{r}</li>)}
         </ul>
+      </section>
+
+      <section data-testid="population" className="rounded-xl bg-white p-4 text-sm shadow-sm ring-1 ring-slate-200">
+        <h2 className="text-base font-semibold text-slate-900">Base del cálculo</h2>
+        <p className="mt-1 text-slate-700">
+          Cuentan <strong>{v.population.valid}</strong> de {v.population.total} pruebas: solo las completas (terminaron y enviaron la encuesta final).
+          No cuentan {v.population.counts.sin_terminar} sin terminar o abandonadas, {v.population.counts.logistica} con problema de logística (sin
+          repartidor asignado o sin comunicación con él)
+          {v.population.counts.mesa ? ` y ${v.population.counts.mesa} excluidas por Mesa de control` : ""}. Los hallazgos críticos cuentan de todas.
+        </p>
+        {v.population.excluded.some((e) => e.reason !== "sin_terminar") && (
+          <ul className="mt-2 space-y-1">
+            {v.population.excluded
+              .filter((e) => e.reason !== "sin_terminar")
+              .map((e) => (
+                <li key={e.runId} className="text-slate-600">
+                  <Link href={`/admin/runs/${e.runId}`} className="font-medium text-[#2F5DA8] hover:underline">{e.name}</Link> · {EXCLUSION_LABEL[e.reason]}
+                  {e.detail ? `: ${e.detail}` : ""}
+                </li>
+              ))}
+          </ul>
+        )}
+        <p className="mt-2 text-xs text-slate-500">Para incluir o excluir a alguien a mano, abre su prueba y usa «¿Cuenta para el veredicto?».</p>
       </section>
 
       <section>
@@ -217,6 +240,10 @@ export default async function VerdictPage() {
           Las encuestas miden la satisfacción con ISO 9241-11:2018: clientes y establecimientos con UMUX-Lite (2 preguntas de 1 a 7, convertido a
           escala SUS, donde 68 es el promedio de referencia) y repartidores con caritas de 1 a 5 llevadas a 0–100. Las tasas llevan intervalo de
           confianza del 95 % con Wald ajustado.
+        </p>
+        <p className="mt-2">
+          Todos los porcentajes se calculan solo con las pruebas completas: no cuentan quienes abandonaron o no terminaron, ni quienes tuvieron un
+          problema de logística (no les asignaron repartidor o no pudieron comunicarse con él), según su encuesta o la decisión de Mesa de control.
         </p>
         <p className="mt-2">Los criterios de salida se fijaron antes de la prueba y no se ajustan después: el veredicto es «Sí» solo si se cumplen todos.</p>
       </section>

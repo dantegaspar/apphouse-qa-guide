@@ -18,6 +18,11 @@ import { LEGACY_SEVERITY, PRIORITIES, SEVERITIES, TRIAGE, type Guide, type Order
  * - Muestra, cobertura y satisfacción de las encuestas (UMUX-Lite → SUS para clientes y establecimientos;
  *   caritas 1–5 para repartidores). Usabilidad ISO 9241-11:2018.
  * - Intervalos de confianza del 95 % con Wald ajustado.
+ * - Base del cálculo: solo las pruebas COMPLETAS (el tester terminó y envió la encuesta final). No cuentan
+ *   quienes abandonaron o no terminaron, ni quienes tuvieron un problema de logística (no les asignaron
+ *   repartidor o no pudieron comunicarse con él: pregunta «logistica» de la encuesta). Mesa de control
+ *   puede incluir o excluir una prueba a mano desde su detalle. Los hallazgos críticos abiertos cuentan
+ *   de todas las pruebas: una falla grave existe aunque el tester no haya terminado (se descarta en la revisión).
  */
 
 // ---------------------------------------------------------------- Umbrales (criterios de salida)
@@ -166,13 +171,25 @@ export type Verdict = {
   reasons: string[];
   guides: GuideVerdict[];
   courier: { n: number; score: number | null; issues: number; criterion: Criterion | null };
+  /** Quiénes entran en el cálculo (pruebas completas sin problema de logística). */
+  population: Population;
   defects: DefectItem[];
   defectTotals: Record<Severity, { open: number; closed: number }>;
   generatedAt: string;
 };
 
 // ---------------------------------------------------------------- Cálculo
-type RunRow = { id: string; guide_id: string; name: string; status: string };
+type RunRow = { id: string; guide_id: string; name: string; status: string; verdict_scope?: string; verdict_scope_note?: string };
+
+/** Por qué una prueba no entra en el cálculo del veredicto. */
+export type ExclusionReason = "sin_terminar" | "logistica" | "mesa";
+export const EXCLUSION_LABEL: Record<ExclusionReason, string> = {
+  sin_terminar: "No terminó (abandonó o sigue en curso)",
+  logistica: "Problema de logística",
+  mesa: "Excluida por Mesa de control",
+};
+export type ExcludedRun = { runId: string; guideId: string; name: string; reason: ExclusionReason; detail: string };
+export type Population = { total: number; valid: number; excluded: ExcludedRun[]; counts: Record<ExclusionReason, number> };
 type ActRow = { run_id: string; activity_id: string; result: string | null; fields: string; updated_at: string };
 type StepRow = { run_id: string; activity_id: string; updated_at: string };
 type IssueRow = { id: string; run_id: string; activity_id: string; kind: string; blocking: number; severity: string; triage: string; description: string };
@@ -191,7 +208,8 @@ const sevOf = (i: IssueRow): Severity =>
 
 export function computeVerdict(): Verdict {
   const T = THRESHOLDS;
-  const runs = safeAll<RunRow>("SELECT id, guide_id, name, status FROM runs");
+  let runs = safeAll<RunRow>("SELECT id, guide_id, name, status, verdict_scope, verdict_scope_note FROM runs");
+  if (!runs.length) runs = safeAll<RunRow>("SELECT id, guide_id, name, status FROM runs");
   const acts = safeAll<ActRow>("SELECT run_id, activity_id, result, fields, updated_at FROM activity_results");
   const steps = safeAll<StepRow>("SELECT run_id, activity_id, updated_at FROM step_results");
   const issues = safeAll<IssueRow>(
@@ -200,6 +218,30 @@ export function computeVerdict(): Verdict {
   const surveys = safeAll<{ run_id: string; answers: string }>("SELECT run_id, answers FROM survey_responses WHERE is_draft = 0");
   const runById = new Map(runs.map((r) => [r.id, r]));
 
+  // ---- Base del cálculo: pruebas completas y sin problema de logística.
+  const surveyByRun = new Map(surveys.map((s) => [s.run_id, parseRec(s.answers)]));
+  const excluded: ExcludedRun[] = [];
+  for (const r of runs) {
+    const scope = r.verdict_scope ?? "";
+    const note = r.verdict_scope_note ?? "";
+    const g = GUIDES.find((x) => x.id === r.guide_id);
+    const q = g?.survey.questions.find((x) => x.id === "logistica");
+    const ans = String(surveyByRun.get(r.id)?.logistica ?? "");
+    const logistics = !!ans && !!q?.options?.length && ans !== q.options[0];
+    let reason: ExclusionReason | null = null;
+    let detail = "";
+    if (scope === "excluir") [reason, detail] = ["mesa", note];
+    else if (r.status !== "finished") [reason, detail] = ["sin_terminar", r.status === "ended_blocked" ? "Terminada por bloqueo" : "Sin terminar"];
+    else if (scope !== "incluir" && logistics) [reason, detail] = ["logistica", ans];
+    if (reason) excluded.push({ runId: r.id, guideId: r.guide_id, name: r.name, reason, detail });
+  }
+  const excludedIds = new Set(excluded.map((e) => e.runId));
+  const validRuns = runs.filter((r) => !excludedIds.has(r.id));
+  const validIds = new Set(validRuns.map((r) => r.id));
+  const counts = { sin_terminar: 0, logistica: 0, mesa: 0 } as Record<ExclusionReason, number>;
+  for (const e of excluded) counts[e.reason]++;
+  const population: Population = { total: runs.length, valid: validRuns.length, excluded, counts };
+
   // Las guías ocultas (p. ej. la variante de la app móvil del establecimiento) entran si alguien las usó.
   const guides = GUIDES.filter((g) => !g.hidden || runs.some((r) => r.guide_id === g.id));
   const defects: DefectItem[] = [];
@@ -207,13 +249,17 @@ export function computeVerdict(): Verdict {
 
   const guideVerdicts: GuideVerdict[] = guides.map((g) => {
     const gRuns = runs.filter((r) => r.guide_id === g.id);
-    const ids = new Set(gRuns.map((r) => r.id));
+    // Las fallas se revisan de todas las pruebas; los porcentajes, solo de las pruebas válidas.
+    const allIds = new Set(gRuns.map((r) => r.id));
+    const ids = new Set(gRuns.filter((r) => validIds.has(r.id)).map((r) => r.id));
     // Muestra, cobertura y encuesta se miden por rol: el establecimiento junta panel web y app móvil.
-    const roleRuns = runs.filter((r) => r.guide_id === g.id || (!!g.mobileGuideId && r.guide_id === g.mobileGuideId));
+    const roleAll = runs.filter((r) => r.guide_id === g.id || (!!g.mobileGuideId && r.guide_id === g.mobileGuideId));
+    const roleRuns = roleAll.filter((r) => validIds.has(r.id));
     const roleIds = new Set(roleRuns.map((r) => r.id));
+    const roleOut = (k: ExclusionReason) => excluded.filter((e) => e.reason === k && roleAll.some((r) => r.id === e.runId)).length;
     const execOf = (id: string) => acts.filter((x) => roleIds.has(x.run_id) && x.activity_id === id && x.result && x.result !== "skipped").length;
-    const finished = roleRuns.filter((r) => r.status === "finished").length;
-    const gIssues = issues.filter((i) => ids.has(i.run_id));
+    const finished = roleRuns.length;
+    const gIssues = issues.filter((i) => allIds.has(i.run_id));
 
     for (const i of gIssues) {
       const a = g.activities.find((x) => x.id === i.activity_id);
@@ -321,8 +367,16 @@ export function computeVerdict(): Verdict {
       {
         id: "muestra",
         label: "Muestra suficiente",
-        measured: `${finished} de ${roleRuns.length} testers terminaron`,
-        threshold: `≥ ${T.minFinished} terminados`,
+        measured: `${finished} de ${roleAll.length} testers completaron la prueba${
+          roleAll.length > finished
+            ? ` (no cuentan: ${[
+                roleOut("sin_terminar") && `${roleOut("sin_terminar")} sin terminar`,
+                roleOut("logistica") && `${roleOut("logistica")} con problema de logística`,
+                roleOut("mesa") && `${roleOut("mesa")} excluidas por Mesa`,
+              ].filter(Boolean).join(", ")})`
+            : ""
+        }`,
+        threshold: `≥ ${T.minFinished} pruebas completas`,
         pass: finished >= T.minFinished,
         basis: "Nielsen y Landauer (1993): con 5 usuarios aparecen cerca del 85 % de los problemas de uso.",
       },
@@ -406,7 +460,7 @@ export function computeVerdict(): Verdict {
   // Solo se descuentan los rechazados y cancelados A PROPÓSITO: los folios que el establecimiento anotó en
   // E08 (rechazado y cancelado) y E09 (sin responder). Un rechazado o cancelado con otro folio cuenta como
   // pedido no completado. Si el establecimiento no anotó folios en E08/E09, se descuentan todos (como antes).
-  const estRunIds = new Set(runs.filter((r) => r.guide_id.startsWith("establecimiento")).map((r) => r.id));
+  const estRunIds = new Set(validRuns.filter((r) => r.guide_id.startsWith("establecimiento")).map((r) => r.id));
   const normFolio = (v: unknown) => String(v ?? "").split("·")[0].replace(/\s+/g, "").toLowerCase();
   const intentionalFolios = new Map<string, Set<string>>();
   for (const a of acts) {
@@ -488,15 +542,16 @@ export function computeVerdict(): Verdict {
   ];
   const all = [...criteria, ...guideVerdicts.filter((g) => !g.guide.hidden).flatMap((g) => g.criteria), ...(courierCriterion ? [courierCriterion] : [])];
   const failed = all.filter((c) => !c.pass);
-  const ready = failed.length === 0 && runs.length > 0;
+  const ready = failed.length === 0 && validRuns.length > 0;
   const reasons = ready
     ? ["Se cumplieron todos los criterios de salida definidos antes de la prueba.", ...criteria.map((c) => `${c.label}: ${c.measured}.`)]
     : failed.map((c) => `${c.label}: ${c.measured} (se pide ${c.threshold}).`);
   if (!runs.length) reasons.unshift("Todavía no hay pruebas registradas.");
+  else if (!validRuns.length) reasons.unshift("Todavía no hay pruebas completas: solo cuentan quienes terminaron y enviaron la encuesta final.");
 
   const participants = {
-    clientes: runs.filter((r) => r.guide_id === "cliente").length,
-    establecimientos: runs.filter((r) => r.guide_id.startsWith("establecimiento")).length,
+    clientes: validRuns.filter((r) => r.guide_id === "cliente").length,
+    establecimientos: validRuns.filter((r) => r.guide_id.startsWith("establecimiento")).length,
   };
 
   const sevRank: Record<Severity, number> = { critico: 0, alto: 1, medio: 2, bajo: 3 };
@@ -513,6 +568,7 @@ export function computeVerdict(): Verdict {
     reasons,
     guides: guideVerdicts,
     courier: { n: feedback.length, score: courierScore, issues: cIssues.length, criterion: courierCriterion },
+    population,
     defects,
     defectTotals,
     generatedAt: new Date().toISOString(),

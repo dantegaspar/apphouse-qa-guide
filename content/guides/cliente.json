@@ -868,7 +868,7 @@
   },
   "survey": {
     "title": "Encuesta del Cliente final",
-    "intro": "Son 4 preguntas cortas; toma 1 minuto.",
+    "intro": "Son 5 preguntas cortas; toma 1 minuto.",
     "questions": [
       {
         "id": "umux1",
@@ -888,6 +888,17 @@
         "minLabel": "Totalmente en desacuerdo",
         "maxLabel": "Totalmente de acuerdo",
         "label": "La app es fácil de usar.",
+        "required": true
+      },
+      {
+        "id": "logistica",
+        "type": "choice",
+        "label": "¿Tuviste algún problema con el repartidor?",
+        "options": [
+          "No, todo bien con el repartidor",
+          "No me asignaron repartidor",
+          "No pude comunicarme con mi repartidor"
+        ],
         "required": true
       },
       {

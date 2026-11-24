@@ -5,6 +5,7 @@ import { isAdmin } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { getGuide } from "@/lib/guides";
 import IssueTriage from "@/components/admin/IssueTriage";
+import VerdictScope from "@/components/admin/VerdictScope";
 import {
   checkValue, fmtDate, guideTitle, HELP_STATUS, isImage, isVideo, parseRec, resultLabel, runStatusLabel,
   type ActivityRow, type AttachmentRow, type HelpRow, type IssueRow, type RunRow, type StepRow,
@@ -77,6 +78,22 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
           {run.ended_at && <p className="mt-1 text-xs text-red-700">{fmtDate(run.ended_at)}</p>}
         </section>
       )}
+
+      <Card title="¿Cuenta para el veredicto?">
+        {(() => {
+          const answers = survey && !survey.is_draft ? parseRec(survey.answers) : {};
+          const q = guide?.survey.questions.find((x) => x.id === "logistica");
+          const ans = String(answers.logistica ?? "");
+          const logistics = !!ans && !!q?.options?.length && ans !== q.options[0];
+          const auto =
+            run.status !== "finished"
+              ? "Automático: no cuenta porque la prueba no está completa (solo cuentan quienes terminan y envían la encuesta final)."
+              : logistics
+                ? `Automático: no cuenta, reportó un problema de logística («${ans}»).`
+                : "Automático: sí cuenta, la prueba está completa y no reportó problemas de logística.";
+          return <VerdictScope runId={run.id} scope={run.verdict_scope ?? ""} note={run.verdict_scope_note ?? ""} auto={auto} />;
+        })()}
+      </Card>
 
       {help.length > 0 && (
         <Card title={`Solicitudes de ayuda (${help.length})`}>
