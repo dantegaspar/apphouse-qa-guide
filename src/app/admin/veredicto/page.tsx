@@ -45,9 +45,13 @@ function CriteriaTable({ rows }: { rows: Criterion[] }) {
               <td className="px-3 py-2 text-slate-700">{c.measured}</td>
               <td className="px-3 py-2 text-slate-600">{c.threshold}</td>
               <td className="px-3 py-2">
-                <span className={`rounded px-2 py-0.5 text-xs font-semibold ${c.pass ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"}`}>
-                  {c.pass ? "Sí" : "No"}
-                </span>
+                {c.informative ? (
+                  <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">Informativo</span>
+                ) : (
+                  <span className={`rounded px-2 py-0.5 text-xs font-semibold ${c.pass ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"}`}>
+                    {c.pass ? "Sí" : "No"}
+                  </span>
+                )}
               </td>
               <td className="px-3 py-2 text-xs text-slate-500">{c.basis}</td>
             </tr>
@@ -74,21 +78,21 @@ export default async function VerdictPage() {
           <Link href="/admin" className="text-sm text-[#2F5DA8] hover:underline">← Volver al panel</Link>
           <h1 className="mt-1 text-2xl font-semibold text-slate-900">¿Listo para producción?</h1>
           <p className="text-sm text-slate-500">Calculado con los criterios de salida fijos de los participantes · {fmtDate(v.generatedAt)}</p>
-          {!gate.keyOk && <p className="text-xs text-amber-800">Sin ANTHROPIC_API_KEY en el .env del servidor: se muestra el veredicto sin el dictamen con Claude.</p>}
+          {!gate.keyOk && <p className="text-xs text-amber-800">Sin ANTHROPIC_API_KEY en el .env del servidor: se muestra el veredicto sin procesar los reportes con Claude.</p>}
         </div>
         <LogoutButton />
       </header>
 
       {gate.needed ? (
       <section data-testid="claude-gate" className="rounded-2xl bg-white p-6 text-sm shadow-sm ring-1 ring-slate-200">
-        <h2 className="text-xl font-semibold text-slate-900">Primero: dictaminar con Claude</h2>
+        <h2 className="text-xl font-semibold text-slate-900">Primero: procesar los reportes con Claude</h2>
         <p className="mt-2 text-slate-700">
-          Antes de ver el veredicto, Claude revisa los reportes y los clasifica: <strong>desarrollo, servidor, logística o tester</strong>. Lo que
-          no es del desarrollo se cierra y sale del cálculo. Con los resultados ya limpios revisa los criterios fijos (ISO/IEC/IEEE 29119-2 y
-          29119-3:2021) y entonces aparece el veredicto.
+          Antes de ver el veredicto, Claude ayuda a procesar los reportes y los clasifica: <strong>desarrollo, servidor, logística o tester</strong>.
+          Lo que no es del desarrollo se cierra y sale del cálculo. Con los resultados ya limpios se revisan los criterios fijos (ISO/IEC/IEEE 29119-2 y
+          29119-3:2021) y aparece el dictamen según la especificación ISO/IEC/IEEE 29119.
         </p>
         <p className="mt-3 text-slate-800">
-          Por dictaminar: <strong>{gate.pendingReports}</strong> reportes sin revisar · <strong>{gate.newOrders}</strong> pruebas con pedidos
+          Por procesar: <strong>{gate.pendingReports}</strong> reportes sin revisar · <strong>{gate.newOrders}</strong> pruebas con pedidos
           fallados nuevos · <strong>{gate.newCourier}</strong> problemas de repartidores nuevos
         </p>
         <div className="mt-4">
@@ -117,13 +121,13 @@ export default async function VerdictPage() {
         </ul>
         {cd?.dictamen && (
           <div data-testid="claude-result" className="mt-5 space-y-3 border-t border-slate-300/60 pt-4 text-sm text-slate-800">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Dictamen de Claude · ISO/IEC/IEEE 29119</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Dictamen según la especificación: ISO/IEC/IEEE 29119</h2>
             <p>
               <strong>{cd.dictamen.veredicto}.</strong> {cd.dictamen.resumen}
             </p>
             {(cd.dictamen.veredicto === "Sí") !== v.ready && (
               <p className="rounded-lg bg-amber-50 p-2 text-amber-900 ring-1 ring-amber-200">
-                El dictamen de Claude no coincide con el cálculo fijo. Manda el cálculo fijo; revisa los datos.
+                El dictamen no coincide con el cálculo fijo. Manda el cálculo fijo; revisa los datos.
               </p>
             )}
             <ul className="space-y-1">
@@ -210,8 +214,8 @@ export default async function VerdictPage() {
         <h2 className="mb-3 text-lg font-semibold text-slate-900">Criterios de salida</h2>
         <CriteriaTable rows={[...v.criteria, ...v.guides.filter((g) => !g.guide.hidden).flatMap((g) => g.criteria), ...(v.courier.criterion ? [v.courier.criterion] : [])]} />
         <p className="mt-2 text-xs text-slate-500">
-          El veredicto es «Sí» solo si se cumplen todos. Solo cuentan los manuales, los reportes y las encuestas de clientes, establecimientos y
-          repartidores. Los hallazgos sin revisar cuentan como abiertos.
+          El veredicto es «Sí» solo si se cumplen todos los que deciden. La satisfacción de repartidores es solo informativa: al ser una medida de
+          percepción, ambigua para medir el desarrollo, no pesa en el veredicto. Los hallazgos sin revisar cuentan como abiertos.
         </p>
       </section>
 
@@ -349,7 +353,7 @@ export default async function VerdictPage() {
         </p>
         <p className="mt-2">
           Las encuestas miden la satisfacción con ISO 9241-11:2018: clientes y establecimientos con UMUX-Lite (2 preguntas de 1 a 7, convertido a
-          escala SUS, donde 68 es el promedio de referencia) y repartidores con caritas de 1 a 5 llevadas a 0–100. Las tasas llevan intervalo de
+          escala SUS, donde 68 es el promedio de referencia) y repartidores con caritas de 1 a 5 llevadas a 0–100 (solo informativa, sin peso en el veredicto). Las tasas llevan intervalo de
           confianza del 95 % con Wald ajustado.
         </p>
         <p className="mt-2">

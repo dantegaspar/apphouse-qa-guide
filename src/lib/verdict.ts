@@ -146,6 +146,8 @@ export type Criterion = {
   pass: boolean;
   /** Fundamento (norma o referencia). */
   basis: string;
+  /** Solo informativo: se muestra pero no decide el veredicto (p. ej. satisfacción de repartidores). */
+  informative?: boolean;
 };
 
 export type DefectItem = {
@@ -470,9 +472,10 @@ export function computeVerdict(): Verdict {
         measured: `${courierScore === null ? "—" : Math.round(courierScore)} / 100 con ${feedback.length} respuestas; ${cIssues.length} problemas reportados${
           courierOut ? `; ${courierOut} encuestas excluidas por problemas ajenos al desarrollo` : ""
         }`,
-        threshold: `promedio ≥ ${T.courier} de las encuestas que cuentan`,
+        threshold: `informativo (referencia ${T.courier}); no decide el veredicto`,
         pass: feedback.length >= T.minSurvey && courierScore !== null && courierScore >= T.courier,
-        basis: "Escala Likert de 5 puntos llevada a 0–100; 70 equivale a «fácil» en promedio.",
+        basis: "Encuesta de satisfacción (Likert de 5 puntos llevada a 0–100). Peso nulo en el veredicto: es una medida de percepción, ambigua para medir el desarrollo.",
+        informative: true,
       }
     : null;
 
@@ -603,7 +606,7 @@ export function computeVerdict(): Verdict {
     },
   ];
   const all = [...criteria, ...guideVerdicts.filter((g) => !g.guide.hidden).flatMap((g) => g.criteria), ...(courierCriterion ? [courierCriterion] : [])];
-  const failed = all.filter((c) => !c.pass);
+  const failed = all.filter((c) => !c.pass && !c.informative);
   const ready = failed.length === 0 && validRuns.length > 0;
   const reasons = ready
     ? ["Se cumplieron todos los criterios de salida definidos antes de la prueba.", ...criteria.map((c) => `${c.label}: ${c.measured}.`)]

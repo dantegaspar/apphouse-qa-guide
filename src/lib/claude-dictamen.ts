@@ -58,7 +58,6 @@ export function umbralesAprobacion() {
     { criterio: "Muestra real por rol", umbral: `≥ ${T.minFinished} prueba completa; quienes completan = 100 % de la base` },
     { criterio: "Cobertura de casos por rol", umbral: `≥ ${p(T.coverage)} de los casos; cada caso crítico ≥ ${T.minCriticalRuns} ejecuciones (o todas las pruebas si son menos)` },
     { criterio: "Satisfacción de clientes y establecimientos (SUS equivalente)", umbral: `≥ ${T.sus}` },
-    { criterio: "Satisfacción de repartidores (0–100)", umbral: `≥ ${T.courier}` },
   ];
 }
 
@@ -96,7 +95,7 @@ const scrub = (s: unknown) =>
     .slice(0, 1500);
 
 const SYSTEM = `Eres el analista de calidad de una prueba de aceptación con usuarios reales (clientes, establecimientos y repartidores) de AppHouse, una app de pedidos de comida.
-La prueba califica ÚNICAMENTE el desarrollo (la app y su panel). Los errores de servidor o infraestructura (correo que no llega, caídas, red), de logística (no se asignó repartidor, el repartidor dejó de contestar o apareció sin conexión) y de los testers (no siguieron la guía, se equivocaron de dato, confundieron un paso) NO cuentan contra el desarrollo.
+El resultado se presenta como «Dictamen según la especificación: ISO/IEC/IEEE 29119»: no te menciones a ti mismo ni a Claude en el texto del dictamen. La prueba califica ÚNICAMENTE el desarrollo (la app y su panel). La encuesta de satisfacción de repartidores es solo informativa (medida de percepción, ambigua): no decide el veredicto ni pesa en él; los problemas de la app que reporten los repartidores sí se clasifican. Los errores de servidor o infraestructura (correo que no llega, caídas, red), de logística (no se asignó repartidor, el repartidor dejó de contestar o apareció sin conexión) y de los testers (no siguieron la guía, se equivocaron de dato, confundieron un paso) NO cuentan contra el desarrollo.
 Responde en español de México, claro y breve. Basa todo en los datos que recibes; no inventes datos.`;
 
 function client() {
@@ -222,7 +221,7 @@ ${JSON.stringify(data)}`,
       normasYVersiones: NORMAS,
       base: { pruebasQueCuentan: v.population.valid, registradas: v.population.total, fueraPor: v.population.counts, actividadesAjenas: v.population.externalActs },
       criteriosDeSalida: [...v.criteria, ...v.guides.filter((g) => !g.guide.hidden).flatMap((g) => g.criteria), ...(v.courier.criterion ? [v.courier.criterion] : [])].map(
-        (c) => ({ criterio: c.label, medicion: c.measured, umbral: c.threshold, cumple: c.pass })
+        (c) => ({ criterio: c.label, medicion: c.measured, umbral: c.threshold, cumple: c.informative ? "informativo (no decide)" : c.pass })
       ),
       actividades: v.activities.map((a) => ({ id: a.id, titulo: a.title, prioridad: a.priority, ejecutadas: a.executed, todoBien: a.allOk, porcentaje: a.okRate, criticosAbiertos: a.openCritical, cumple: a.meets })),
       pedidos: { entregados: v.orders.completed, total: v.orders.total, aPropósito: v.orders.intentional, tasa: v.orders.rate, ajenosDescontados: appliedInfo.pedidosAjenos },
