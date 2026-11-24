@@ -122,7 +122,7 @@ export const TRIAGE = {
   pendiente: "Sin revisar",
   confirmada: "Confirmada",
   no_es_falla: "No es falla",
-  externa: "Ajena al desarrollo (servidor, correo, red)",
+  externa: "Ajena al desarrollo (servidor, correo, red, logística)",
   duplicada: "Duplicada",
   corregida: "Corregida",
 } as const;

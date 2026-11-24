@@ -20,7 +20,7 @@ import { LEGACY_SEVERITY, PRIORITIES, SEVERITIES, TRIAGE, type Guide, type Order
  * - Intervalos de confianza del 95 % con Wald ajustado.
  * - Base del cálculo: solo las pruebas COMPLETAS (el tester terminó y envió la encuesta final). No cuentan
  *   quienes abandonaron o no terminaron, ni quienes tuvieron un problema de logística (no les asignaron
- *   repartidor o no pudieron comunicarse con él: pregunta «logistica» de la encuesta). Mesa de control
+ *   repartidor, no pudieron comunicarse con él, o dejó de contestar y apareció sin conexión: pregunta «logistica»). Mesa de control
  *   puede incluir o excluir una prueba a mano desde su detalle. Los hallazgos críticos abiertos cuentan
  *   de todas las pruebas: una falla grave existe aunque el tester no haya terminado (se descarta en la revisión).
  * - Solo se califica el DESARROLLO. Un reporte que Mesa marca «Ajena al desarrollo» (servidor, correo que no

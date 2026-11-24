@@ -1200,7 +1200,8 @@
         "options": [
           "No, todo bien con los repartidores",
           "A mis pedidos no se les asignó repartidor",
-          "No pude comunicarme con el repartidor"
+          "No pude comunicarme con el repartidor",
+          "El repartidor dejó de contestar o apareció sin conexión"
         ],
         "required": true
       },

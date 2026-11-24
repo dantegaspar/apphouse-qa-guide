@@ -92,11 +92,11 @@ export default async function VerdictPage() {
         <p className="mt-1 text-slate-700">
           Cuentan <strong>{v.population.valid}</strong> de {v.population.total} pruebas: solo las completas (terminaron y enviaron la encuesta final).
           No cuentan {v.population.counts.sin_terminar} sin terminar o abandonadas, {v.population.counts.logistica} con problema de logística (sin
-          repartidor asignado o sin comunicación con él)
+          repartidor asignado, sin comunicación con él, o el repartidor dejó de contestar o apareció sin conexión)
           {v.population.counts.mesa ? ` y ${v.population.counts.mesa} excluidas por Mesa de control` : ""}. Los hallazgos críticos cuentan de todas.
         </p>
         <p className="mt-1 text-slate-700">
-          Solo se califica el desarrollo. Los reportes marcados «Ajena al desarrollo» (servidor, correo que no llega, red) no cuentan como falla
+          Solo se califica el desarrollo. Los reportes marcados «Ajena al desarrollo» (servidor, correo que no llega, red o logística, como un repartidor que deja de contestar o aparece sin conexión) no cuentan como falla
           {v.population.externalActs ? `, y ${v.population.externalActs} actividades donde pasó eso quedaron fuera del cálculo` : ""}.
         </p>
         {v.population.excluded.some((e) => e.reason !== "sin_terminar") && (
@@ -247,8 +247,8 @@ export default async function VerdictPage() {
         </p>
         <p className="mt-2">
           Todos los porcentajes se calculan solo con las pruebas completas: no cuentan quienes abandonaron o no terminaron, ni quienes tuvieron un
-          problema de logística (no les asignaron repartidor o no pudieron comunicarse con él), según su encuesta o la decisión de Mesa de control.
-          La prueba califica únicamente el desarrollo: las fallas de servidor, de correo o de red se marcan «Ajena al desarrollo» y no cuentan ni
+          problema de logística (no les asignaron repartidor, no pudieron comunicarse con él, o dejó de contestar y apareció sin conexión), según su encuesta o la decisión de Mesa de control.
+          La prueba califica únicamente el desarrollo: las fallas de servidor, de correo, de red o de logística ajenas al equipo de desarrollo se marcan «Ajena al desarrollo» y no cuentan ni
           como falla ni como actividad ejecutada; lo mismo con las encuestas de repartidores que no pudieron entrar por esas causas.
         </p>
         <p className="mt-2">Los criterios de salida se fijaron antes de la prueba y no se ajustan después: el veredicto es «Sí» solo si se cumplen todos.</p>

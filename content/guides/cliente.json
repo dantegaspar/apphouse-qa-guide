@@ -897,7 +897,8 @@
         "options": [
           "No, todo bien con el repartidor",
           "No me asignaron repartidor",
-          "No pude comunicarme con mi repartidor"
+          "No pude comunicarme con mi repartidor",
+          "Mi repartidor dejó de contestar o apareció sin conexión"
         ],
         "required": true
       },
