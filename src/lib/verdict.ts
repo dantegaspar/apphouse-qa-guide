@@ -35,8 +35,12 @@ export const THRESHOLDS = {
   activityOk: 0.9,
   /** Criterio 1: pedidos completados de punta a punta. */
   endToEnd: 0.98,
-  /** Testers con la prueba terminada por guía (Nielsen y Landauer: 5 usuarios ≈ 85 % de los problemas). */
-  minFinished: 5,
+  /**
+   * Muestra real: quienes sí completaron la prueba son el 100 %. Basta 1 prueba completa por rol; con menos
+   * de `refSample` se avisa que la confianza es menor (Nielsen y Landauer: 5 usuarios ≈ 85 % de los problemas).
+   */
+  minFinished: 1,
+  refSample: 5,
   /** Casos de la guía ejecutados por al menos un tester. */
   coverage: 0.9,
   /** Ejecuciones mínimas de cada caso crítico. */
@@ -49,8 +53,8 @@ export const THRESHOLDS = {
   overallPassRate: 0.9,
   /** SUS equivalente (a partir de UMUX-Lite). */
   sus: 68,
-  /** Respuestas mínimas de encuesta para juzgar la satisfacción. */
-  minSurvey: 5,
+  /** Respuestas mínimas de encuesta: la muestra real (cada prueba completa trae su encuesta). */
+  minSurvey: 1,
   /** Satisfacción de repartidores (0–100, de caritas 1–5). */
   courier: 70,
   /** Eficiencia (informativo): un caso es lento si su mediana pasa de este múltiplo del estimado. */
@@ -394,8 +398,10 @@ export function computeVerdict(): Verdict {
     const criteria: Criterion[] = [
       {
         id: "muestra",
-        label: "Muestra suficiente",
-        measured: `${finished} de ${roleAll.length} testers completaron la prueba${
+        label: "Muestra real",
+        measured: `${finished} de ${roleAll.length} registrados completaron la prueba${finished ? `: esos ${finished} son el 100 % de la base` : ""}${
+          finished && finished < T.refSample ? ` (con menos de ${T.refSample}, los porcentajes tienen menos confianza; ver IC 95 %)` : ""
+        }${
           roleAll.length > finished
             ? ` (no cuentan: ${[
                 roleOut("sin_terminar") && `${roleOut("sin_terminar")} sin terminar`,
@@ -404,9 +410,9 @@ export function computeVerdict(): Verdict {
               ].filter(Boolean).join(", ")})`
             : ""
         }`,
-        threshold: `≥ ${T.minFinished} pruebas completas`,
+        threshold: "al menos 1 prueba completa; la base es quien sí probó",
         pass: finished >= T.minFinished,
-        basis: "Nielsen y Landauer (1993): con 5 usuarios aparecen cerca del 85 % de los problemas de uso.",
+        basis: "Los porcentajes se calculan sobre quienes completaron la prueba. Referencia: Nielsen y Landauer (1993), con 5 usuarios aparecen cerca del 85 % de los problemas de uso.",
       },
       {
         id: "cobertura",
@@ -420,7 +426,7 @@ export function computeVerdict(): Verdict {
         id: "satisfaccion",
         label: "Satisfacción (SUS equivalente)",
         measured: nS ? `${Math.round(meanSus!)} con ${nS} respuestas${susCi ? ` (IC 95 % ${Math.round(susCi[0])}–${Math.round(susCi[1])})` : ""}` : "sin respuestas",
-        threshold: `≥ ${T.sus} con ≥ ${T.minSurvey} respuestas`,
+        threshold: `promedio ≥ ${T.sus} de las pruebas completas`,
         pass: nS >= T.minSurvey && meanSus !== null && meanSus >= T.sus,
         basis: "UMUX-Lite (Lewis et al., 2013) convertido a SUS; 68 es el promedio de referencia (Sauro, 2011).",
       },
@@ -454,7 +460,7 @@ export function computeVerdict(): Verdict {
         measured: `${courierScore === null ? "—" : Math.round(courierScore)} / 100 con ${feedback.length} respuestas; ${cIssues.length} problemas reportados${
           courierOut ? `; ${courierOut} encuestas excluidas por problemas ajenos al desarrollo` : ""
         }`,
-        threshold: `≥ ${T.courier} con ≥ ${T.minSurvey} respuestas`,
+        threshold: `promedio ≥ ${T.courier} de las encuestas que cuentan`,
         pass: feedback.length >= T.minSurvey && courierScore !== null && courierScore >= T.courier,
         basis: "Escala Likert de 5 puntos llevada a 0–100; 70 equivale a «fácil» en promedio.",
       }

@@ -246,7 +246,7 @@ export default async function VerdictPage() {
           confianza del 95 % con Wald ajustado.
         </p>
         <p className="mt-2">
-          Todos los porcentajes se calculan solo con las pruebas completas: no cuentan quienes abandonaron o no terminaron, ni quienes tuvieron un
+          La muestra es la real: si se registran 10 establecimientos y solo 7 completan la prueba, esos 7 son el 100 %. Todos los porcentajes se calculan solo con las pruebas completas: no cuentan quienes abandonaron o no terminaron, ni quienes tuvieron un
           problema de logística (no les asignaron repartidor, no pudieron comunicarse con él, o dejó de contestar y apareció sin conexión), según su encuesta o la decisión de Mesa de control.
           La prueba califica únicamente el desarrollo: las fallas de servidor, de correo, de red o de logística ajenas al equipo de desarrollo se marcan «Ajena al desarrollo» y no cuentan ni
           como falla ni como actividad ejecutada; lo mismo con las encuestas de repartidores que no pudieron entrar por esas causas.
