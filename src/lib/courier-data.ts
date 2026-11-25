@@ -1,3 +1,4 @@
+import { roundCond, viewRoundId } from "./rounds";
 import crypto from "node:crypto";
 import { getDb } from "./db";
 import { sha256 } from "./auth";
@@ -38,14 +39,16 @@ export function answerOf(answers: Record<string, unknown>, id: string): number |
 /** El repartidor eligió «No me tocó / No llegué a esta parte». */
 export const isCourierNa = (answers: Record<string, unknown>, id: string) => answers[id] === COURIER_NA;
 
-export function loadCourier() {
+/** Encuestas de repartidores de una ronda (por omisión, la que está a la vista en el panel). */
+export function loadCourier(round = viewRoundId()) {
   const db = getDb();
   const feedback = db
-    .prepare("SELECT id, name, phone, device, answers, comment, created_at, updated_at, verdict_scope, verdict_scope_note FROM courier_feedback ORDER BY created_at DESC")
+    .prepare(`SELECT id, name, phone, device, answers, comment, created_at, updated_at, verdict_scope, verdict_scope_note FROM courier_feedback WHERE ${roundCond("round_id", round)} ORDER BY created_at DESC`)
     .all() as CourierFeedbackRow[];
-  const issues = db.prepare("SELECT * FROM courier_issues ORDER BY created_at").all() as CourierIssueRow[];
+  const inRound = `feedback_id IN (SELECT id FROM courier_feedback WHERE ${roundCond("round_id", round)})`;
+  const issues = db.prepare(`SELECT * FROM courier_issues WHERE ${inRound} ORDER BY created_at`).all() as CourierIssueRow[];
   const attachments = db
-    .prepare("SELECT id, feedback_id, issue_id, original_name, mime, size FROM courier_attachments ORDER BY created_at")
+    .prepare(`SELECT id, feedback_id, issue_id, original_name, mime, size FROM courier_attachments WHERE ${inRound} ORDER BY created_at`)
     .all() as CourierAttachmentRow[];
   return { feedback, issues, attachments };
 }

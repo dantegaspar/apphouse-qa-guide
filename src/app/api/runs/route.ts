@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { getDb, now } from "@/lib/db";
 import { getGuide } from "@/lib/guides";
+import { activeRoundId } from "@/lib/rounds";
 import { sha256 } from "@/lib/auth";
 import { cleanRecord, hasErrors, invalid, json, readJsonObject } from "@/lib/http";
 import { collect, emailError, fieldsCheck, objectError, text, textError } from "@/lib/validate";
@@ -41,12 +42,12 @@ export async function POST(req: Request) {
   const device = { ...cleanRecord(body.device, 30, 500), ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "" };
   getDb()
     .prepare(
-      `INSERT INTO runs (id, token_hash, guide_id, guide_version, name, email, role, tester_fields, device, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO runs (id, token_hash, guide_id, guide_version, name, email, role, tester_fields, device, created_at, updated_at, round_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       id, sha256(token), guide.id, guide.version, text(body.name), text(body.email).toLowerCase(), role,
-      JSON.stringify(tester.values), JSON.stringify(device), ts, ts
+      JSON.stringify(tester.values), JSON.stringify(device), ts, ts, activeRoundId()
     );
   return json({ runId: id, token });
 }
