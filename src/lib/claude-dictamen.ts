@@ -1,3 +1,4 @@
+import { roundCond, runInRound, viewRoundId } from "./rounds";
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
@@ -131,13 +132,16 @@ type IssueRow = { id: string; run_id: string; activity_id: string; severity: str
 
 export async function runDictamen(opts: { reclasificar?: boolean } = {}): Promise<DictamenRow> {
   const db = getDb();
+  // Todo el dictamen es de la ronda que estaba a la vista al empezar (aunque el admin cambie de ronda mientras corre).
+  const round = viewRoundId();
+  const inRound = runInRound("run_id", round);
   // Volver a clasificar con las reglas vigentes lo que clasificó Claude antes y lo confirmado sin nota. Lo que Mesa
   // decidió con una nota no se toca.
   if (opts.reclasificar)
-    db.prepare("UPDATE issues SET triage = 'pendiente', triage_at = NULL WHERE kind = 'issue' AND triage <> 'pendiente' AND (triage_note LIKE 'Claude (%' OR (triage = 'confirmada' AND triage_note = ''))").run();
+    db.prepare(`UPDATE issues SET triage = 'pendiente', triage_at = NULL WHERE kind = 'issue' AND ${inRound} AND triage <> 'pendiente' AND (triage_note LIKE 'Claude (%' OR (triage = 'confirmada' AND triage_note = ''))`).run();
   usage.input = 0;
   usage.output = 0;
-  const runs = db.prepare("SELECT id, guide_id, status FROM runs ORDER BY created_at").all() as RunRow[];
+  const runs = db.prepare(`SELECT id, guide_id, status FROM runs WHERE ${roundCond("round_id", round)} ORDER BY created_at`).all() as RunRow[];
   const ref = new Map(runs.map((r, i) => [r.id, `T${i + 1}`]));
   const byRef = new Map(runs.map((r, i) => [`T${i + 1}`, r.id]));
   const titleOf = (guideId: string, actId: string) =>
@@ -145,19 +149,19 @@ export async function runDictamen(opts: { reclasificar?: boolean } = {}): Promis
 
   // ---- Paso 1: clasificar lo pendiente
   const pending = db
-    .prepare("SELECT id, run_id, activity_id, severity, triage, description, expected, triage_note FROM issues WHERE kind = 'issue' AND triage = 'pendiente'")
+    .prepare(`SELECT id, run_id, activity_id, severity, triage, description, expected, triage_note FROM issues WHERE kind = 'issue' AND triage = 'pendiente' AND ${inRound}`)
     .all() as IssueRow[];
   // Hallazgos del desarrollo que Mesa ya revisó pero todavía no tienen tipo de bug
   const untyped = db
-    .prepare("SELECT id, run_id, activity_id, severity, triage, description, expected FROM issues WHERE kind = 'issue' AND triage IN ('confirmada', 'corregida') AND bug_type = ''")
+    .prepare(`SELECT id, run_id, activity_id, severity, triage, description, expected FROM issues WHERE kind = 'issue' AND triage IN ('confirmada', 'corregida') AND bug_type = '' AND ${inRound}`)
     .all() as IssueRow[];
   const runOf = new Map(runs.map((r) => [r.id, r]));
-  const e07 = db.prepare("SELECT run_id, fields FROM activity_results WHERE activity_id = 'E07'").all() as { run_id: string; fields: string }[];
+  const e07 = db.prepare(`SELECT run_id, fields FROM activity_results WHERE activity_id = 'E07' AND ${inRound}`).all() as { run_id: string; fields: string }[];
   const failedOrders = e07
     .map((a) => ({ run: a.run_id, f: parseRec(a.fields) }))
     .filter((x) => Number(x.f.ordersFailed) > 0)
     .map((x) => ({ ref: ref.get(x.run) ?? "", fallados: Number(x.f.ordersFailed), porQue: scrub(x.f.failedDetail) }));
-  const { feedback, issues: cIssues } = loadCourier();
+  const { feedback, issues: cIssues } = loadCourier(round);
   const cRef = new Map(feedback.map((f, i) => [f.id, `R${i + 1}`]));
   const courier = cIssues.map((i) => ({ ref: cRef.get(i.feedback_id) ?? "", problema: scrub(i.description) }));
 
@@ -249,13 +253,13 @@ ${JSON.stringify(data)}`,
   // Se guarda antes del paso 2 para que el cálculo ya descuente los pedidos ajenos.
   const rowId = Number(
     db
-      .prepare("INSERT INTO claude_dictamen (created_at, model, classification, applied) VALUES (?, ?, ?, ?)")
-      .run(ts, CLAUDE_MODEL, JSON.stringify(classification), JSON.stringify(appliedInfo)).lastInsertRowid
+      .prepare("INSERT INTO claude_dictamen (created_at, model, classification, applied, round_id) VALUES (?, ?, ?, ?, ?)")
+      .run(ts, CLAUDE_MODEL, JSON.stringify(classification), JSON.stringify(appliedInfo), round).lastInsertRowid
   );
 
   // ---- Paso 2: dictamen sobre los resultados limpios y los criterios fijos
   try {
-    const v = computeVerdict();
+    const v = computeVerdict(round);
     const clean = {
       veredictoDelCalculoFijo: v.ready ? "Sí" : "No",
       umbrales: THRESHOLDS,
@@ -299,12 +303,13 @@ ${JSON.stringify(clean)}`,
     db.prepare("UPDATE claude_dictamen SET error = ? WHERE id = ?").run(e instanceof Error ? e.message : String(e), rowId);
   }
   db.prepare("UPDATE claude_dictamen SET input_tokens = ?, output_tokens = ? WHERE id = ?").run(usage.input, usage.output, rowId);
-  return latestDictamen()!;
+  return latestDictamen(round)!;
 }
 
-export function latestDictamen(): DictamenRow | null {
+/** Último dictamen de una ronda (por omisión, la que está a la vista en el panel). */
+export function latestDictamen(round = viewRoundId()): DictamenRow | null {
   try {
-    const r = getDb().prepare("SELECT * FROM claude_dictamen ORDER BY id DESC LIMIT 1").get() as
+    const r = getDb().prepare(`SELECT * FROM claude_dictamen WHERE ${roundCond("round_id", round)} ORDER BY id DESC LIMIT 1`).get() as
       | { id: number; created_at: string; model: string; classification: string; dictamen: string; applied: string; error: string; input_tokens?: number; output_tokens?: number }
       | undefined;
     if (!r) return null;
@@ -333,7 +338,9 @@ export const hasClaudeKey = () => !!process.env.ANTHROPIC_API_KEY;
 export function dictamenGate() {
   const db = getDb();
   const keyOk = hasClaudeKey();
-  const last = latestDictamen();
+  const round = viewRoundId();
+  const inRound = runInRound("run_id", round);
+  const last = latestDictamen(round);
   const since = last && !last.error && last.dictamen ? last.created_at : "";
   const one = (sql: string, ...a: unknown[]) => {
     try {
@@ -342,13 +349,16 @@ export function dictamenGate() {
       return 0;
     }
   };
-  const runs = one("SELECT COUNT(*) AS n FROM runs");
-  const pendingReports = one("SELECT COUNT(*) AS n FROM issues WHERE kind = 'issue' AND triage = 'pendiente'");
+  const runs = one(`SELECT COUNT(*) AS n FROM runs WHERE ${roundCond("round_id", round)}`);
+  const pendingReports = one(`SELECT COUNT(*) AS n FROM issues WHERE kind = 'issue' AND triage = 'pendiente' AND ${inRound}`);
   // Hallazgos confirmados por Mesa sin tipo de bug: también se mandan a clasificar
-  const untypedBugs = one("SELECT COUNT(*) AS n FROM issues WHERE kind = 'issue' AND triage IN ('confirmada', 'corregida') AND bug_type = ''");
-  const e07 = db.prepare("SELECT fields, updated_at FROM activity_results WHERE activity_id = 'E07'").all() as { fields: string; updated_at: string }[];
+  const untypedBugs = one(`SELECT COUNT(*) AS n FROM issues WHERE kind = 'issue' AND triage IN ('confirmada', 'corregida') AND bug_type = '' AND ${inRound}`);
+  const e07 = db.prepare(`SELECT fields, updated_at FROM activity_results WHERE activity_id = 'E07' AND ${inRound}`).all() as { fields: string; updated_at: string }[];
   const newOrders = e07.filter((a) => Number(parseRec(a.fields).ordersFailed) > 0 && (!since || a.updated_at > since)).length;
-  const newCourier = since ? one("SELECT COUNT(*) AS n FROM courier_issues WHERE created_at > ?", since) : one("SELECT COUNT(*) AS n FROM courier_issues");
+  const cInRound = `feedback_id IN (SELECT id FROM courier_feedback WHERE ${roundCond("round_id", round)})`;
+  const newCourier = since
+    ? one(`SELECT COUNT(*) AS n FROM courier_issues WHERE created_at > ? AND ${cInRound}`, since)
+    : one(`SELECT COUNT(*) AS n FROM courier_issues WHERE ${cInRound}`);
   const needed = keyOk && runs > 0 && (!since || pendingReports > 0 || untypedBugs > 0 || newOrders > 0 || newCourier > 0);
   return { needed, keyOk, pendingReports, untypedBugs, newOrders, newCourier };
 }

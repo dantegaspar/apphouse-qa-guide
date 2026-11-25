@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Revisión de una falla por Mesa de control: cambia la gravedad y/o el estado de revisión.
- * Cuerpo: { severity?: critico|alto|medio|bajo, triage?: pendiente|confirmada|no_es_falla|externa|tester|duplicada|corregida,
+ * Cuerpo: { severity?: critico|alto|medio|bajo, triage?: pendiente|confirmada|no_es_falla|externa|tester|duplicada|corregida|descartada,
  *   bugType?: diseno|funcional|datos|rendimiento|compatibilidad|contenido|"", note?: string }.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -40,6 +40,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     sets.push("triage_note = ?");
     vals.push(str(body.note, 1000));
   }
+  // Descartar un hallazgo lo saca del veredicto: siempre con motivo.
+  if (body.triage === "descartada" && !str(body.note, 1000)) return err("Escribe el motivo del descarte");
   if (!sets.length) return err("Nada que cambiar");
   sets.push("triage_at = ?");
   vals.push(now());

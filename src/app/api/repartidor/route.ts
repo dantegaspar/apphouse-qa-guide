@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { getDb, now, UPLOAD_DIR } from "@/lib/db";
 import { sha256 } from "@/lib/auth";
+import { activeRoundId } from "@/lib/rounds";
 import { checkCourierToken } from "@/lib/courier-data";
 import { COURIER_QUESTIONS, type CourierAnswer } from "@/lib/courier";
 import { cleanRecord, err, hasErrors, invalid, json, readJsonObject } from "@/lib/http";
@@ -94,9 +95,9 @@ export async function POST(req: Request) {
         );
       } else {
         db.prepare(
-          `INSERT INTO courier_feedback (id, token_hash, name, phone, device, answers, comment, created_at, updated_at)
-           VALUES (?,?,?,?,?,?,?,?,?)`
-        ).run(id, sha256(token), name, phone, JSON.stringify(device), JSON.stringify(answers), comment, ts, ts);
+          `INSERT INTO courier_feedback (id, token_hash, name, phone, device, answers, comment, created_at, updated_at, round_id)
+           VALUES (?,?,?,?,?,?,?,?,?,?)`
+        ).run(id, sha256(token), name, phone, JSON.stringify(device), JSON.stringify(answers), comment, ts, ts, activeRoundId());
       }
       const keep = new Set(issues.map((i) => i.id));
       const current = db.prepare("SELECT id FROM courier_issues WHERE feedback_id = ?").all(id) as { id: string }[];

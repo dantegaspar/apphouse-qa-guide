@@ -1,3 +1,4 @@
+import { roundCond, runInRound, viewRoundId } from "./rounds";
 import { getDb } from "./db";
 import { GUIDES } from "./guides";
 import { answerOf, loadCourier } from "./courier-data";
@@ -77,8 +78,8 @@ export const THRESHOLDS = {
 
 /** Estados de revisión que sacan a una falla del conteo de vigentes. */
 /** Revisiones que dicen que el reporte no es falla del desarrollo: la actividad no cuenta para ese tester. */
-const NOT_DEV = new Set(["externa", "tester", "no_es_falla", "duplicada"]);
-const CLOSED_TRIAGE = new Set(["no_es_falla", "externa", "tester", "duplicada", "corregida"]);
+const NOT_DEV = new Set(["externa", "tester", "no_es_falla", "duplicada", "descartada"]);
+const CLOSED_TRIAGE = new Set(["no_es_falla", "externa", "tester", "duplicada", "corregida", "descartada"]);
 
 // ---------------------------------------------------------------- Estadística
 /** IC 95 % de una proporción con Wald ajustado (Agresti-Coull). */
@@ -243,8 +244,8 @@ type StepRow = { run_id: string; activity_id: string; updated_at: string };
 type IssueRow = { id: string; run_id: string; activity_id: string; kind: string; blocking: number; severity: string; triage: string; description: string; bug_type?: string };
 
 /** Pedidos fallados ajenos al desarrollo por prueba, según el último dictamen con Claude. */
-function latestOrderAjenos(): Record<string, number> {
-  const row = safeAll<{ applied: string }>("SELECT applied FROM claude_dictamen ORDER BY id DESC LIMIT 1")[0];
+function latestOrderAjenos(round: number): Record<string, number> {
+  const row = safeAll<{ applied: string }>(`SELECT applied FROM claude_dictamen WHERE ${roundCond("round_id", round)} ORDER BY id DESC LIMIT 1`)[0];
   const v = row ? (parseRec(row.applied).orderAjenos as unknown as Record<string, number> | undefined) : undefined;
   return v && typeof v === "object" ? v : {};
 }
@@ -261,16 +262,17 @@ const pct = (x: number | null | undefined) => (x == null ? "—" : `${Math.round
 const sevOf = (i: IssueRow): Severity =>
   i.severity && i.severity in SEVERITIES ? (i.severity as Severity) : LEGACY_SEVERITY[i.severity] ?? (i.blocking ? "alto" : "medio");
 
-export function computeVerdict(): Verdict {
+/** Veredicto de una ronda de encuestas (por omisión, la que está a la vista en el panel). */
+export function computeVerdict(round = viewRoundId()): Verdict {
   const T = THRESHOLDS;
-  let runs = safeAll<RunRow>("SELECT id, guide_id, name, status, verdict_scope, verdict_scope_note FROM runs");
-  if (!runs.length) runs = safeAll<RunRow>("SELECT id, guide_id, name, status FROM runs");
-  const acts = safeAll<ActRow>("SELECT run_id, activity_id, result, fields, updated_at FROM activity_results");
-  const steps = safeAll<StepRow>("SELECT run_id, activity_id, updated_at FROM step_results");
+  // Solo la ronda de encuestas a la vista en el panel.
+  const runs = safeAll<RunRow>(`SELECT id, guide_id, name, status, verdict_scope, verdict_scope_note FROM runs WHERE ${roundCond("round_id", round)}`);
+  const acts = safeAll<ActRow>(`SELECT run_id, activity_id, result, fields, updated_at FROM activity_results WHERE ${runInRound("run_id", round)}`);
+  const steps = safeAll<StepRow>(`SELECT run_id, activity_id, updated_at FROM step_results WHERE ${runInRound("run_id", round)}`);
   const issues = safeAll<IssueRow>(
-    "SELECT id, run_id, activity_id, kind, blocking, severity, triage, description, bug_type FROM issues WHERE kind = 'issue'"
+    `SELECT id, run_id, activity_id, kind, blocking, severity, triage, description, bug_type FROM issues WHERE kind = 'issue' AND ${runInRound("run_id", round)}`
   );
-  const surveys = safeAll<{ run_id: string; answers: string }>("SELECT run_id, answers FROM survey_responses WHERE is_draft = 0");
+  const surveys = safeAll<{ run_id: string; answers: string }>(`SELECT run_id, answers FROM survey_responses WHERE is_draft = 0 AND ${runInRound("run_id", round)}`);
   const runById = new Map(runs.map((r) => [r.id, r]));
 
   // ---- Base del cálculo: pruebas completas y sin problema de logística.
@@ -497,7 +499,7 @@ export function computeVerdict(): Verdict {
   });
 
   // Repartidores (formulario aparte, caritas 1–5). answerOf descarta «No me tocó» ("na"): no cuenta en el promedio.
-  const { feedback: allFeedback, issues: allCIssues } = loadCourier();
+  const { feedback: allFeedback, issues: allCIssues } = loadCourier(round);
   // Encuestas excluidas por Mesa de control (problema ajeno al desarrollo, p. ej. el correo nunca llegó).
   const feedback = allFeedback.filter((f) => f.verdict_scope !== "excluir");
   const courierOut = allFeedback.length - feedback.length;
@@ -569,7 +571,7 @@ export function computeVerdict(): Verdict {
     intentionalFolios.set(a.run_id, set);
   }
   let oTotal = 0, oDone = 0, oIntentional = 0;
-  const orderAjenos = latestOrderAjenos();
+  const orderAjenos = latestOrderAjenos(round);
   const failures: OrderFailure[] = [];
   const assignMins: number[] = [];
   for (const a of acts) {
@@ -698,4 +700,46 @@ export function computeVerdict(): Verdict {
     defectTotals,
     generatedAt: new Date().toISOString(),
   };
+}
+
+/** Hallazgo crítico para la revisión de Mesa antes del veredicto (aceptado / descartado con motivo). */
+export type CriticalFinding = {
+  id: string;
+  runId: string;
+  tester: string;
+  guideId: string;
+  activityId: string;
+  activityTitle: string;
+  description: string;
+  expected: string;
+  triage: string;
+  note: string;
+  decidedAt: string | null;
+  /** "aceptado" = cuenta como crítico; "descartado" = Mesa lo sacó del veredicto; "" = sin decidir. */
+  decision: "aceptado" | "descartado" | "";
+};
+
+/** Todos los hallazgos críticos de la ronda (de todas las pruebas, como en el veredicto), para revisarlos uno por uno. */
+export function loadCriticalFindings(round = viewRoundId()): CriticalFinding[] {
+  type Row = { id: string; run_id: string; name: string; guide_id: string; activity_id: string; description: string; expected: string; triage: string; triage_note: string; triage_at: string | null };
+  const rows = safeAll<Row>(
+    `SELECT i.id, i.run_id, r.name, r.guide_id, i.activity_id, i.description, i.expected, i.triage, i.triage_note, i.triage_at
+     FROM issues i JOIN runs r ON r.id = i.run_id
+     WHERE i.kind = 'issue' AND i.severity = 'critico' AND ${roundCond("r.round_id", round)}
+     ORDER BY i.activity_id, i.created_at`
+  );
+  return rows.map((i) => ({
+    id: i.id,
+    runId: i.run_id,
+    tester: i.name,
+    guideId: i.guide_id,
+    activityId: i.activity_id,
+    activityTitle: GUIDES.find((g) => g.id === i.guide_id)?.activities.find((a) => a.id === i.activity_id)?.title ?? "",
+    description: i.description,
+    expected: i.expected,
+    triage: i.triage in TRIAGE ? i.triage : "pendiente",
+    note: i.triage_note,
+    decidedAt: i.triage_at,
+    decision: i.triage === "confirmada" && i.triage_note ? "aceptado" : i.triage === "descartada" ? "descartado" : "",
+  }));
 }

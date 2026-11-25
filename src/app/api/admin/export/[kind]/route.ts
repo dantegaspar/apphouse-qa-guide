@@ -1,3 +1,4 @@
+import { roundSlug } from "@/lib/rounds";
 import { isAdmin } from "@/lib/auth";
 import { toCsv } from "@/lib/csv";
 import { err, invalid } from "@/lib/http";
@@ -22,7 +23,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
   return new Response(toCsv(headers, rows), {
     headers: {
       "content-type": "text/csv; charset=utf-8",
-      "content-disposition": `attachment; filename="apphouse-qa-${kind}-${date}.csv"`,
+      "content-disposition": `attachment; filename="apphouse-qa-${roundSlug()}-${kind}-${date}.csv"`,
       "cache-control": "no-store",
     },
   });

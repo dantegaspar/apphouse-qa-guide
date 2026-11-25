@@ -1,3 +1,4 @@
+import { roundCond } from "./rounds";
 import { getDb } from "./db";
 import { getGuide } from "./guides";
 import { ACTIVITY_RESULTS } from "./types";
@@ -82,7 +83,7 @@ export function loadOpenHelp() {
   const rows = getDb()
     .prepare(
       `SELECT h.*, r.name AS tester, r.guide_id AS guide_id FROM help_requests h JOIN runs r ON r.id = h.run_id
-       WHERE h.status = 'open' ORDER BY h.created_at`
+       WHERE h.status = 'open' AND ${roundCond("r.round_id")} ORDER BY h.created_at`
     )
     .all() as (HelpRow & { tester: string; guide_id: string })[];
   return { rows, at: Date.now() };
@@ -129,8 +130,8 @@ export const resultLabel = (r: string | null | undefined) =>
 export function loadRuns(guideId?: string | null): RunRow[] {
   const db = getDb();
   return (guideId
-    ? db.prepare("SELECT * FROM runs WHERE guide_id = ? ORDER BY created_at DESC").all(guideId)
-    : db.prepare("SELECT * FROM runs ORDER BY created_at DESC").all()) as RunRow[];
+    ? db.prepare(`SELECT * FROM runs WHERE guide_id = ? AND ${roundCond()} ORDER BY created_at DESC`).all(guideId)
+    : db.prepare(`SELECT * FROM runs WHERE ${roundCond()} ORDER BY created_at DESC`).all()) as RunRow[];
 }
 
 export function loadAll(guideId?: string | null) {

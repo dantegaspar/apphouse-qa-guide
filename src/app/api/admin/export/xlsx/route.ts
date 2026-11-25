@@ -1,3 +1,4 @@
+import { roundSlug } from "@/lib/rounds";
 import ExcelJS from "exceljs";
 import { isAdmin } from "@/lib/auth";
 import { getDb } from "@/lib/db";
@@ -84,7 +85,7 @@ export async function GET(req: Request) {
   return new Response(new Uint8Array(buf as ArrayBuffer), {
     headers: {
       "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "content-disposition": `attachment; filename="apphouse-qa-${date}.xlsx"`,
+      "content-disposition": `attachment; filename="apphouse-qa-${roundSlug()}-${date}.xlsx"`,
       "cache-control": "no-store",
     },
   });

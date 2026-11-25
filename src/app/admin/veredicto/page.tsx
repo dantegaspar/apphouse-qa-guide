@@ -1,9 +1,11 @@
+import { viewRound } from "@/lib/rounds";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { isAdmin } from "@/lib/auth";
 import { fmtDate } from "@/lib/admin-data";
 import { BUG_TYPE_HINT, BUG_TYPES, PRIORITIES, SEVERITIES, SEVERITY_CLASS as SEV_CLASS, TRIAGE, type Severity } from "@/lib/types";
-import { computeVerdict, EXCLUSION_LABEL, THRESHOLDS, type Criterion } from "@/lib/verdict";
+import { computeVerdict, EXCLUSION_LABEL, loadCriticalFindings, THRESHOLDS, type Criterion } from "@/lib/verdict";
+import { CriticalReview } from "@/components/admin/CriticalReview";
 import { LogoutButton } from "@/components/admin/LogoutButton";
 import { AutoRefresh } from "@/components/admin/AutoRefresh";
 import ClaudeDictamenButton from "@/components/admin/ClaudeDictamenButton";
@@ -77,7 +79,7 @@ export default async function VerdictPage() {
         <div>
           <Link href="/admin" className="text-sm text-[#2F5DA8] hover:underline">← Volver al panel</Link>
           <h1 className="mt-1 text-2xl font-semibold text-slate-900">¿Listo para producción?</h1>
-          <p className="text-sm text-slate-500">Calculado con los criterios de salida fijos de los participantes · {fmtDate(v.generatedAt)}</p>
+          <p className="text-sm text-slate-500">{viewRound().name} · Calculado con los criterios de salida fijos de los participantes · {fmtDate(v.generatedAt)}</p>
           {!gate.keyOk && <p className="text-xs text-amber-800">Sin ANTHROPIC_API_KEY en el .env del servidor: se muestra el veredicto sin procesar los reportes con Claude.</p>}
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -89,6 +91,8 @@ export default async function VerdictPage() {
           <LogoutButton />
         </div>
       </header>
+
+      <CriticalReview findings={loadCriticalFindings()} />
 
       {gate.needed ? (
       <section data-testid="claude-gate" className="rounded-2xl bg-white p-6 text-sm shadow-sm ring-1 ring-slate-200">

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { isAdmin } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { roundCond, viewRound } from "@/lib/rounds";
 import { fmtDate } from "@/lib/admin-data";
 import { GUIDES } from "@/lib/guides";
 import { BUG_TYPES, PRIORITIES, SEVERITIES, TRIAGE, type BugType, type Severity } from "@/lib/types";
@@ -13,7 +14,7 @@ import { ExportButton } from "@/components/admin/ExportButton";
 export const dynamic = "force-dynamic";
 
 const ORIGIN_LABEL: Record<string, string> = { desarrollo: "Desarrollo", servidor: "Servidor", logistica: "Logística", tester: "Tester" };
-const CLOSED = ["no_es_falla", "externa", "tester", "duplicada", "corregida"];
+const CLOSED = ["no_es_falla", "externa", "tester", "duplicada", "corregida", "descartada"];
 const pct = (x: number | null | undefined) => (x == null ? "—" : `${Math.round(x * 100)} %`);
 const TH = "border border-slate-300 px-2 py-1 text-left align-top";
 
@@ -38,7 +39,7 @@ function closedFindings(): ClosedRow[] {
       .prepare(
         `SELECT i.id, i.activity_id, i.severity, i.triage, i.triage_note, i.triage_at, i.bug_type, i.description, i.run_id, r.name, r.guide_id
          FROM issues i JOIN runs r ON r.id = i.run_id
-         WHERE i.kind = 'issue' AND i.triage IN (${CLOSED.map(() => "?").join(",")})
+         WHERE i.kind = 'issue' AND ${roundCond("r.round_id")} AND i.triage IN (${CLOSED.map(() => "?").join(",")})
          ORDER BY i.activity_id, i.created_at`
       )
       .all(...CLOSED) as ClosedRow[];
@@ -73,7 +74,7 @@ export default async function VerdictReportPage() {
 
       <header className="border-b border-slate-300 pb-3">
         <h1 className="text-2xl font-semibold">Informe del veredicto · AppHouse QA</h1>
-        <p className="text-slate-600">¿Listo para producción? · Generado {fmtDate(v.generatedAt)}</p>
+        <p className="text-slate-600">¿Listo para producción? · {viewRound().name} · Generado {fmtDate(v.generatedAt)}</p>
       </header>
 
       <section>

@@ -130,6 +130,7 @@ export const TRIAGE = {
   tester: "Error del tester (no es falla)",
   duplicada: "Duplicada",
   corregida: "Corregida",
+  descartada: "Descartada por Mesa (con motivo)",
 } as const;
 export type Triage = keyof typeof TRIAGE;
 

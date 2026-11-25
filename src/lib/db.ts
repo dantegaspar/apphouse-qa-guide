@@ -207,6 +207,24 @@ const MIGRATIONS: string[] = [
   `
   ALTER TABLE issues ADD COLUMN bug_type TEXT NOT NULL DEFAULT '';
   `,
+  // 13: rondas de encuestas («Primera encuesta», «Segunda encuesta»…). Cada prueba, encuesta de
+  // repartidor y dictamen pertenece a una ronda; lo que ya existía queda en la primera. El panel
+  // muestra solo la ronda elegida (app_settings.view_round); las nuevas pruebas entran a la última.
+  `
+  CREATE TABLE rounds (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  INSERT INTO rounds (id, name, created_at)
+    VALUES (1, 'Primera encuesta', COALESCE((SELECT MIN(created_at) FROM runs), strftime('%Y-%m-%dT%H:%M:%fZ', 'now')));
+  ALTER TABLE runs ADD COLUMN round_id INTEGER NOT NULL DEFAULT 1;
+  ALTER TABLE courier_feedback ADD COLUMN round_id INTEGER NOT NULL DEFAULT 1;
+  ALTER TABLE claude_dictamen ADD COLUMN round_id INTEGER NOT NULL DEFAULT 1;
+  CREATE INDEX runs_round ON runs(round_id, created_at);
+  CREATE INDEX courier_feedback_round ON courier_feedback(round_id, created_at);
+  CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+  `,
 ];
 
 function migrate(db: Database.Database) {
