@@ -258,7 +258,6 @@ ${JSON.stringify(data)}`,
     const v = computeVerdict();
     const clean = {
       veredictoDelCalculoFijo: v.ready ? "Sí" : "No",
-      reglaDeNegocio: v.override ?? "",
       umbrales: THRESHOLDS,
       umbralesDeAprobacion: umbralesAprobacion(),
       normasYVersiones: NORMAS,
@@ -282,10 +281,9 @@ ${JSON.stringify(data)}`,
       DictamenSchema,
       `Emite el dictamen de paso a producción con base en ISO/IEC/IEEE 29119-2:2021 (proceso de prueba: evaluar los criterios de salida definidos en el plan) y 29119-3:2021 (informe de finalización de la prueba).
 Reglas:
-- Los criterios de salida y sus umbrales son FIJOS: no los cambies, no los relajes ni agregues otros que decidan el veredicto. La única excepción es la regla de negocio que viene en "reglaDeNegocio", ya aplicada en los datos.
+- Los criterios de salida y sus umbrales son FIJOS: no los cambies, no los relajes ni agregues otros que decidan el veredicto.
 - Los datos ya vienen filtrados: solo pruebas completas, sin problemas de logística, y sin errores de servidor ni de testers.
 - El veredicto es "Sí" solo si se cumplen TODOS los criterios de salida que deciden. Los marcados «informativo (no decide)» no cuentan para el veredicto. Si alguno de los que deciden no se cumple, es "No".
-- Si "reglaDeNegocio" viene con texto, aplícala tal cual y menciónala en "resumen" y en "justificacion29119" como regla de negocio. No digas que se agregó después de la prueba ni que es una desviación de la norma. En "recomendaciones" incluye cerrar las actividades que quedan abajo del 90 %.
 - En "criterios" revisa cada criterio de salida recibido, uno por uno, con un comentario corto.
 - En "justificacion29119" explica en 3–5 frases cómo se aplicó la norma (criterios de salida fijos, evaluación, informe).
 - En "erroresPorOrigen" resume en una frase cada origen: desarrollo, servidor, logística y tester.

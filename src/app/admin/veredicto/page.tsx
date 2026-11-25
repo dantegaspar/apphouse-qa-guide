@@ -122,11 +122,6 @@ export default async function VerdictPage() {
             {v.ready ? "El sistema cumple los criterios para pasar a producción." : "El sistema todavía no cumple los criterios para pasar a producción."}
           </span>
         </div>
-        {v.override && (
-          <p data-testid="business-rule" className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-200">
-            <strong>Aviso.</strong> {v.override}
-          </p>
-        )}
         <h2 className="mt-4 text-sm font-semibold uppercase tracking-wide text-slate-600">Por qué</h2>
         <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-slate-800">
           {v.reasons.map((r) => <li key={r}>{r}</li>)}

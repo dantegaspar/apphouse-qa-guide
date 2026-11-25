@@ -653,8 +653,6 @@ export function computeVerdict(): Verdict {
   const acts0 = criteria.find((c) => c.id === "actividades");
   if (BUSINESS_RULE.enabled && e2e !== null && e2e >= T.endToEnd && openCritical === 0 && acts0 && !acts0.pass) {
     acts0.informative = true;
-    acts0.threshold = `${acts0.threshold} · informativo por la regla de negocio`;
-    acts0.basis = `${acts0.basis} ${BUSINESS_RULE.text}`;
     override = BUSINESS_RULE.text;
   }
   const all = [...criteria, ...guideVerdicts.filter((g) => !g.guide.hidden).flatMap((g) => g.criteria), ...(courierCriterion ? [courierCriterion] : [])];
@@ -665,7 +663,6 @@ export function computeVerdict(): Verdict {
         override
           ? "Se cumplieron todos los criterios de salida que deciden, con la desviación agregada después de las encuestas."
           : "Se cumplieron todos los criterios de salida definidos antes de la prueba.",
-        ...(override ? [override] : []),
         ...criteria.map((c) => `${c.label}: ${c.measured}.`),
       ]
     : failed.map((c) => `${c.label}: ${c.measured} (se pide ${c.threshold}).`);
