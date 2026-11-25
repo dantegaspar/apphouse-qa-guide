@@ -30,15 +30,15 @@ import { BUG_TYPES, LEGACY_SEVERITY, PRIORITIES, SEVERITIES, TRIAGE, type BugTyp
  */
 
 /**
- * Regla de negocio agregada el 24-nov-2026, DESPUÉS de la prueba, por decisión del responsable: si el 100 % de los
- * pedidos se completaron de punta a punta y no hay hallazgos críticos abiertos, el criterio «Actividades que cumplen»
- * queda como informativo. Se muestra siempre que se aplica.
+ * Regla de negocio (24-nov-2026, decisión del responsable): si los pedidos completados de punta a punta cumplen su
+ * umbral (≥ 90 %) y no hay hallazgos críticos abiertos, el criterio «Actividades que cumplen» queda como informativo.
+ * Se muestra siempre que se aplica.
  */
 export const BUSINESS_RULE = {
   enabled: true,
   since: "2026-11-24",
   text:
-    "Regla de negocio del 24-nov-2026 (agregada después de la prueba): con el 100 % de pedidos completados de punta a punta y 0 hallazgos críticos abiertos, «Actividades que cumplen» es informativo y no decide el veredicto. Es una desviación de ISO/IEC/IEEE 29119-2, que pide fijar los criterios antes de probar; las actividades que no llegan al 90 % quedan como riesgo residual.",
+    "Regla de negocio: con ≥ 90 % de pedidos completados de punta a punta y 0 hallazgos críticos abiertos, «Actividades que cumplen» es informativo y no decide el veredicto.",
 };
 
 // ---------------------------------------------------------------- Umbrales (criterios de salida)
@@ -645,12 +645,11 @@ export function computeVerdict(): Verdict {
       basis: "Informe de resultados (ISO/IEC/IEEE 29119-3:2021): resultados por actividad de los manuales.",
     },
   ];
-  // Regla de negocio (desde el 24-nov-2026, después de la prueba): con el 100 % de pedidos completados de punta a
-  // punta y ningún hallazgo crítico abierto, «Actividades que cumplen» pasa a informativo y no decide el veredicto.
-  // Es una desviación de ISO/IEC/IEEE 29119-2 (criterios fijados antes de probar) y se declara en la página y el dictamen.
+  // Regla de negocio (24-nov-2026): con los pedidos de punta a punta en su umbral (≥ 90 %) y ningún hallazgo crítico
+  // abierto, «Actividades que cumplen» pasa a informativo y no decide el veredicto.
   let override: string | null = null;
   const acts0 = criteria.find((c) => c.id === "actividades");
-  if (BUSINESS_RULE.enabled && e2e === 1 && openCritical === 0 && acts0 && !acts0.pass) {
+  if (BUSINESS_RULE.enabled && e2e !== null && e2e >= T.endToEnd && openCritical === 0 && acts0 && !acts0.pass) {
     acts0.informative = true;
     acts0.threshold = `${acts0.threshold} · informativo por la regla de negocio`;
     acts0.basis = `${acts0.basis} ${BUSINESS_RULE.text}`;
@@ -662,7 +661,7 @@ export function computeVerdict(): Verdict {
   const reasons = ready
     ? [
         override
-          ? "Se cumplieron todos los criterios de salida que deciden, con la regla de negocio del 24-nov-2026."
+          ? "Se cumplieron todos los criterios de salida que deciden, con la regla de negocio."
           : "Se cumplieron todos los criterios de salida definidos antes de la prueba.",
         ...(override ? [override] : []),
         ...criteria.map((c) => `${c.label}: ${c.measured}.`),

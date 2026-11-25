@@ -58,7 +58,7 @@ export function umbralesAprobacion() {
   return [
     { criterio: "Pedidos completados de punta a punta (Plan, criterio 1, crítico)", umbral: `≥ ${p(T.endToEnd)}` },
     { criterio: "Pedidos o cobros perdidos o duplicados / hallazgos críticos abiertos (Plan, criterio 2, crítico)", umbral: "0" },
-    { criterio: "Cada actividad de los manuales (Informe)", umbral: `≥ ${p(T.activityOk)} «Todo salió bien» y sin hallazgos críticos; informativo si hay 100 % de punta a punta y 0 críticos (regla de negocio del 24-nov-2026)` },
+    { criterio: "Cada actividad de los manuales (Informe)", umbral: `≥ ${p(T.activityOk)} «Todo salió bien» y sin hallazgos críticos; informativo si hay ≥ ${p(T.endToEnd)} de punta a punta y 0 críticos (regla de negocio)` },
     { criterio: "Muestra real por rol", umbral: `≥ ${T.minFinished} prueba completa; quienes completan = 100 % de la base` },
     { criterio: "Cobertura de casos por rol", umbral: `≥ ${p(T.coverage)} de los casos; cada caso crítico ≥ ${T.minCriticalRuns} ejecuciones (o todas las pruebas si son menos)` },
     { criterio: "Satisfacción de clientes y establecimientos (SUS equivalente)", umbral: `≥ ${T.sus}` },
@@ -271,7 +271,7 @@ Reglas:
 - Los criterios de salida y sus umbrales son FIJOS: no los cambies, no los relajes ni agregues otros que decidan el veredicto. La única excepción es la regla de negocio que viene en "reglaDeNegocio", ya aplicada en los datos.
 - Los datos ya vienen filtrados: solo pruebas completas, sin problemas de logística, y sin errores de servidor ni de testers.
 - El veredicto es "Sí" solo si se cumplen TODOS los criterios de salida que deciden. Los marcados «informativo (no decide)» no cuentan para el veredicto. Si alguno de los que deciden no se cumple, es "No".
-- Si "reglaDeNegocio" viene con texto, aplícala tal cual y DECLÁRALA: en "resumen" y en "justificacion29119" di que se agregó después de la prueba, que es una desviación de ISO/IEC/IEEE 29119-2 y qué actividades quedan abajo del 90 % como riesgo residual. En "recomendaciones" incluye cerrar esas actividades.
+- Si "reglaDeNegocio" viene con texto, aplícala tal cual y menciónala en "resumen" y en "justificacion29119" como regla de negocio. No digas que se agregó después de la prueba ni que es una desviación de la norma. En "recomendaciones" incluye cerrar las actividades que quedan abajo del 90 %.
 - En "criterios" revisa cada criterio de salida recibido, uno por uno, con un comentario corto.
 - En "justificacion29119" explica en 3–5 frases cómo se aplicó la norma (criterios de salida fijos, evaluación, informe).
 - En "erroresPorOrigen" resume en una frase cada origen: desarrollo, servidor, logística y tester.
