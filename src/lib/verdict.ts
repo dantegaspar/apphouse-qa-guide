@@ -38,7 +38,7 @@ export const BUSINESS_RULE = {
   enabled: true,
   since: "2026-11-24",
   text:
-    "Regla de negocio: con ≥ 90 % de pedidos completados de punta a punta y 0 hallazgos críticos abiertos, «Actividades que cumplen» es informativo y no decide el veredicto.",
+    "Desviación agregada después de las encuestas (24-nov-2026): con ≥ 90 % de pedidos completados de punta a punta y 0 hallazgos críticos abiertos, «Actividades que cumplen» es informativo y no decide el veredicto. Los criterios originales se fijaron antes de la prueba (ISO/IEC/IEEE 29119-2); esta regla se agregó al revisar los resultados.",
 };
 
 // ---------------------------------------------------------------- Umbrales (criterios de salida)
@@ -76,6 +76,8 @@ export const THRESHOLDS = {
 };
 
 /** Estados de revisión que sacan a una falla del conteo de vigentes. */
+/** Revisiones que dicen que el reporte no es falla del desarrollo: la actividad no cuenta para ese tester. */
+const NOT_DEV = new Set(["externa", "tester", "no_es_falla", "duplicada"]);
 const CLOSED_TRIAGE = new Set(["no_es_falla", "externa", "tester", "duplicada", "corregida"]);
 
 // ---------------------------------------------------------------- Estadística
@@ -316,7 +318,7 @@ export function computeVerdict(): Verdict {
       acts.filter((x) => {
         if (!roleIds.has(x.run_id) || x.activity_id !== id || !x.result || x.result === "skipped") return false;
         const mine = issues.filter((i) => i.run_id === x.run_id && i.activity_id === id);
-        return x.result === "ok" || !mine.length || !mine.every((i) => i.triage === "externa" || i.triage === "tester");
+        return x.result === "ok" || !mine.length || !mine.every((i) => NOT_DEV.has(i.triage));
       }).length;
     const finished = roleRuns.length;
     const gIssues = issues.filter((i) => allIds.has(i.run_id));
@@ -360,7 +362,7 @@ export function computeVerdict(): Verdict {
         // Falla ajena al desarrollo (servidor, correo, red): esa actividad no cuenta para este tester.
         if (x.result !== "ok") {
           const mine = gIssues.filter((i) => i.run_id === x.run_id && i.activity_id === a.id);
-          if (mine.length && mine.every((i) => i.triage === "externa" || i.triage === "tester")) {
+          if (mine.length && mine.every((i) => NOT_DEV.has(i.triage))) {
             externalActs.n++;
             return false;
           }
@@ -661,7 +663,7 @@ export function computeVerdict(): Verdict {
   const reasons = ready
     ? [
         override
-          ? "Se cumplieron todos los criterios de salida que deciden, con la regla de negocio."
+          ? "Se cumplieron todos los criterios de salida que deciden, con la desviación agregada después de las encuestas."
           : "Se cumplieron todos los criterios de salida definidos antes de la prueba.",
         ...(override ? [override] : []),
         ...criteria.map((c) => `${c.label}: ${c.measured}.`),

@@ -124,7 +124,7 @@ export default async function VerdictPage() {
         </div>
         {v.override && (
           <p data-testid="business-rule" className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-200">
-            <strong>Con regla de negocio.</strong> {v.override}
+            <strong>Aviso.</strong> {v.override}
           </p>
         )}
         <h2 className="mt-4 text-sm font-semibold uppercase tracking-wide text-slate-600">Por qué</h2>
@@ -199,6 +199,20 @@ export default async function VerdictPage() {
           </div>
         )}
       </section>
+
+      {gate.keyOk && (
+        <section data-testid="reclasificar" className="rounded-xl bg-white p-4 text-sm shadow-sm ring-1 ring-slate-200">
+          <h2 className="text-base font-semibold text-slate-900">Reclasificar con las reglas de las especificaciones</h2>
+          <p className="mt-1 text-slate-700">
+            Claude vuelve a revisar los reportes que clasificó antes y los confirmados sin nota, con las reglas de los requerimientos
+            (cancelación, menú de la marca, datos capturados por la sucursal, invitado, código de entrega). Lo que no es falla del
+            desarrollo deja de contar en su actividad. Lo que Mesa decidió con una nota no se toca.
+          </p>
+          <div className="mt-3">
+            <ClaudeDictamenButton reclasificar label="Reclasificar con Claude" />
+          </div>
+        </section>
+      )}
 
       <section data-testid="population" className="rounded-xl bg-white p-4 text-sm shadow-sm ring-1 ring-slate-200">
         <h2 className="text-base font-semibold text-slate-900">Base del cálculo</h2>

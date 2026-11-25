@@ -14,7 +14,7 @@ const STAGES: [number, string][] = [
 ];
 
 /** Botón «Procesar con Claude» con indicador de «pensando» mientras la API responde (1–3 min). */
-export default function ClaudeDictamenButton({ disabled }: { disabled?: boolean }) {
+export default function ClaudeDictamenButton({ disabled, reclasificar, label }: { disabled?: boolean; reclasificar?: boolean; label?: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [secs, setSecs] = useState(0);
@@ -32,7 +32,7 @@ export default function ClaudeDictamenButton({ disabled }: { disabled?: boolean 
     setBusy(true);
     setError(null);
     try {
-      const r = await fetch("/api/admin/claude-dictamen", { method: "POST" });
+      const r = await fetch(`/api/admin/claude-dictamen${reclasificar ? "?reclasificar=1" : ""}`, { method: "POST" });
       const body = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(body.error || "No se pudo procesar con Claude");
       if (body.error) setError(body.error);
@@ -74,7 +74,7 @@ export default function ClaudeDictamenButton({ disabled }: { disabled?: boolean 
         className="rounded-lg bg-gradient-to-r from-[#2F5DA8] to-[#3BA3A8] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
         data-testid="claude-dictamen"
       >
-        Procesar con Claude
+        {label ?? "Procesar con Claude"}
       </button>
       {error && <span className="text-sm text-red-700">{error}</span>}
     </div>

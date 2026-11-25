@@ -129,8 +129,12 @@ async function ask<T>(schema: z.ZodType<T>, prompt: string, effort: "medium" | "
 type RunRow = { id: string; guide_id: string; status: string };
 type IssueRow = { id: string; run_id: string; activity_id: string; severity: string; triage: string; description: string; expected: string; triage_note?: string };
 
-export async function runDictamen(): Promise<DictamenRow> {
+export async function runDictamen(opts: { reclasificar?: boolean } = {}): Promise<DictamenRow> {
   const db = getDb();
+  // Volver a clasificar con las reglas vigentes lo que clasificó Claude antes y lo confirmado sin nota. Lo que Mesa
+  // decidió con una nota no se toca.
+  if (opts.reclasificar)
+    db.prepare("UPDATE issues SET triage = 'pendiente', triage_at = NULL WHERE kind = 'issue' AND triage <> 'pendiente' AND (triage_note LIKE 'Claude (%' OR (triage = 'confirmada' AND triage_note = ''))").run();
   usage.input = 0;
   usage.output = 0;
   const runs = db.prepare("SELECT id, guide_id, status FROM runs ORDER BY created_at").all() as RunRow[];
@@ -196,6 +200,16 @@ export async function runDictamen(): Promise<DictamenRow> {
 Para elegir "tester" por configuración, versión o requerimiento, el reporte o la nota de Mesa deben dar indicios de eso; no lo supongas.
 Sigue siendo "desarrollo": lo que la app no guarda o no muestra después de guardarlo, pantallas que se ven distintas o se cortan con la versión vigente, estados o cálculos equivocados que no vienen de un dato capturado, y cualquier falla cuya causa no se identifica.
 Si un reporte mezcla algo de configuración con una falla de la app, es "desarrollo".
+Reglas de las especificaciones de requerimientos (Tenant App, Panel web de establecimientos y App de mensajeros) que debes aplicar:
+  · Cancelar: el cliente solo cancela desde la app mientras el pedido está recibido y sin confirmar, o pendiente de pago (Tenant App RF54 y RN05). «No me deja cancelar» un pedido ya confirmado es "tester".
+  · Menú: es de la marca y lo comparten sus sucursales; la sucursal solo fija su precio y sus agotados (Panel RN17 y RN18). El aviso «Lo de la marca lo edita el representante legal» y que no se guarde ese cambio es "tester".
+  · Precios distintos, productos, tamaños o extras que faltan o salen repetidos en una sucursal son datos capturados del menú: "tester", salvo que el reporte diga que la app muestra algo distinto de lo capturado.
+  · Promociones: cada sucursal muestra las de la marca que no apagó y las propias (Tenant App RN08). «No hay promociones» en una sucursal sin promociones es "tester".
+  · Invitado: puede ver la carta y armar el carrito, pero pagar y guardar direcciones requiere cuenta (Tenant App RN23). Que pida entrar o la contraseña al pagar es "tester".
+  · Código de entrega: las especificaciones no fijan en qué etapa se muestra; verlo desde «Recibido» es "tester" (lo pide la guía, no el requerimiento).
+  · Notificaciones push con la app cerrada o en segundo plano SÍ son requerimiento (Tenant App RF51): si solo llegan dentro de la app, es "desarrollo".
+  · Un producto o variante que se crea en el panel y no aparece es "desarrollo" (Panel RF23 y RF24).
+  · Un reporte sin descripción útil (p. ej. «no pude») es "desarrollo" con severidad "bajo" hasta que Mesa lo aclare.
 Si hay duda razonable entre desarrollo y otra causa, elige "desarrollo".
 Para cada reporte da también el TIPO de bug (ISO/IEC 25010:2023; aunque el origen no sea desarrollo, elige el más cercano):
 ${(Object.keys(BUG_TYPES) as BugType[]).map((k) => `- "${k}" (${BUG_TYPES[k]}): ${BUG_TYPE_HINT[k]}.`).join("\n")}
