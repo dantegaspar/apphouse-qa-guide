@@ -15,10 +15,13 @@ const prefKey = (guideId: string) => `apphouse-qa:variant:${guideId}`;
 export default function GuideVariantPicker({
   guide,
   mobileGuide,
+  roundId,
   maxUploadMb,
   allowedMime,
 }: {
   guide: Guide;
+  /** Ronda (encuesta) activa: una prueba guardada de otra ronda no cuenta. */
+  roundId: number;
   mobileGuide?: Guide;
   maxUploadMb: number;
   allowedMime?: string[];
@@ -58,12 +61,12 @@ export default function GuideVariantPicker({
   const ctl = useMemo<VariantCtl | undefined>(() => {
     if (!mobileGuide || !variant) return undefined;
     const other = variant === "mobile" ? guide : mobileGuide;
-    return { variant, detected, otherHasRun: hasStoredRun(other.id), choose, draft, setDraft, carriedFrom };
-  }, [mobileGuide, variant, guide, detected, choose, draft, carriedFrom]);
+    return { variant, detected, otherHasRun: hasStoredRun(other.id, roundId), choose, draft, setDraft, carriedFrom };
+  }, [mobileGuide, variant, guide, roundId, detected, choose, draft, carriedFrom]);
 
-  if (!mobileGuide) return <GuideApp guide={guide} maxUploadMb={maxUploadMb} allowedMime={allowedMime} />;
+  if (!mobileGuide) return <GuideApp guide={guide} roundId={roundId} maxUploadMb={maxUploadMb} allowedMime={allowedMime} />;
   if (!variant || !ctl) return <div className="flex flex-1 items-center justify-center text-slate-600">Cargando…</div>;
 
   const chosen = variant === "mobile" ? mobileGuide : guide;
-  return <GuideApp key={chosen.id} guide={chosen} maxUploadMb={maxUploadMb} allowedMime={allowedMime} variantCtl={ctl} />;
+  return <GuideApp key={chosen.id} guide={chosen} roundId={roundId} maxUploadMb={maxUploadMb} allowedMime={allowedMime} variantCtl={ctl} />;
 }

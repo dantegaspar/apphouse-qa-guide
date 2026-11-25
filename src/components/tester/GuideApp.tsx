@@ -49,18 +49,23 @@ type HelpStatus = {
 
 export default function GuideApp({
   guide,
+  roundId,
   maxUploadMb,
   allowedMime = [],
   variantCtl,
 }: {
   guide: Guide;
+  /** Ronda (encuesta) activa en el servidor. */
+  roundId: number;
   maxUploadMb: number;
   /** Tipos de archivo que acepta el servidor (src/lib/http.ts). */
   allowedMime?: string[];
   /** Solo en guías con variante de computadora y de celular. */
   variantCtl?: VariantCtl;
 }) {
-  const { state, loaded, syncing, syncError, commit, update, flush, stateRef } = useRun(guide.id);
+  const { state, loaded, syncing, syncError, commit, update, flush, stateRef, restart } = useRun(guide.id, roundId);
+  // «Empezar otra prueba» pide confirmación en la misma pantalla (sin ventanas del navegador)
+  const [restartAsk, setRestartAsk] = useState(false);
   const [view, setView] = useState<View>({ name: "home" });
   const [showRef, setShowRef] = useState(false);
   // Parte de la actividad desde la que se abrió «Datos» (E04: A, B, C o D)
@@ -654,6 +659,38 @@ export default function GuideApp({
             </Button>
           )}
         </div>
+        {(state.finished || ended) && state.outbox.length === 0 && (
+          <div className={"rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-700 ring-1 ring-slate-200" + dk("lg:max-w-xl")} data-testid="restart-run">
+            {restartAsk ? (
+              <>
+                <p className="font-semibold text-slate-800">¿Empezar otra prueba en este navegador?</p>
+                <p className="mt-1">Tu prueba ya quedó enviada y no se borra. Se abrirá el registro para una prueba nueva.</p>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <Button variant="outline" onClick={() => setRestartAsk(false)}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setRestartAsk(false);
+                      restart();
+                      setView({ name: "home" });
+                      window.scrollTo({ top: 0 });
+                    }}
+                  >
+                    Sí, empezar otra
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p>¿Otra persona va a hacer la prueba en este aparato?</p>
+                <Button variant="outline" className="mt-2 w-full" onClick={() => setRestartAsk(true)}>
+                  Empezar otra prueba
+                </Button>
+              </>
+            )}
+          </div>
+        )}
         <p className="pb-6 text-center text-xs text-slate-600">
           Tu avance se guarda en este navegador. Versión de la guía {guide.version}.
         </p>
@@ -1018,6 +1055,7 @@ function Identify({
         guideVersion: guide.version,
         runId: data.runId,
         token: data.token,
+        roundId: typeof data.roundId === "number" ? data.roundId : undefined,
         tester: { name: name.trim(), email: email.trim(), role, fields: clean },
         prep: {},
         prepDone: false,
