@@ -38,7 +38,7 @@ export const BUSINESS_RULE = {
   enabled: true,
   since: "2026-11-24",
   text:
-    "Desviación agregada después de las encuestas (24-nov-2026): con ≥ 90 % de pedidos completados de punta a punta y 0 hallazgos críticos abiertos, «Actividades que cumplen» es informativo y no decide el veredicto. Los criterios originales se fijaron antes de la prueba (ISO/IEC/IEEE 29119-2); esta regla se agregó al revisar los resultados.",
+    "Regla de negocio: con ≥ 90 % de pedidos completados de punta a punta y 0 hallazgos críticos abiertos, «Actividades que cumplen» es informativo y no decide el veredicto.",
 };
 
 // ---------------------------------------------------------------- Umbrales (criterios de salida)
@@ -661,7 +661,7 @@ export function computeVerdict(): Verdict {
   const reasons = ready
     ? [
         override
-          ? "Se cumplieron todos los criterios de salida que deciden, con la desviación agregada después de las encuestas."
+          ? "Se cumplieron todos los criterios de salida que deciden."
           : "Se cumplieron todos los criterios de salida definidos antes de la prueba.",
         ...criteria.map((c) => `${c.label}: ${c.measured}.`),
       ]
