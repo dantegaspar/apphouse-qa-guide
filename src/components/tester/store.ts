@@ -52,6 +52,12 @@ export type RunState = {
   guideVersion: string;
   runId: string;
   token: string;
+  /**
+   * Ronda (encuesta) en la que se registró la prueba. Cuando el admin abre «+ Nueva encuesta», la
+   * prueba guardada deja de valer y el tester empieza otra sin borrar nada del navegador.
+   * Las pruebas guardadas antes de que existieran las rondas no lo traen: se pregunta al servidor.
+   */
+  roundId?: number;
   tester: Tester;
   prep: Record<string, boolean>;
   prepDone: boolean;
@@ -81,13 +87,57 @@ export const uid = () =>
     : Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 const storageKey = (guideId: string) => `apphouse-qa:${guideId}`;
+/** Copia de una prueba de una ronda anterior (no se borra: por si quedó algo sin enviar). */
+const archiveKey = (guideId: string, round: number | string) => `apphouse-qa:${guideId}:ronda-${round}`;
 
-/** ¿Hay una corrida guardada en este navegador para la guía? */
-export function hasStoredRun(guideId: string) {
+function readStored(guideId: string): RunState | null {
   try {
-    return Boolean(localStorage.getItem(storageKey(guideId)));
+    const raw = localStorage.getItem(storageKey(guideId));
+    return raw ? (JSON.parse(raw) as RunState) : null;
   } catch {
-    return false;
+    return null;
+  }
+}
+
+/**
+ * ¿Hay una prueba guardada en este navegador para la guía en la ronda activa? Una prueba de otra
+ * ronda no cuenta; una sin ronda (de antes de las rondas) se cuenta como guardada.
+ */
+export function hasStoredRun(guideId: string, roundId?: number) {
+  const s = readStored(guideId);
+  if (!s) return false;
+  return roundId === undefined || s.roundId === undefined || s.roundId === roundId;
+}
+
+/**
+ * Aparta la prueba guardada (de otra ronda) para que el tester empiece de nuevo. Si le quedaban
+ * cambios sin enviar, se intenta mandarlos una vez antes de dejarla de lado.
+ */
+function archiveStored(guideId: string, s: RunState) {
+  try {
+    localStorage.setItem(archiveKey(guideId, s.roundId ?? "anterior"), JSON.stringify(s));
+    localStorage.removeItem(storageKey(guideId));
+  } catch {
+    /* almacenamiento lleno o modo privado */
+  }
+  if (s.outbox?.length) {
+    void fetch(`/api/runs/${s.runId}/events`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-run-token": s.token },
+      body: JSON.stringify({ events: s.outbox.slice(0, 100) }),
+    }).catch(() => undefined);
+  }
+}
+
+/** Ronda de una prueba guardada sin `roundId`: se pregunta al servidor (null si no se sabe). */
+async function fetchRunRound(s: RunState): Promise<number | null> {
+  try {
+    const res = await fetch(`/api/runs/${s.runId}/round`, { headers: { "x-run-token": s.token } });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { roundId?: number };
+    return typeof data.roundId === "number" ? data.roundId : null;
+  } catch {
+    return null;
   }
 }
 
@@ -95,7 +145,7 @@ export function hasStoredRun(guideId: string) {
  * Estado de la corrida: vive en localStorage (el progreso sobrevive a recargas) y cada cambio
  * se encola en `outbox` y se envía al servidor. Si no hay red, se reintenta solo.
  */
-export function useRun(guideId: string) {
+export function useRun(guideId: string, roundId?: number) {
   const [state, setState] = useState<RunState | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -104,20 +154,43 @@ export function useRun(guideId: string) {
   const flushing = useRef<Promise<boolean> | null>(null);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(storageKey(guideId));
-      if (raw) {
-        const parsed = JSON.parse(raw) as RunState;
-        stateRef.current = parsed;
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage solo existe en el cliente
-        setState(parsed);
-      }
-    } catch {
-      /* estado corrupto: se empieza de nuevo */
+    let cancelled = false;
+    const use = (s: RunState | null) => {
+      if (cancelled) return;
+      stateRef.current = s;
+      setState(s);
+      setLoaded(true);
+    };
+    const parsed = readStored(guideId);
+    if (!parsed || roundId === undefined || parsed.roundId === roundId) {
+      use(parsed);
+    } else if (parsed.roundId !== undefined) {
+      // Prueba de una encuesta anterior: se aparta y el tester empieza la de la ronda nueva
+      archiveStored(guideId, parsed);
+      use(null);
+    } else {
+      // Guardada antes de que existieran las rondas: el servidor dice a cuál pertenece
+      void fetchRunRound(parsed).then((r) => {
+        if (cancelled) return;
+        if (r !== null && r !== roundId) {
+          archiveStored(guideId, { ...parsed, roundId: r });
+          use(null);
+          return;
+        }
+        // Misma ronda (o no se pudo saber): se sigue con la prueba guardada
+        const next = r !== null ? { ...parsed, roundId: r } : parsed;
+        try {
+          localStorage.setItem(storageKey(guideId), JSON.stringify(next));
+        } catch {
+          /* modo privado */
+        }
+        use(next);
+      });
     }
-     
-    setLoaded(true);
-  }, [guideId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [guideId, roundId]);
 
   const commit = useCallback(
     (next: RunState | null) => {
@@ -204,7 +277,15 @@ export function useRun(guideId: string) {
     };
   }, [flush, loaded]);
 
-  return { state, loaded, syncing, syncError, commit, update, flush, stateRef };
+  /** Aparta la prueba terminada y deja el navegador listo para registrar otra (otra persona). */
+  const restart = useCallback(() => {
+    const cur = stateRef.current;
+    if (cur) archiveStored(guideId, { ...cur, roundId: cur.roundId ?? roundId });
+    stateRef.current = null;
+    setState(null);
+  }, [guideId, roundId]);
+
+  return { state, loaded, syncing, syncError, commit, update, flush, stateRef, restart };
 }
 
 /**
@@ -231,8 +312,8 @@ async function recoverRun(guideId: string, s: RunState): Promise<RunState> {
     }),
   });
   if (!res.ok) throw new Error(String(res.status));
-  const data = (await res.json()) as { runId: string; token: string };
-  return { ...s, runId: data.runId, token: data.token, outbox: rebuildEvents(s) };
+  const data = (await res.json()) as { runId: string; token: string; roundId?: number };
+  return { ...s, runId: data.runId, token: data.token, roundId: data.roundId ?? s.roundId, outbox: rebuildEvents(s) };
 }
 
 function rebuildEvents(s: RunState): QAEvent[] {

@@ -7,7 +7,7 @@ import { cleanRecord, hasErrors, invalid, json, readJsonObject } from "@/lib/htt
 import { collect, emailError, fieldsCheck, objectError, text, textError } from "@/lib/validate";
 
 /**
- * Registra al tester y abre una corrida de la guía. Devuelve el token que el navegador guarda.
+ * Registra al tester y abre una corrida de la guía. Devuelve el token que el navegador guarda y la ronda (encuesta) en la que quedó.
  *
  * Reglas: guideId obligatorio y de una guía conocida (404 si no existe); nombre 2–120; correo
  * válido (≤200); rol opcional de la lista (por omisión el de la guía); campos del tester según la
@@ -39,6 +39,7 @@ export async function POST(req: Request) {
   const id = crypto.randomUUID();
   const token = crypto.randomBytes(24).toString("base64url");
   const ts = now();
+  const roundId = activeRoundId();
   const device = { ...cleanRecord(body.device, 30, 500), ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "" };
   getDb()
     .prepare(
@@ -47,7 +48,7 @@ export async function POST(req: Request) {
     )
     .run(
       id, sha256(token), guide.id, guide.version, text(body.name), text(body.email).toLowerCase(), role,
-      JSON.stringify(tester.values), JSON.stringify(device), ts, ts, activeRoundId()
+      JSON.stringify(tester.values), JSON.stringify(device), ts, ts, roundId
     );
-  return json({ runId: id, token });
+  return json({ runId: id, token, roundId });
 }
