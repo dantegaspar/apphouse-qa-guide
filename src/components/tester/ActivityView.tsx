@@ -96,6 +96,19 @@ export default function ActivityView({
   // El resultado se marca solo según el resultado esperado; los 4 botones aparecen al tocar «Cambiar»
   const [showResults, setShowResults] = useState(false);
   const closingRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const set = () => document.documentElement.style.setProperty("--acthead-h", `${el.offsetHeight}px`);
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      document.documentElement.style.removeProperty("--acthead-h");
+    };
+  }, []);
   // Los avisos flotantes van arriba de la barra fija de botones (una sola fila en celular)
   useToastOffset(desktop ? 96 : 90);
 
@@ -104,7 +117,9 @@ export default function ActivityView({
     setPos(p);
     // Pantalla nueva: la vista queda al inicio de su contenido, no hasta arriba de la página
     const el = document.querySelector<HTMLElement>("[data-activity-content]");
-    const top = el ? el.getBoundingClientRect().top + window.scrollY - (desktop && window.innerWidth >= 1024 ? 24 : 150) : 0;
+    // Lo que tapan arriba la barra superior y el encabezado fijo de la actividad (+ un margen)
+    const covered = (headerRef.current?.getBoundingClientRect().bottom ?? 150) + 12;
+    const top = el ? el.getBoundingClientRect().top + window.scrollY - covered : 0;
     if (window.scrollY > top) window.scrollTo({ top: Math.max(0, top) });
   };
   const parts = partsOf(activity);
@@ -181,8 +196,14 @@ export default function ActivityView({
     </div>
   );
 
+  // Encabezado de la actividad: fijo arriba (debajo de la barra superior) también en escritorio.
+  // Su altura se publica en --acthead-h para que la captura fija y los saltos de pantalla queden debajo.
   const header = (
-    <div className={"sticky top-[var(--topbar-h,0px)] z-20 -mx-4 bg-[#f4f6fa]/95 px-4 pb-2 pt-1 backdrop-blur" + dk("lg:static lg:mx-0 lg:bg-transparent lg:px-0 lg:pb-1 lg:pt-1 lg:backdrop-blur-none")}>
+    <div
+      ref={headerRef}
+      data-testid="activity-header"
+      className={"sticky top-[var(--topbar-h,0px)] z-20 -mx-4 bg-[#f4f6fa]/95 px-4 pb-2 pt-1 backdrop-blur" + dk("lg:-mx-3 lg:px-3 lg:pb-3 lg:pt-2")}
+    >
       <div className="flex items-center gap-2">
         <button onClick={onExit} className={"-ml-2 min-h-9 rounded-lg px-2 py-0.5 text-sm font-medium text-brand-600 hover:bg-brand-50" + dk("lg:py-1")}>
           ← Actividades
@@ -191,7 +212,7 @@ export default function ActivityView({
           Actividad {index + 1} de {total}
         </span>
       </div>
-      <h1 className={"line-clamp-2 text-lg font-bold leading-tight" + dk("lg:mt-1 lg:line-clamp-none lg:text-[26px]")}>
+      <h1 className={"line-clamp-2 text-lg font-bold leading-tight" + dk("lg:mt-1 lg:text-[26px] lg:[@media(max-height:760px)]:mt-0 lg:[@media(max-height:760px)]:text-xl")}>
         <span className="text-teal-ink">{activity.id}</span> · {activity.title}
       </h1>
       {parts.list.length > 1 && parts.of(screens[pos].steps[0].id) && (
@@ -201,22 +222,25 @@ export default function ActivityView({
         </p>
       )}
       {screens.length > 1 && (
-        <div className={"mt-1.5 flex items-center gap-2" + dk("lg:mt-3 lg:gap-3")}>
+        <div className={"mt-1.5 flex items-center gap-2" + dk("lg:mt-3 lg:gap-3 lg:[@media(max-height:760px)]:mt-1.5")}>
           <ProgressBar value={(pos + 1) / screens.length} />
           <span className={"shrink-0 text-xs font-medium text-slate-600" + dk("lg:text-sm")}>
             Pantalla {pos + 1} de {screens.length}
           </span>
         </div>
       )}
-      {desktop && pos > 0 && (
-        <details className="group mt-3 hidden rounded-xl bg-white text-sm ring-1 ring-slate-200 lg:block">
-          <summary className="cursor-pointer select-none px-4 py-2 font-medium text-slate-600 marker:text-slate-400 hover:text-slate-900">
-            Cuándo, dónde y avisos de {activity.id}
-          </summary>
-          <div className="border-t border-slate-100 px-4 pb-4 pt-3">{info(true)}</div>
-        </details>
-      )}
     </div>
+  );
+
+  // «Cuándo, dónde y avisos» en las pantallas 2 en adelante (escritorio): va con los pasos, fuera del
+  // encabezado fijo, para que este no crezca al abrirlo
+  const infoDetails = desktop && pos > 0 && (
+    <details className="group hidden rounded-xl bg-white text-sm ring-1 ring-slate-200 lg:block">
+      <summary className="cursor-pointer select-none px-4 py-2 font-medium text-slate-600 marker:text-slate-400 hover:text-slate-900">
+        Cuándo, dónde y avisos de {activity.id}
+      </summary>
+      <div className="border-t border-slate-100 px-4 pb-4 pt-3">{info(true)}</div>
+    </details>
   );
 
   // ---- Cierre de la actividad (al final de la última pantalla) ----
@@ -655,7 +679,7 @@ export default function ActivityView({
           const badge = o === "fail" ? "bg-rose-600" : o === "na" ? "bg-slate-500" : o ? "bg-emerald-600" : "bg-brand-gradient";
           const showImg = !!s.image && firstUse.has(s.id) && imgs.find((x) => x.stepId === s.id)?.src === s.image;
           return (
-            <li key={s.id} data-step-id={s.id} data-testid="instruction" className={"scroll-mt-40 px-4 py-4" + dk("lg:scroll-mt-6 lg:px-6 lg:py-4")}>
+            <li key={s.id} data-step-id={s.id} data-testid="instruction" className={"scroll-mt-40 px-4 py-4" + dk("lg:scroll-mt-[calc(var(--topbar-h,0px)+var(--acthead-h,0px)+12px)] lg:px-6 lg:py-4")}>
               <div className="flex items-start gap-3">
                 <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${badge}`} aria-hidden="true">
                   {o === "fail" ? "!" : o === "na" ? "–" : o ? "✓" : num(s)}
@@ -808,6 +832,7 @@ export default function ActivityView({
   const content = (
     <>
       {blocked && blockedPanel}
+      {infoDetails}
       {stepsCard}
       {isLast && closeCard}
       {isLast && <p className={"px-1 text-xs text-slate-600" + dk("lg:hidden")}>✓ Tus respuestas se guardan solas en este navegador mientras llenas.</p>}
@@ -821,9 +846,12 @@ export default function ActivityView({
       <StepFrame id={`${activity.id}-p${pos}`} dir={dir}>
         {twoCol ? (
           <div className="mt-1 lg:mt-4 lg:max-w-3xl xl:grid xl:max-w-none xl:grid-cols-2 2xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] xl:items-start xl:gap-6" data-activity-content>
-            <aside className="hidden xl:sticky xl:top-4 xl:block xl:max-h-[calc(100vh-2rem)] xl:space-y-4 xl:overflow-y-auto xl:pr-1" data-testid="screen-images">
+            <aside
+              className="hidden xl:sticky xl:top-[calc(var(--topbar-h,0px)+var(--acthead-h,0px)+12px)] xl:block xl:max-h-[calc(100dvh-var(--topbar-h,0px)-var(--acthead-h,0px)-24px)] xl:space-y-4 xl:overflow-y-auto xl:pr-1"
+              data-testid="screen-images"
+            >
               {imgs.map((im) => (
-                <StepImage key={im.src} src={im.src} caption={im.caption} desktop tall />
+                <StepImage key={im.src} src={im.src} caption={im.caption} desktop tall fit={imgs.length === 1} />
               ))}
             </aside>
             <section className="space-y-4">{content}</section>

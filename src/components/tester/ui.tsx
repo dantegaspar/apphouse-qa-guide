@@ -232,6 +232,7 @@ export function StepImage({
   flash = false,
   compact = false,
   tall = false,
+  fit = false,
 }: {
   src: string;
   caption?: string;
@@ -244,6 +245,8 @@ export function StepImage({
   compact?: boolean;
   /** Captura alta de una pantalla completa del panel: en escritorio se muestra a todo el ancho, sin tope de altura. */
   tall?: boolean;
+  /** Captura fija junto a los pasos: en escritorio se ajusta al alto libre de la ventana (debajo de las barras fijas). */
+  fit?: boolean;
 }) {
   const [open, setOpen] = useState<null | "tap" | "button">(null);
   const [wide, setWide] = useState(false);
@@ -274,7 +277,7 @@ export function StepImage({
           onLoad={(e) => measure(e.currentTarget)}
           src={src}
           alt={caption || "Captura de la app"}
-          className={`block h-auto w-full ${desktop ? `lg:mx-auto lg:rounded-md lg:object-contain ${tall ? "" : "lg:max-h-[75vh]"}` : ""}`}
+          className={`block h-auto w-full ${desktop ? `lg:mx-auto lg:rounded-md lg:object-contain ${fit ? "lg:max-h-[calc(100dvh-var(--topbar-h,0px)-var(--acthead-h,0px)-84px)]" : tall ? "" : "lg:max-h-[75vh]"}` : ""}`}
           loading="lazy"
         />
       </button>
