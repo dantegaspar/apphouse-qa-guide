@@ -45,6 +45,10 @@ Después abre en el celular `http://<IP-de-tu-computadora>:3000`, usando la IP l
 
 La base de datos se guarda en `./data/qa.sqlite` y las subidas en `./uploads/`. Para reiniciar la prueba desde cero, detén el servidor y borra la carpeta `./data` (borra también `./uploads` si quieres eliminar las capturas).
 
+## Simular testers (para probar la Mesa de control)
+
+`node scripts/simular-clientes.mjs` y `node scripts/simular-establecimientos.mjs` contestan la guía como testers simulados, con avance gradual, fallas con foto, ayudas y encuesta final. Instrucciones en [scripts/simulador/README.md](scripts/simulador/README.md).
+
 ## Producción con Docker
 
 1. Crea el archivo de variables:
