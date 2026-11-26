@@ -1,9 +1,10 @@
-import { roundCond, viewRoundId } from "./rounds";
+import { activeRoundId, roundCond, viewRoundId } from "./rounds";
 import crypto from "node:crypto";
 import { getDb } from "./db";
 import { sha256 } from "./auth";
 import { parseRec } from "./admin-data";
 import { COURIER_NA, COURIER_QUESTIONS, type CourierQuestion } from "./courier";
+export { ROUND_CLOSED, ROUND_CLOSED_MESSAGE } from "./courier";
 
 export type CourierFeedbackRow = {
   id: string;
@@ -19,6 +20,15 @@ export type CourierFeedbackRow = {
 };
 export type CourierIssueRow = { id: string; feedback_id: string; description: string; created_at: string };
 export type CourierAttachmentRow = { id: string; feedback_id: string; issue_id: string; original_name: string; mime: string; size: number };
+
+/**
+ * La encuesta existe y es de una ronda anterior a la activa: ya no se edita ni se le agregan
+ * problemas o fotos (lo que llega después de abrir una ronda nueva es de la ronda nueva).
+ */
+export function courierRoundClosed(feedbackId: string): boolean {
+  const row = getDb().prepare("SELECT round_id FROM courier_feedback WHERE id = ?").get(feedbackId) as { round_id: number } | undefined;
+  return !!row && row.round_id !== activeRoundId();
+}
 
 /** Valida el token de la encuesta (cabecera x-courier-token). */
 export function checkCourierToken(feedbackId: string, token: string | null) {

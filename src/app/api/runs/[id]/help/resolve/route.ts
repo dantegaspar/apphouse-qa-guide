@@ -1,5 +1,6 @@
 import { getDb, now } from "@/lib/db";
 import { checkRunToken } from "@/lib/auth";
+import { runRounds } from "@/lib/rounds";
 import { verifyGuidePassword } from "@/lib/guide-auth";
 import { err, hasErrors, invalid, json, readJsonObject } from "@/lib/http";
 import { collect, idError, text, textError } from "@/lib/validate";
@@ -38,5 +39,5 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     );
     db.prepare("UPDATE runs SET updated_at=? WHERE id=?").run(ts, id);
   }
-  return json({ ok: true });
+  return json({ ok: true, ...runRounds(id) });
 }

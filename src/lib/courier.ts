@@ -51,6 +51,13 @@ export const FACES = [
 
 export const faceOf = (v: number | null | undefined) => (v ? FACES.find((f) => f.value === Math.round(v)) : undefined);
 
+/**
+ * Código de error (409, `{ error, code }`) cuando la encuesta es de una ronda que ya no está activa:
+ * ya no se edita ni se le agregan problemas o fotos.
+ */
+export const ROUND_CLOSED = "round_closed";
+export const ROUND_CLOSED_MESSAGE = "Se abrió una nueva encuesta. Esta ya no se puede cambiar.";
+
 /** Ids que genera el navegador para la encuesta, los problemas y las fotos. */
 export const COURIER_ID_RE = /^[A-Za-z0-9-]{8,64}$/;
 

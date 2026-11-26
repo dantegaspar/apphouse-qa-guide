@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { getDb, now } from "./db";
 
 /**
@@ -33,9 +34,41 @@ export function activeRoundId(): number {
   return rows[rows.length - 1].id;
 }
 
+/**
+ * Ronda fijada para una petición (p. ej. una descarga pide la ronda que el admin tiene en pantalla).
+ * Mientras corre `withRound`, `viewRoundId()` devuelve esa ronda en lugar de la vista compartida.
+ */
+const roundOverride = new AsyncLocalStorage<number>();
+
+/** Ejecuta `fn` como si la ronda a la vista fuera `id` (sin cambiar app_settings.view_round). */
+export function withRound<T>(id: number | null | undefined, fn: () => T): T {
+  return id ? roundOverride.run(id, fn) : fn();
+}
+
+/**
+ * Lee la ronda que manda el cliente (?round= o body.round): la que el admin tiene en pantalla.
+ * Devuelve null si no viene o no existe; quien llama usa entonces viewRoundId().
+ */
+export function parseRoundId(v: unknown): number | null {
+  const id = Number(v);
+  if (!Number.isInteger(id) || id < 1) return null;
+  return listRounds().some((r) => r.id === id) ? id : null;
+}
+
+/**
+ * Ronda de una prueba y la ronda activa. Va en las respuestas a la página del tester para que una
+ * pestaña abierta note que el admin abrió una encuesta nueva (y deje de mandar a la anterior).
+ */
+export function runRounds(runId: string): { roundId?: number; activeRoundId: number } {
+  const row = getDb().prepare("SELECT round_id FROM runs WHERE id = ?").get(runId) as { round_id: number } | undefined;
+  return { roundId: row?.round_id, activeRoundId: activeRoundId() };
+}
+
 /** Ronda que el panel está mostrando. */
 export function viewRoundId(): number {
   const rows = listRounds();
+  const fixed = roundOverride.getStore();
+  if (fixed && rows.some((r) => r.id === fixed)) return fixed;
   const v = getDb().prepare("SELECT value FROM app_settings WHERE key = 'view_round'").get() as { value: string } | undefined;
   const id = Number(v?.value);
   return rows.some((r) => r.id === id) ? id : rows[rows.length - 1].id;
@@ -61,6 +94,11 @@ export function createRound(name?: string): Round {
   const round: Round = { id: next, name: (name ?? "").trim().slice(0, ROUND_NAME_MAX) || defaultRoundName(next), created_at: now() };
   db.transaction(() => {
     db.prepare("INSERT INTO rounds (id, name, created_at) VALUES (?, ?, ?)").run(round.id, round.name, round.created_at);
+    // Las pruebas de la encuesta anterior se cierran en el navegador del tester: sus solicitudes de
+    // ayuda abiertas ya no las puede atender nadie, así que se cierran aquí
+    db.prepare("UPDATE help_requests SET status='ended', resolved_at=?, resolution=? WHERE status='open'").run(
+      round.created_at, `Se abrió «${round.name}»`
+    );
     setViewRound(round.id);
   })();
   return round;

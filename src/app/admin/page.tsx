@@ -4,13 +4,15 @@ import { isAdmin } from "@/lib/auth";
 import { getGuide, GUIDES } from "@/lib/guides";
 import { ACTIVITY_RESULTS } from "@/lib/types";
 import {
-  deviceSummary, fmtDate, guideTitle, isImage, loadAll, loadOpenHelp, parseRec, runStatusClass, runStatusLabel, timeAgo,
+  deviceSummary, fmtDate, guideTitle, isImage, loadAll, loadOpenHelp, loadOtherRoundsActivity, OTHER_ROUND_ACTIVE_MIN, parseRec, runStatusClass,
+  runStatusLabel, timeAgo,
 } from "@/lib/admin-data";
 import { LogoutButton } from "@/components/admin/LogoutButton";
 import { AutoRefresh } from "@/components/admin/AutoRefresh";
 import { CourierAdminSection } from "@/components/admin/CourierSection";
 import { ExportButton } from "@/components/admin/ExportButton";
 import { HelpRequestWatcher } from "@/components/admin/HelpRequestWatcher";
+import { OtherRoundsAlert } from "@/components/admin/OtherRoundsAlert";
 import { InsightsPanel } from "@/components/admin/InsightsPanel";
 import { Coachmark } from "@/components/feedback";
 import { computeInsights } from "@/lib/insights";
@@ -50,8 +52,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const attachmentsByIssue = new Map<string, typeof d.attachments>();
   for (const a of d.attachments) attachmentsByIssue.set(a.issue_id, [...(attachmentsByIssue.get(a.issue_id) ?? []), a]);
   const runById = new Map(d.runs.map((r) => [r.id, r]));
-  // Las solicitudes abiertas se muestran siempre, sin importar el filtro de guía
+  // Las solicitudes abiertas se muestran siempre, sin importar el filtro de guía ni la ronda a la vista
   const { rows: openHelp, at: nowMs } = loadOpenHelp();
+  const otherRounds = loadOtherRoundsActivity(nowMs);
 
   return (
     <main className="mx-auto w-full max-w-6xl space-y-8 px-4 py-6">
@@ -77,6 +80,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           return { id: h.id, tester: h.tester, where: act ? `${h.activity_id} ${act.title}` : h.activity_id || "la guía" };
         })}
       />
+      <OtherRoundsAlert rounds={otherRounds} activeMinutes={OTHER_ROUND_ACTIVE_MIN} />
 
       <section
         id="ayuda"
@@ -109,6 +113,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                       {h.tester}
                     </Link>
                     <span className="text-slate-600">{g?.title ?? h.guide_id}</span>
+                    {h.other_round && (
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900" data-testid="help-round" title="Esta prueba es de otra encuesta">
+                        {h.round_name}
+                      </span>
+                    )}
                     <span className="font-medium text-slate-800">
                       {h.activity_id} {act?.title}
                       {stepIdx >= 0 ? ` · paso ${stepIdx + 1}` : ""}

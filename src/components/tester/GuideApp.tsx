@@ -12,7 +12,7 @@ import BlockedPanel from "./BlockedPanel";
 import ReportSheet, { type ReportDraft } from "./ReportSheet";
 import Survey from "./Survey";
 import { Button, Callout, FormField, ProgressBar, Rich, Sheet, StepImage } from "./ui";
-import { callRun, detectDevice, emptyActivity, stepKey, uid, useRun, type Blocked, type Issue, type RunState } from "./store";
+import { callRun, detectDevice, emptyActivity, reportRound, stepKey, uid, useRun, type Blocked, type Issue, type RunState } from "./store";
 import { focusFirstError, LIMITS, trimAll, validateEmail, validateFields, validateName, type Errors } from "./validation";
 
 /** Datos del formulario de identificación que se conservan al cambiar de variante. */
@@ -28,7 +28,7 @@ export type VariantCtl = {
   /** Cambia de variante; `carry` lleva los datos del tester a la otra (si todavía no empezó). */
   choose: (next: GuideVariant, carry?: IdentifyDraft) => void;
   draft: IdentifyDraft | null;
-  setDraft: (d: IdentifyDraft) => void;
+  setDraft: (d: IdentifyDraft | null) => void;
   /** Se llegó aquí desde una prueba ya empezada con la otra variante. */
   carriedFrom: GuideVariant | null;
 };
@@ -63,7 +63,7 @@ export default function GuideApp({
   /** Solo en guías con variante de computadora y de celular. */
   variantCtl?: VariantCtl;
 }) {
-  const { state, loaded, syncing, syncError, commit, update, flush, stateRef, restart } = useRun(guide.id, roundId);
+  const { state, loaded, syncing, syncError, commit, update, flush, stateRef, restart, roundClosed, dismissRoundClosed } = useRun(guide.id, roundId);
   // «Empezar otra prueba» pide confirmación en la misma pantalla (sin ventanas del navegador)
   const [restartAsk, setRestartAsk] = useState(false);
   const [view, setView] = useState<View>({ name: "home" });
@@ -97,6 +97,12 @@ export default function GuideApp({
     return () => clearTimeout(t);
   }, [saved]);
   const [report, setReport] = useState<{ kind: "issue" | "evidence"; activityId: string; stepId?: string; markFail?: boolean; choices?: string[] } | null>(null);
+  // El admin abrió una encuesta nueva con la prueba abierta: se cerró y el tester vuelve al registro
+  useEffect(() => {
+    if (!roundClosed) return;
+    window.scrollTo({ top: 0 });
+    toast.info(ROUND_CLOSED_MSG, { id: "round-closed", title: "Nueva encuesta" });
+  }, [roundClosed]);
 
   // Guía de escritorio: en pantallas ≥1024 px (lg) usa barra lateral y vistas anchas
   const desktop = guide.layout === "desktop";
@@ -150,10 +156,13 @@ export default function GuideApp({
         done();
         return null;
       }
+      // Los archivos van a la misma prueba que el reporte (se toma antes de enviar: si en ese
+      // momento se abrió una encuesta nueva, la prueba se cierra y el estado queda vacío)
+      const s = stateRef.current;
+      if (!s) return "No se pudo enviar el reporte. Recarga la página e inténtalo de nuevo.";
       // Los archivos necesitan que el reporte ya exista en el servidor
       const ok = await flush();
       if (!ok) return "Se guardó tu reporte, pero no hay conexión para subir los archivos. Revisa tu internet e inténtalo de nuevo.";
-      const s = stateRef.current!;
       for (const f of files) {
         const fd = new FormData();
         fd.append("issueId", issue.id);
@@ -164,6 +173,7 @@ export default function GuideApp({
           return msg || "No se pudo subir un archivo. Revisa tu conexión e inténtalo de nuevo.";
         }
         const att = (await res.json()) as { id: string; size: number };
+        reportRound(s.runId, att);
         update((st) => ({
           ...st,
           issues: st.issues.map((i) => (i.id === issue.id ? { ...i, attachments: [...i.attachments, { id: att.id, name: f.name, size: att.size }] } : i)),
@@ -215,7 +225,22 @@ export default function GuideApp({
 
   if (!loaded) return <div className="flex flex-1 items-center justify-center text-slate-600">Cargando…</div>;
   if (!state || state.guideVersion === undefined)
-    return <Identify guide={guide} desktop={desktop} variantCtl={variantCtl} onDone={(s) => commit(s)} />;
+    return (
+      <Identify
+        guide={guide}
+        desktop={desktop}
+        variantCtl={variantCtl}
+        notice={roundClosed ? ROUND_CLOSED_MSG : undefined}
+        onDone={(s) => {
+          // La prueba nueva empieza en el inicio (la anterior pudo cerrarse a media actividad)
+          dismissRoundClosed();
+          setView({ name: "home" });
+          setReport(null);
+          setShowRef(false);
+          commit(s);
+        }}
+      />
+    );
 
   const doneActs = guide.activities.filter((a) => state.activities[a.id]?.done).length;
   // Una sola medida de avance (actividades guardadas) y el tiempo que falta, según los minutos de cada actividad
@@ -672,6 +697,8 @@ export default function GuideApp({
                   <Button
                     onClick={() => {
                       setRestartAsk(false);
+                      // Otra persona: el registro empieza vacío (sin los datos de quien terminó)
+                      variantCtl?.setDraft(null);
                       restart();
                       setView({ name: "home" });
                       window.scrollTo({ top: 0 });
@@ -786,6 +813,8 @@ function SavedBurst() {
 const SURVEY_DONE_ID = "surveyDone";
 
 /** Espera el envío de lo pendiente, pero no más de `ms` (con mala señal la petición puede tardar mucho). */
+const ROUND_CLOSED_MSG = "Se abrió una nueva encuesta. Tu prueba anterior quedó guardada; regístrate para contestar la nueva.";
+
 function flushWithin(flush: () => Promise<boolean>, ms: number): Promise<boolean> {
   return Promise.race([flush().catch(() => false), new Promise<boolean>((r) => setTimeout(() => r(false), ms))]);
 }
@@ -982,11 +1011,14 @@ function Identify({
   guide,
   desktop = false,
   variantCtl,
+  notice,
   onDone,
 }: {
   guide: Guide;
   desktop?: boolean;
   variantCtl?: VariantCtl;
+  /** Aviso arriba del formulario (p. ej. se abrió una encuesta nueva). */
+  notice?: string;
   onDone: (s: RunState) => void;
 }) {
   const d0 = variantCtl?.draft;
@@ -1129,6 +1161,11 @@ function Identify({
       </div>
 
       <div className={"mt-5 space-y-5" + (desktop ? " lg:mt-0" : "")}>
+        {notice && (
+          <div data-testid="round-closed">
+            <Callout tone="info">{notice}</Callout>
+          </div>
+        )}
         <div className={desktop ? "lg:hidden" : undefined}>{intro}</div>
         {variantCtl?.carriedFrom && (
           <Callout tone="info">

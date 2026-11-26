@@ -3,7 +3,7 @@ import path from "node:path";
 import { getDb, now, UPLOAD_DIR } from "@/lib/db";
 import { sha256 } from "@/lib/auth";
 import { activeRoundId } from "@/lib/rounds";
-import { checkCourierToken } from "@/lib/courier-data";
+import { checkCourierToken, courierRoundClosed, ROUND_CLOSED, ROUND_CLOSED_MESSAGE } from "@/lib/courier-data";
 import { COURIER_QUESTIONS, type CourierAnswer } from "@/lib/courier";
 import { cleanRecord, err, hasErrors, invalid, json, readJsonObject } from "@/lib/http";
 import {
@@ -27,6 +27,7 @@ const TOKEN_RE = /^[A-Za-z0-9_-]{20,200}$/;
  * Guarda la encuesta de un repartidor. El navegador genera el id y el token (guarda el token y aquí
  * solo se guarda su sha256), así que reenviar la misma encuesta (p. ej. tras perder la conexión)
  * la actualiza en lugar de duplicarla. Los problemas se sincronizan con la lista enviada.
+ * Si la encuesta ya existe pero es de una ronda anterior, responde 409 con `code: "round_closed"`.
  *
  * Reglas: id (8–64, letras/números/-/_) y token (20–200) del navegador; nombre 2–80; teléfono
  * opcional (números, espacios, + o -, 8–20); answers: cada pregunta conocida con un entero 1–5
@@ -83,6 +84,9 @@ export async function POST(req: Request) {
   const db = getDb();
   const exists = db.prepare("SELECT 1 FROM courier_feedback WHERE id = ?").get(id);
   if (exists && !checkCourierToken(id, token)) return err("Esta encuesta ya existe", 409);
+  // Encuesta de una ronda anterior (p. ej. un envío a medias que se reintenta tras abrir otra ronda):
+  // no se toca. El navegador la manda de nuevo con otro id y queda en la ronda activa.
+  if (exists && courierRoundClosed(id)) return err(ROUND_CLOSED_MESSAGE, 409, ROUND_CLOSED);
 
   const ts = now();
   const removedFiles: string[] = [];

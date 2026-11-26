@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { getDb, now, UPLOAD_DIR } from "@/lib/db";
-import { checkCourierToken } from "@/lib/courier-data";
+import { checkCourierToken, courierRoundClosed, ROUND_CLOSED, ROUND_CLOSED_MESSAGE } from "@/lib/courier-data";
 import { ALLOWED_PHOTO_TYPES, guessPhotoMime } from "@/lib/courier";
 import { ALLOWED_MIME, err, hasErrors, invalid, json, MAX_UPLOAD_MB, str } from "@/lib/http";
 import { collect, idError } from "@/lib/validate";
@@ -17,6 +17,8 @@ const MAX_PER_ISSUE = 3;
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!checkCourierToken(id, req.headers.get("x-courier-token"))) return err("No autorizado", 401);
+  // La encuesta es de una ronda anterior: ya no se le agrega nada
+  if (courierRoundClosed(id)) return err(ROUND_CLOSED_MESSAGE, 409, ROUND_CLOSED);
   const maxBytes = MAX_UPLOAD_MB * 1024 * 1024;
   const declared = Number(req.headers.get("content-length") || 0);
   if (declared > maxBytes + 64 * 1024) return err(`La foto pasa el límite de ${MAX_UPLOAD_MB} MB`, 413);

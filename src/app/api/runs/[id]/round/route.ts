@@ -6,8 +6,9 @@ import { err, json } from "@/lib/http";
 export const dynamic = "force-dynamic";
 
 /**
- * Ronda (encuesta) a la que pertenece la prueba y la ronda activa. El navegador lo pregunta solo
- * cuando guarda una prueba de antes de que existieran las rondas (sin `roundId` guardado).
+ * Ronda (encuesta) a la que pertenece la prueba y la ronda activa. El navegador lo pregunta al
+ * abrir una prueba guardada sin `roundId` (de antes de las rondas) y, con la página abierta, cada
+ * 15 s y al volver a la pestaña: si el admin abrió una encuesta nueva, cierra la prueba anterior.
  */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

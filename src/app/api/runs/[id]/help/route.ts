@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { getDb, now } from "@/lib/db";
 import { getGuide } from "@/lib/guides";
 import { checkRunToken } from "@/lib/auth";
+import { runRounds } from "@/lib/rounds";
 import { err, hasErrors, invalid, json, readJsonObject } from "@/lib/http";
 import { collect, idError, text, textError } from "@/lib/validate";
 
@@ -28,7 +29,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const open = db
     .prepare("SELECT * FROM help_requests WHERE run_id = ? AND status = 'open' ORDER BY created_at DESC LIMIT 1")
     .get(id) as HelpRow | undefined;
-  return json({ status: run.status, endedReason: run.ended_reason, endedAt: run.ended_at, open: open ? helpOut(open) : null });
+  return json({ status: run.status, endedReason: run.ended_reason, endedAt: run.ended_at, open: open ? helpOut(open) : null, ...runRounds(id) });
 }
 
 /**
@@ -44,6 +45,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const db = getDb();
   const run = db.prepare("SELECT guide_id, status FROM runs WHERE id = ?").get(id) as RunRow;
   if (run.status === "ended_blocked") return err("La prueba ya terminó", 409);
+  // Prueba de una encuesta anterior: no se abre una solicitud que nadie podrá cerrar. La respuesta
+  // trae la ronda y el navegador cierra la prueba y muestra el registro de la encuesta nueva.
+  const rounds = runRounds(id);
+  if (rounds.roundId !== undefined && rounds.roundId !== rounds.activeRoundId)
+    return json({ error: "Se abrió una nueva encuesta. Regístrate de nuevo para seguir.", code: "round_closed", ...rounds }, 409);
   const guide = getGuide(run.guide_id);
   const act = guide?.activities.find((a) => a.id === body.activityId);
   if (!act) return invalid({ activityId: "La actividad no existe en esta guía." }, 400, "Actividad no encontrada");
@@ -63,7 +69,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const open = db.prepare("SELECT * FROM help_requests WHERE run_id = ? AND status = 'open'").get(id) as HelpRow | undefined;
   if (open) {
     db.prepare("UPDATE help_requests SET activity_id=?, step_id=?, issue_id=?, reason=? WHERE id=?").run(activityId, stepId, issueId, reason, open.id);
-    return json({ id: open.id, createdAt: open.created_at });
+    return json({ id: open.id, createdAt: open.created_at, ...runRounds(id) });
   }
   const helpId = crypto.randomUUID();
   db.prepare(
@@ -71,5 +77,5 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
      VALUES (?,?,?,?,?,?, 'open', ?)`
   ).run(helpId, id, activityId, stepId, issueId, reason, ts);
   db.prepare("UPDATE runs SET updated_at=? WHERE id=?").run(ts, id);
-  return json({ id: helpId, createdAt: ts });
+  return json({ id: helpId, createdAt: ts, ...runRounds(id) });
 }

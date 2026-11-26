@@ -1,4 +1,4 @@
-import { roundCond } from "./rounds";
+import { listRounds, roundCond, viewRoundId } from "./rounds";
 import { getDb } from "./db";
 import { getGuide } from "./guides";
 import { ACTIVITY_RESULTS } from "./types";
@@ -78,15 +78,75 @@ export function timeAgo(iso: string, nowMs = Date.now()) {
   return `hace ${Math.floor(h / 24)} día(s)`;
 }
 
-/** Solicitudes de ayuda abiertas de todas las guías (las más antiguas primero). */
+export type OpenHelpRow = HelpRow & {
+  tester: string;
+  guide_id: string;
+  round_id: number;
+  round_name: string;
+  /** La prueba es de otra ronda (no de la que está a la vista). */
+  other_round: boolean;
+};
+
+/**
+ * Solicitudes de ayuda abiertas de todas las guías (las más antiguas primero). Nunca se esconden por
+ * ronda: las de otras encuestas también salen, marcadas con `other_round` y el nombre de su ronda.
+ */
 export function loadOpenHelp() {
-  const rows = getDb()
-    .prepare(
-      `SELECT h.*, r.name AS tester, r.guide_id AS guide_id FROM help_requests h JOIN runs r ON r.id = h.run_id
-       WHERE h.status = 'open' AND ${roundCond("r.round_id")} ORDER BY h.created_at`
-    )
-    .all() as (HelpRow & { tester: string; guide_id: string })[];
+  const view = viewRoundId();
+  const rows = (
+    getDb()
+      .prepare(
+        `SELECT h.*, r.name AS tester, r.guide_id AS guide_id, r.round_id AS round_id, COALESCE(ro.name, '') AS round_name
+         FROM help_requests h JOIN runs r ON r.id = h.run_id LEFT JOIN rounds ro ON ro.id = r.round_id
+         WHERE h.status = 'open' ORDER BY h.created_at`
+      )
+      .all() as Omit<OpenHelpRow, "other_round">[]
+  ).map((h) => ({ ...h, round_name: h.round_name || `Encuesta ${h.round_id}`, other_round: h.round_id !== view }));
   return { rows, at: Date.now() };
+}
+
+/**
+ * Minutos sin señal tras los cuales una prueba sin terminar de otra ronda ya no se avisa como activa.
+ * Corto a propósito: al abrir una encuesta nueva, la página del tester cierra sola la prueba anterior
+ * (en segundos), así que lo que sigue mandando datos después de esto es una pestaña rezagada.
+ */
+export const OTHER_ROUND_ACTIVE_MIN = 20;
+
+/** Actividad que sigue viva en una ronda que NO está a la vista. */
+export type OtherRoundActivity = { id: number; name: string; active: number; help: number };
+
+/**
+ * Pruebas de otras rondas que siguen activas (sin terminar y con alguna señal en las últimas
+ * OTHER_ROUND_ACTIVE_MIN minutos) y solicitudes de ayuda abiertas en otras rondas. Sirve para avisar al
+ * admin cuando abrió una encuesta nueva y todavía hay testers trabajando en la anterior.
+ */
+export function loadOtherRoundsActivity(nowMs = Date.now()): OtherRoundActivity[] {
+  const db = getDb();
+  const view = viewRoundId();
+  const since = new Date(nowMs - OTHER_ROUND_ACTIVE_MIN * 60_000).toISOString();
+  const m = new Map<number, OtherRoundActivity>();
+  const names = new Map(listRounds().map((r) => [r.id, r.name]));
+  const entry = (id: number) => {
+    let e = m.get(id);
+    if (!e) m.set(id, (e = { id, name: names.get(id) ?? `Encuesta ${id}`, active: 0, help: 0 }));
+    return e;
+  };
+  for (const r of db
+    .prepare(
+      `SELECT round_id, COUNT(*) AS n FROM runs
+       WHERE round_id <> ? AND status = 'in_progress' AND ended_at IS NULL AND updated_at > ? GROUP BY round_id`
+    )
+    .all(view, since) as { round_id: number; n: number }[])
+    entry(r.round_id).active = r.n;
+  for (const r of db
+    .prepare(
+      `SELECT r.round_id AS round_id, COUNT(*) AS n FROM help_requests h JOIN runs r ON r.id = h.run_id
+       WHERE h.status = 'open' AND r.round_id <> ? GROUP BY r.round_id`
+    )
+    .all(view) as { round_id: number; n: number }[])
+    entry(r.round_id).help = r.n;
+  // Las rondas más recientes primero (normalmente la anterior a la que se abrió)
+  return [...m.values()].sort((a, b) => b.id - a.id);
 }
 
 export type AttachmentRow = { id: string; run_id: string; issue_id: string; original_name: string; mime: string; size: number };

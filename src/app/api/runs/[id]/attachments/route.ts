@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { getDb, now, UPLOAD_DIR } from "@/lib/db";
 import { checkRunToken } from "@/lib/auth";
+import { runRounds } from "@/lib/rounds";
 import { ALLOWED_MIME, err, invalid, json, MAX_UPLOAD_MB, str } from "@/lib/http";
 import { idError } from "@/lib/validate";
 
@@ -47,5 +48,5 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   db.prepare(
     "INSERT INTO attachments (id, run_id, issue_id, original_name, mime, size, path, created_at) VALUES (?,?,?,?,?,?,?,?)"
   ).run(attId, id, issueId, str(file.name, 200) || `captura.${ext}`, file.type, file.size, rel, now());
-  return json({ id: attId, size: file.size });
+  return json({ id: attId, size: file.size, ...runRounds(id) });
 }

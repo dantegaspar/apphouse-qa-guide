@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { isPlainObject, summarize, type FieldErrors } from "./validate";
 
 export const json = (data: unknown, status = 200) => NextResponse.json(data, { status });
-export const err = (message: string, status = 400) => NextResponse.json({ error: message }, { status });
+/** Error `{ error }`; con `code` (opcional) el cliente distingue casos sin leer el mensaje. */
+export const err = (message: string, status = 400, code?: string) =>
+  NextResponse.json(code ? { error: message, code } : { error: message }, { status });
 
 /** Respuesta de validación: `{ error, fields: { campo: mensaje } }` (400 por omisión). */
 export const invalid = (fields: FieldErrors, status = 400, error?: string) =>

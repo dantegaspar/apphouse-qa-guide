@@ -1,4 +1,4 @@
-import { roundSlug } from "@/lib/rounds";
+import { parseRoundId, roundSlug, withRound } from "@/lib/rounds";
 import { isAdmin } from "@/lib/auth";
 import { toCsv } from "@/lib/csv";
 import { err, invalid } from "@/lib/http";
@@ -17,14 +17,17 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
   const guideId = new URL(req.url).searchParams.get("guide") || null;
   const guideErr = idError(guideId, { known: GUIDES.map((g) => g.id), required: false, label: "la guía" });
   if (guideErr) return invalid({ guide: guideErr });
-  const { headers, rows } = buildExport(kind as ExportKind, requestOrigin(req), guideId);
-
-  const date = new Date().toISOString().slice(0, 10);
-  return new Response(toCsv(headers, rows), {
-    headers: {
-      "content-type": "text/csv; charset=utf-8",
-      "content-disposition": `attachment; filename="apphouse-qa-${roundSlug()}-${kind}-${date}.csv"`,
-      "cache-control": "no-store",
-    },
+  // ?round= opcional: la ronda que el admin tiene en pantalla (si no viene, la vista compartida)
+  const round = parseRoundId(new URL(req.url).searchParams.get("round"));
+  return withRound(round, () => {
+    const { headers, rows } = buildExport(kind as ExportKind, requestOrigin(req), guideId);
+    const date = new Date().toISOString().slice(0, 10);
+    return new Response(toCsv(headers, rows), {
+      headers: {
+        "content-type": "text/csv; charset=utf-8",
+        "content-disposition": `attachment; filename="apphouse-qa-${roundSlug()}-${kind}-${date}.csv"`,
+        "cache-control": "no-store",
+      },
+    });
   });
 }
