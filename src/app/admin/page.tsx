@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PhotoGallery from "@/components/admin/PhotoGallery";
 import { redirect } from "next/navigation";
 import { isAdmin } from "@/lib/auth";
 import { getGuide, GUIDES } from "@/lib/guides";
@@ -302,16 +303,15 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                 {i.expected && <p className="mt-1 whitespace-pre-wrap text-sm text-slate-500">Esperaba: {i.expected}</p>}
                 {atts.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {atts.map((a) => (
-                      <a key={a.id} href={`/api/admin/files/${a.id}`} target="_blank" rel="noreferrer" className="block">
-                        {isImage(a.mime) ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={`/api/admin/files/${a.id}`} alt={a.original_name} loading="lazy" className="h-20 w-20 rounded-lg object-cover ring-1 ring-slate-200" />
-                        ) : (
-                          <span className="inline-flex h-20 items-center rounded-lg bg-slate-100 px-3 text-xs text-slate-700 ring-1 ring-slate-200">{a.original_name}</span>
-                        )}
-                      </a>
-                    ))}
+                    <PhotoGallery photos={atts.filter((a) => isImage(a.mime)).map((a) => ({ id: a.id, src: `/api/admin/files/${a.id}`, name: a.original_name }))}>
+                      {atts
+                        .filter((a) => !isImage(a.mime))
+                        .map((a) => (
+                          <a key={a.id} href={`/api/admin/files/${a.id}`} target="_blank" rel="noreferrer" className="block">
+                            <span className="inline-flex h-20 items-center rounded-lg bg-slate-100 px-3 text-xs text-slate-700 ring-1 ring-slate-200">{a.original_name}</span>
+                          </a>
+                        ))}
+                    </PhotoGallery>
                   </div>
                 )}
               </li>

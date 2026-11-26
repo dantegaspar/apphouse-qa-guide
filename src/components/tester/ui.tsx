@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
 import { motion, useReducedMotion, type HTMLMotionProps } from "motion/react";
+import dynamic from "next/dynamic";
+
+const ImageViewer = dynamic(() => import("@/components/ImageViewer"), { ssr: false });
 
 /**
  * Texto con **negritas** (único formato que usan las guías). Con `links`, las direcciones
@@ -332,9 +334,9 @@ export function StepImage({
 }
 
 /**
- * Visor a pantalla completa: fondo oscuro, captura ajustada a la pantalla y botón para verla a
- * tamaño real (se recorre con scroll). Esc o ✕ lo cierran. Con `nativeFullscreen` además pide el
- * modo pantalla completa del navegador (si existe; en iOS basta con el visor).
+ * Visor a pantalla completa (ver ImageViewer): zoom con pellizco, doble toque, rueda o botones
+ * − / +, arrastre para recorrer y deslizar hacia abajo para cerrar. Se carga solo al abrirlo.
+ * Con `nativeFullscreen` además pide el modo pantalla completa del navegador.
  */
 export function Lightbox({
   src,
@@ -347,96 +349,7 @@ export function Lightbox({
   onClose: () => void;
   nativeFullscreen?: boolean;
 }) {
-  const [actual, setActual] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const closeRef = useRef(onClose);
-  useEffect(() => {
-    closeRef.current = onClose;
-  }, [onClose]);
-
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        closeRef.current();
-      }
-    };
-    // En captura: se cierra el visor antes que una hoja (Sheet) que esté abajo
-    window.addEventListener("keydown", onKey, true);
-    const el = ref.current;
-    let wentFullscreen = false;
-    const onFs = () => {
-      // Al salir del modo pantalla completa del navegador (p. ej. con Esc) también se cierra el visor
-      if (document.fullscreenElement) wentFullscreen = true;
-      else if (wentFullscreen) closeRef.current();
-    };
-    if (nativeFullscreen && el?.requestFullscreen) {
-      document.addEventListener("fullscreenchange", onFs);
-      el.requestFullscreen().catch(() => {});
-    }
-    return () => {
-      document.body.style.overflow = prev;
-      window.removeEventListener("keydown", onKey, true);
-      document.removeEventListener("fullscreenchange", onFs);
-      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-    };
-  }, [nativeFullscreen]);
-
-  return createPortal(
-    <div
-      ref={ref}
-      className="animate-pop fixed inset-0 z-[70] flex flex-col bg-slate-950/95 text-white"
-      role="dialog"
-      aria-modal="true"
-      aria-label={caption ? `Captura: ${caption}` : "Captura en pantalla completa"}
-      data-testid="lightbox"
-    >
-      <div className="flex shrink-0 items-center gap-2 px-3 py-2.5 sm:px-4">
-        <button
-          type="button"
-          onClick={() => setActual((v) => !v)}
-          className="rounded-lg bg-white/10 px-3 py-1.5 text-sm font-medium hover:bg-white/20"
-          aria-pressed={actual}
-        >
-          {actual ? "⤡ Ajustar a la pantalla" : "🔍 Tamaño real"}
-        </button>
-        <span className="hidden text-xs text-white/50 sm:inline">
-          {actual ? "Desplázate para recorrer la captura" : "Esc para cerrar"}
-        </span>
-        <button
-          type="button"
-          onClick={onClose}
-          className="ml-auto flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-lg hover:bg-white/20"
-          aria-label="Cerrar"
-          autoFocus
-        >
-          ✕
-        </button>
-      </div>
-      <div
-        className={`min-h-0 flex-1 overflow-auto ${actual ? "" : "flex items-center justify-center p-2 sm:p-4"}`}
-        onClick={(e) => {
-          if (e.target === e.currentTarget) onClose();
-        }}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={src}
-          alt={caption || ""}
-          onClick={() => setActual((v) => !v)}
-          className={
-            actual
-              ? "m-auto block h-auto w-auto max-w-none cursor-zoom-out"
-              : "block h-full max-h-full w-full max-w-full cursor-zoom-in rounded-md object-contain"
-          }
-        />
-      </div>
-      {caption && <p className="pb-safe shrink-0 px-4 pt-2 text-center text-sm text-white/80">{caption}</p>}
-    </div>,
-    document.body
-  );
+  return <ImageViewer images={[{ src, caption }]} onClose={onClose} nativeFullscreen={nativeFullscreen} />;
 }
 
 /** Barra de avance: crece con un resorte (desde 0 al aparecer) y un brillo la recorre de vez en cuando. */
