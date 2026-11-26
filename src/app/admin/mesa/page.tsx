@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { isAdmin } from "@/lib/auth";
 import { getGuide, GUIDES } from "@/lib/guides";
 import {
-  ABANDON_MIN, fmtDate, guideShortTitle, loadMesa, loadOpenHelp, loadOtherRoundsActivity, MESA_STATE, OTHER_ROUND_ACTIVE_H, qaTiles, STALL_MIN, timeAgo,
+  ABANDON_MIN, fmtDate, guideShortTitle, loadMesa, loadOpenHelp, loadOtherRoundsActivity, MESA_STATE, OTHER_ROUND_ACTIVE_MIN, qaTiles, STALL_MIN, timeAgo,
   type MesaRow, type MesaState,
 } from "@/lib/admin-data";
 import { AutoRefresh } from "@/components/admin/AutoRefresh";
@@ -143,7 +143,7 @@ export default async function MesaPage({ searchParams }: { searchParams: Promise
 
       <OtherRoundsAlert
         rounds={otherRounds}
-        activeHours={OTHER_ROUND_ACTIVE_H}
+        activeMinutes={OTHER_ROUND_ACTIVE_MIN}
         help={otherHelp.map((h) => ({
           id: h.id,
           runId: h.run_id,

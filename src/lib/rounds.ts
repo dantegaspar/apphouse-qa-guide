@@ -94,6 +94,11 @@ export function createRound(name?: string): Round {
   const round: Round = { id: next, name: (name ?? "").trim().slice(0, ROUND_NAME_MAX) || defaultRoundName(next), created_at: now() };
   db.transaction(() => {
     db.prepare("INSERT INTO rounds (id, name, created_at) VALUES (?, ?, ?)").run(round.id, round.name, round.created_at);
+    // Las pruebas de la encuesta anterior se cierran en el navegador del tester: sus solicitudes de
+    // ayuda abiertas ya no las puede atender nadie, así que se cierran aquí
+    db.prepare("UPDATE help_requests SET status='ended', resolved_at=?, resolution=? WHERE status='open'").run(
+      round.created_at, `Se abrió «${round.name}»`
+    );
     setViewRound(round.id);
   })();
   return round;

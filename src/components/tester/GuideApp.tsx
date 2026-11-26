@@ -28,7 +28,7 @@ export type VariantCtl = {
   /** Cambia de variante; `carry` lleva los datos del tester a la otra (si todavía no empezó). */
   choose: (next: GuideVariant, carry?: IdentifyDraft) => void;
   draft: IdentifyDraft | null;
-  setDraft: (d: IdentifyDraft) => void;
+  setDraft: (d: IdentifyDraft | null) => void;
   /** Se llegó aquí desde una prueba ya empezada con la otra variante. */
   carriedFrom: GuideVariant | null;
 };
@@ -156,10 +156,13 @@ export default function GuideApp({
         done();
         return null;
       }
+      // Los archivos van a la misma prueba que el reporte (se toma antes de enviar: si en ese
+      // momento se abrió una encuesta nueva, la prueba se cierra y el estado queda vacío)
+      const s = stateRef.current;
+      if (!s) return "No se pudo enviar el reporte. Recarga la página e inténtalo de nuevo.";
       // Los archivos necesitan que el reporte ya exista en el servidor
       const ok = await flush();
       if (!ok) return "Se guardó tu reporte, pero no hay conexión para subir los archivos. Revisa tu internet e inténtalo de nuevo.";
-      const s = stateRef.current!;
       for (const f of files) {
         const fd = new FormData();
         fd.append("issueId", issue.id);
@@ -694,6 +697,8 @@ export default function GuideApp({
                   <Button
                     onClick={() => {
                       setRestartAsk(false);
+                      // Otra persona: el registro empieza vacío (sin los datos de quien terminó)
+                      variantCtl?.setDraft(null);
                       restart();
                       setView({ name: "home" });
                       window.scrollTo({ top: 0 });

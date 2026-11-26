@@ -4,7 +4,7 @@ import { isAdmin } from "@/lib/auth";
 import { getGuide, GUIDES } from "@/lib/guides";
 import { ACTIVITY_RESULTS } from "@/lib/types";
 import {
-  deviceSummary, fmtDate, guideTitle, isImage, loadAll, loadOpenHelp, loadOtherRoundsActivity, OTHER_ROUND_ACTIVE_H, parseRec, runStatusClass,
+  deviceSummary, fmtDate, guideTitle, isImage, loadAll, loadOpenHelp, loadOtherRoundsActivity, OTHER_ROUND_ACTIVE_MIN, parseRec, runStatusClass,
   runStatusLabel, timeAgo,
 } from "@/lib/admin-data";
 import { LogoutButton } from "@/components/admin/LogoutButton";
@@ -80,7 +80,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           return { id: h.id, tester: h.tester, where: act ? `${h.activity_id} ${act.title}` : h.activity_id || "la guía" };
         })}
       />
-      <OtherRoundsAlert rounds={otherRounds} activeHours={OTHER_ROUND_ACTIVE_H} />
+      <OtherRoundsAlert rounds={otherRounds} activeMinutes={OTHER_ROUND_ACTIVE_MIN} />
 
       <section
         id="ayuda"

@@ -254,6 +254,9 @@ export function useRun(guideId: string, roundId?: number) {
       // Prueba de una encuesta anterior: se aparta y el tester empieza la de la ronda nueva
       archiveStored(guideId, parsed);
       use(null);
+      // Al recargar también se explica por qué aparece el registro otra vez
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage solo existe en el cliente
+      setRoundClosed(true);
     } else {
       // Guardada antes de que existieran las rondas: el servidor dice a cuál pertenece
       void fetchRunRound(parsed).then((info) => {
@@ -263,6 +266,7 @@ export function useRun(guideId: string, roundId?: number) {
         if (info && info.roundId !== active) {
           archiveStored(guideId, { ...parsed, roundId: info.roundId });
           use(null);
+          setRoundClosed(true);
           return;
         }
         // Misma ronda, o no se pudo saber (sin conexión): se vuelve a preguntar con la página abierta
@@ -592,7 +596,11 @@ export async function callRun<T = Record<string, unknown>>(
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) return { ok: false, status: res.status, error: (data as { error?: string }).error || "No se pudo completar. Inténtalo de nuevo." };
+    if (!res.ok) {
+      // Un 409 por encuesta cerrada también trae la ronda: la prueba se cierra igual
+      if (res.status === 409) reportRound(run.runId, data);
+      return { ok: false, status: res.status, error: (data as { error?: string }).error || "No se pudo completar. Inténtalo de nuevo." };
+    }
     // La respuesta trae la ronda: si el admin abrió una encuesta nueva, useRun cierra esta prueba
     reportRound(run.runId, data);
     return { ok: true, data: data as T };

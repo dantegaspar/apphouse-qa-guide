@@ -45,6 +45,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const db = getDb();
   const run = db.prepare("SELECT guide_id, status FROM runs WHERE id = ?").get(id) as RunRow;
   if (run.status === "ended_blocked") return err("La prueba ya terminó", 409);
+  // Prueba de una encuesta anterior: no se abre una solicitud que nadie podrá cerrar. La respuesta
+  // trae la ronda y el navegador cierra la prueba y muestra el registro de la encuesta nueva.
+  const rounds = runRounds(id);
+  if (rounds.roundId !== undefined && rounds.roundId !== rounds.activeRoundId)
+    return json({ error: "Se abrió una nueva encuesta. Regístrate de nuevo para seguir.", code: "round_closed", ...rounds }, 409);
   const guide = getGuide(run.guide_id);
   const act = guide?.activities.find((a) => a.id === body.activityId);
   if (!act) return invalid({ activityId: "La actividad no existe en esta guía." }, 400, "Actividad no encontrada");

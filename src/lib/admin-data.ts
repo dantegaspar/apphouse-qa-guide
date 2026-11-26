@@ -105,21 +105,25 @@ export function loadOpenHelp() {
   return { rows, at: Date.now() };
 }
 
-/** Horas sin señal tras las cuales una prueba sin terminar de otra ronda ya no se avisa como activa. */
-export const OTHER_ROUND_ACTIVE_H = 2;
+/**
+ * Minutos sin señal tras los cuales una prueba sin terminar de otra ronda ya no se avisa como activa.
+ * Corto a propósito: al abrir una encuesta nueva, la página del tester cierra sola la prueba anterior
+ * (en segundos), así que lo que sigue mandando datos después de esto es una pestaña rezagada.
+ */
+export const OTHER_ROUND_ACTIVE_MIN = 20;
 
 /** Actividad que sigue viva en una ronda que NO está a la vista. */
 export type OtherRoundActivity = { id: number; name: string; active: number; help: number };
 
 /**
  * Pruebas de otras rondas que siguen activas (sin terminar y con alguna señal en las últimas
- * OTHER_ROUND_ACTIVE_H horas) y solicitudes de ayuda abiertas en otras rondas. Sirve para avisar al
+ * OTHER_ROUND_ACTIVE_MIN minutos) y solicitudes de ayuda abiertas en otras rondas. Sirve para avisar al
  * admin cuando abrió una encuesta nueva y todavía hay testers trabajando en la anterior.
  */
 export function loadOtherRoundsActivity(nowMs = Date.now()): OtherRoundActivity[] {
   const db = getDb();
   const view = viewRoundId();
-  const since = new Date(nowMs - OTHER_ROUND_ACTIVE_H * 3_600_000).toISOString();
+  const since = new Date(nowMs - OTHER_ROUND_ACTIVE_MIN * 60_000).toISOString();
   const m = new Map<number, OtherRoundActivity>();
   const names = new Map(listRounds().map((r) => [r.id, r.name]));
   const entry = (id: number) => {

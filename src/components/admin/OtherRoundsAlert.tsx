@@ -16,7 +16,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
  * Pasa cuando el admin abre una ronda nueva y todavía hay testers terminando la anterior: sin este aviso
  * parecería que sus datos se perdieron. «Ver» cambia la vista a esa ronda (igual que el selector de arriba).
  */
-export function OtherRoundsAlert({ rounds, help = [], activeHours }: { rounds: Activity[]; help?: HelpItem[]; activeHours: number }) {
+export function OtherRoundsAlert({ rounds, help = [], activeMinutes }: { rounds: Activity[]; help?: HelpItem[]; activeMinutes: number }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   if (!rounds.length) return null;
@@ -78,7 +78,7 @@ export function OtherRoundsAlert({ rounds, help = [], activeHours }: { rounds: A
         })}
       </ul>
       <p className="mt-1.5 text-xs opacity-80">
-        No salen en esta vista: sus datos se guardan en su propia encuesta. «Activa»: sin terminar y con movimiento en las últimas {activeHours} h.
+        No salen en esta vista: sus datos se guardan en su propia encuesta. «Activa»: sin terminar y con movimiento en los últimos {activeMinutes} min.
       </p>
     </section>
   );
