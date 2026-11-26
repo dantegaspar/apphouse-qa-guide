@@ -247,6 +247,77 @@ export default function GuideApp({
   const minsLeft = guide.activities.filter((a) => !state.activities[a.id]?.done).reduce((n, a) => n + (a.estMin ?? 0), 0);
   const failCount = state.issues.filter((i) => i.kind === "issue").length;
 
+  const ended = !!state.ended;
+  const acc = access(guide, state);
+  const { currentAct, canFinish, flexible, seqDone, isOpen } = acc;
+  let cur: View = view;
+  if (cur.name === "activity" && !isOpen(cur.id)) cur = { name: "home" };
+  if ((cur.name === "summary" || cur.name === "survey") && !canFinish) cur = { name: "home" };
+
+  // Encuesta final: ¿ya se puede ir a ella? (todas guardadas, o ya pasó la parte en orden y se marcan las pendientes)
+  const pendingIds = guide.activities.filter((a) => !state.activities[a.id]?.done).map((a) => a.id);
+  const finalReachable = !state.finished && state.prepDone && (canFinish || (flexible && seqDone));
+  const finalLabel = state.finished ? "Encuesta final enviada" : "Encuesta final";
+  /** Lleva a la encuesta final; si quedan actividades sin guardar, pide marcarlas como «No me tocó». */
+  const openFinal = async () => {
+    if (canFinish) return nav({ name: "summary" });
+    if (!finalReachable) return;
+    const ids = [...pendingIds];
+    const ok = await confirm({
+      title: `¿Ya terminaste? ${ids.length === 1 ? "Falta 1 actividad" : `Faltan ${ids.length} actividades`}`,
+      message: `Para abrir la encuesta final, ${ids.join(", ")} ${ids.length === 1 ? "queda" : "quedan"} como «No me tocó» (no cuenta en tu contra). Hazlo cuando Mesa de control dé por terminada la prueba. Puedes corregir cualquier actividad hasta que envíes la encuesta.`,
+      confirmLabel: "Sí, ir a la encuesta",
+      cancelLabel: "Todavía no",
+    });
+    if (!ok) return;
+    update(
+      (s) => {
+        const activities = { ...s.activities };
+        for (const id of ids) activities[id] = { result: "skipped", checks: {}, fields: {}, notes: activities[id]?.notes ?? "", done: true };
+        return { ...s, activities };
+      },
+      ids.map((id) => ({
+        type: "activity",
+        payload: { activityId: id, result: "skipped", checks: {}, fields: {}, notes: state.activities[id]?.notes ?? "" },
+      }))
+    );
+    toast.success("Contesta la encuesta para terminar tu prueba.", { title: `${ids.length === 1 ? "1 actividad marcada" : `${ids.length} actividades marcadas`} como «No me tocó»` });
+    nav({ name: "summary" });
+  };
+  // Aviso fijo bajo la barra superior: sigue visible en todas las pantallas hasta enviar la encuesta
+  const showFinalBar = (finalReachable || (ended && !state.finished)) && cur.name !== "summary" && cur.name !== "survey";
+  const finalReady = canFinish;
+  const finalBar = showFinalBar && (
+    <div
+      data-testid="final-survey-bar"
+      className={`border-t ${finalReady ? "border-amber-200 bg-amber-50 text-amber-950" : "border-brand-100 bg-brand-50 text-brand-700"}`}
+    >
+      <div className={"mx-auto flex max-w-xl items-center gap-2 px-3 py-1.5" + dk("lg:max-w-[1440px] lg:px-8 lg:py-2")}>
+        <span className="text-base" aria-hidden="true">📝</span>
+        <span className="min-w-0 flex-1 text-xs leading-tight sm:text-sm">
+          <strong>Falta la encuesta final.</strong>{" "}
+          {finalReady ? (
+            <span>Es el último paso y es obligatoria.</span>
+          ) : (
+            <span className={desktop ? "" : "hidden sm:inline"}>Contéstala cuando termines tus actividades.</span>
+          )}
+        </span>
+        <Button
+          size="md"
+          variant={finalReady ? "primary" : "outline"}
+          pulse={finalReady}
+          onClick={() => void openFinal()}
+          className={`shrink-0 !min-h-9 !rounded-lg !px-3 !py-1 !text-sm ${finalReady ? "attn-amber !bg-amber-600 hover:!bg-amber-700" : ""}`}
+          data-testid="final-survey-bar-go"
+        >
+          <span>
+            Contestar<span className={desktop ? "hidden lg:inline" : "hidden"}> la encuesta final</span> →
+          </span>
+        </Button>
+      </div>
+    </div>
+  );
+
   const topbar = (
     <header ref={topbarRef} className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
       {/* En celular la barra es compacta (una línea, ~44 px) para dejar más espacio a la actividad */}
@@ -276,15 +347,10 @@ export default function GuideApp({
           </span>
         </Button>
       </div>
+      {finalBar}
     </header>
   );
 
-  const ended = !!state.ended;
-  const acc = access(guide, state);
-  const { currentAct, canFinish, flexible, seqDone, isOpen } = acc;
-  let cur: View = view;
-  if (cur.name === "activity" && !isOpen(cur.id)) cur = { name: "home" };
-  if ((cur.name === "summary" || cur.name === "survey") && !canFinish) cur = { name: "home" };
 
   let body: React.ReactNode;
   if (cur.name === "activity") {
@@ -367,15 +433,15 @@ export default function GuideApp({
             // Se terminó la parte en orden: se abren todas las demás a la vez
             const opened = guide.activities.filter((x) => !stateRef.current?.activities[x.id]?.done).map((x) => x.id);
             setFresh(opened);
-            toast.success(opened.length ? `Ya puedes abrir ${opened[0]} a ${opened[opened.length - 1]} cuando te toque.` : "Ya puedes contestar la encuesta.", {
+            toast.success(opened.length ? `Ya puedes abrir ${opened[0]} a ${opened[opened.length - 1]} cuando te toque.` : "Falta la encuesta final: es el último paso.", {
               title: `Actividad ${act.id} guardada ✓`,
             });
-            nav({ name: "home" });
+            nav({ name: opened.length ? "home" : "summary" });
           } else if (flexible && after.seqDone) {
-            toast.success(next ? `Sigue con la que te toque. Puedes corregir ${act.id} hasta que envíes la encuesta final.` : "Ya puedes contestar la encuesta y terminar.", {
+            toast.success(next ? `Sigue con la que te toque. Puedes corregir ${act.id} hasta que envíes la encuesta final.` : "Terminaste tus actividades. Falta la encuesta final: es el último paso.", {
               title: `Actividad ${act.id} guardada ✓`,
             });
-            nav({ name: "home" });
+            nav({ name: next ? "home" : "summary" });
           } else {
             toast.success(next ? `🔓 Se desbloqueó ${next.id}: ${next.title}` : "Terminaste todas las actividades. Falta la encuesta final.", {
               title: `Actividad ${act.id} guardada ✓`,
@@ -503,63 +569,24 @@ export default function GuideApp({
         )}
 
         {!ended && canFinish && (
-          <Button size="lg" className="w-full" onClick={() => nav({ name: "summary" })}>
-            {state.finished
-              ? "Ver resumen y encuesta"
-              : flexible && guide.activities.some((a) => !state.activities[a.id]?.done)
-                ? "Contestar la encuesta y terminar"
-                : "¡Terminaste! Ver resumen y contestar la encuesta"}{" "}
-            →
+          <Button size="lg" pulse={!state.finished} className={"w-full" + (state.finished ? "" : " attn-amber !bg-amber-600 hover:!bg-amber-700") + dk("lg:w-auto lg:min-w-96")} onClick={() => nav({ name: "summary" })} data-testid="home-final-survey">
+            {state.finished ? "Ver mi encuesta final" : "📝 Último paso: contestar la encuesta final"} →
           </Button>
         )}
 
-        {!ended && !canFinish && !state.finished && flexible && seqDone && (() => {
-          const pendingIds = guide.activities.filter((a) => !state.activities[a.id]?.done).map((a) => a.id);
-          return (
-            <div className="rounded-2xl bg-brand-50 px-4 py-3 text-sm text-brand-700 ring-1 ring-brand-100" data-testid="survey-locked-hint">
-              <p className="font-semibold">¿Y la encuesta final?</p>
-              <p className="mt-1">
-                Se abre cuando todas las actividades tengan su resultado guardado. Te {pendingIds.length === 1 ? "falta" : "faltan"}:{" "}
-                <strong>{pendingIds.join(", ")}</strong>.
-              </p>
-              <p className="mt-1">
-                Cuando Mesa de control dé por terminada la prueba, marca las que no te tocaron como <strong>«No me tocó»</strong> con este botón y
-                se abre la encuesta.
-              </p>
-              <Button
-                variant="outline"
-                className="mt-3 w-full sm:w-auto"
-                data-testid="skip-pending"
-                onClick={async () => {
-                  const ok = await confirm({
-                    title: `¿Marcar ${pendingIds.join(", ")} como «No me tocó»?`,
-                    message:
-                      "Hazlo solo cuando Mesa de control haya terminado la prueba. Lo que no alcanzaste a hacer queda como «No me tocó» y no cuenta en tu contra. Puedes abrir y corregir cualquiera hasta que envíes la encuesta final.",
-                    confirmLabel: "Sí, marcar",
-                    cancelLabel: "Todavía no",
-                  });
-                  if (!ok) return;
-                  const ids = [...pendingIds];
-                  update(
-                    (s) => {
-                      const activities = { ...s.activities };
-                      for (const id of ids)
-                        activities[id] = { result: "skipped", checks: {}, fields: {}, notes: activities[id]?.notes ?? "", done: true };
-                      return { ...s, activities };
-                    },
-                    ids.map((id) => ({
-                      type: "activity",
-                      payload: { activityId: id, result: "skipped", checks: {}, fields: {}, notes: state.activities[id]?.notes ?? "" },
-                    }))
-                  );
-                  toast.success("Ya puedes contestar la encuesta final.", { title: `${ids.length === 1 ? "1 actividad marcada" : `${ids.length} actividades marcadas`} como «No me tocó»` });
-                }}
-              >
-                Marcar las pendientes como «No me tocó»
-              </Button>
-            </div>
-          );
-        })()}
+        {!ended && !canFinish && !state.finished && flexible && seqDone && (
+          <div className="rounded-2xl bg-brand-50 px-4 py-3 text-sm text-brand-700 ring-1 ring-brand-100" data-testid="survey-locked-hint">
+            <p className="font-semibold">📝 Al final falta la encuesta final</p>
+            <p className="mt-1">
+              Es el último paso y es obligatoria. Te {pendingIds.length === 1 ? "falta" : "faltan"}: <strong>{pendingIds.join(", ")}</strong>. Cuando
+              Mesa de control dé por terminada la prueba, toca este botón: las que no te tocaron quedan como <strong>«No me tocó»</strong> y se abre la
+              encuesta.
+            </p>
+            <Button className="mt-3 w-full sm:w-auto" data-testid="skip-pending" onClick={() => void openFinal()}>
+              Ya terminé: ir a la encuesta final →
+            </Button>
+          </div>
+        )}
 
         {nextAct && state.prepDone && state.blocked?.activityId === nextAct.id && (
           <Callout>
@@ -672,6 +699,14 @@ export default function GuideApp({
               );
             })}
           </motion.ul>
+          <FinalSurveyCard
+            className="mt-2"
+            finished={state.finished}
+            ready={canFinish}
+            reachable={finalReachable}
+            onOpen={() => void openFinal()}
+            onView={() => nav({ name: "summary" })}
+          />
         </section>
 
         <div className={`grid gap-2 ${canFinish ? "grid-cols-2" : "grid-cols-1"}` + dk("lg:max-w-xl")}>
@@ -680,7 +715,7 @@ export default function GuideApp({
           </Button>
           {canFinish && (
             <Button variant="outline" onClick={() => nav({ name: "summary" })}>
-              Resumen y encuesta
+              📝 {finalLabel}
             </Button>
           )}
         </div>
@@ -743,6 +778,8 @@ export default function GuideApp({
             nav={nav}
             fresh={fresh}
             onFreshSeen={(id) => setFreshState((f) => f.filter((x) => x !== id))}
+            finalReachable={finalReachable}
+            onFinal={() => void openFinal()}
           />
           <main className="min-w-0 flex-1 lg:pb-10">{body}</main>
         </div>
@@ -882,7 +919,11 @@ function Sidebar({
   fresh = [],
   onFreshSeen,
   isOpen,
+  finalReachable,
+  onFinal,
 }: {
+  finalReachable: boolean;
+  onFinal: () => void;
   fresh?: string[];
   onFreshSeen?: (id: string) => void;
   isOpen: (id: string) => boolean;
@@ -902,7 +943,7 @@ function Sidebar({
     }`;
   return (
     <aside className="hidden w-72 shrink-0 lg:block" aria-label="Navegación de la guía" data-testid="guide-sidebar">
-      <div className="sticky top-[78px] flex max-h-[calc(100dvh-102px)] flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+      <div className="sticky top-[calc(var(--topbar-h,66px)+12px)] flex max-h-[calc(100dvh-var(--topbar-h,66px)-36px)] flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
         <div className="border-b border-slate-100 p-4">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-teal-ink">{guide.role}</div>
           <div className="mt-0.5 font-bold leading-snug">{guide.title}</div>
@@ -991,18 +1032,100 @@ function Sidebar({
           </motion.ul>
         </nav>
 
-        <div className="space-y-0.5 border-t border-slate-100 p-2">
-          {canFinish && (
-            <button onClick={() => nav({ name: "summary" })} className={item(view.name === "summary" || view.name === "survey")}>
+        <div className="space-y-0.5 border-t border-slate-100 p-2" data-testid="sidebar-final-survey">
+          {state.finished || canFinish || finalReachable ? (
+            <button
+              onClick={() => (state.finished || canFinish ? nav({ name: "summary" }) : onFinal())}
+              className={`${item(view.name === "summary" || view.name === "survey")} ${!state.finished && canFinish && view.name !== "summary" && view.name !== "survey" ? "bg-amber-50 ring-2 ring-amber-300" : ""}`}
+            >
               <span className="w-5 text-center" aria-hidden="true">
-                🏁
+                {state.finished ? "✅" : "📝"}
               </span>
-              Resumen y encuesta
+              <span className="min-w-0 flex-1">
+                <span className="block leading-snug">Encuesta final</span>
+                <span className={`block text-[11px] leading-tight ${state.finished ? "text-slate-600" : "font-medium text-amber-800"}`}>
+                  {state.finished ? "✓ Enviada" : "Falta · último paso, obligatoria"}
+                </span>
+              </span>
             </button>
+          ) : (
+            <div aria-disabled="true" className="flex w-full cursor-not-allowed items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-slate-500">
+              <span className="w-5 text-center" aria-hidden="true">
+                📝
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block leading-snug">Encuesta final</span>
+                <span className="block text-[11px] leading-tight">🔒 Último paso: se abre al terminar</span>
+              </span>
+            </div>
           )}
         </div>
       </div>
     </aside>
+  );
+}
+
+/**
+ * Encuesta final como último elemento de la lista de actividades: así el tester la ve desde el
+ * principio como parte de la prueba («último paso, obligatoria») y no solo como un botón abajo.
+ */
+function FinalSurveyCard({
+  finished,
+  ready,
+  reachable,
+  onOpen,
+  onView,
+  className = "",
+}: {
+  finished: boolean;
+  /** Todas las actividades guardadas (o el guía terminó la prueba). */
+  ready: boolean;
+  /** Ya se puede ir (aunque falten actividades por marcar como «No me tocó»). */
+  reachable: boolean;
+  onOpen: () => void;
+  onView: () => void;
+  className?: string;
+}) {
+  const reduce = useReducedMotion();
+  const status = finished ? "✓ Enviada" : ready ? "Falta: contéstala ahora" : reachable ? "Al terminar tus actividades" : "🔒 Todavía no toca";
+  const inner = (
+    <>
+      <span className="mt-0.5 w-14 shrink-0 text-xl" aria-hidden="true">
+        {finished ? "✅" : "📝"}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold leading-snug">Encuesta final</span>
+        <span className="mt-0.5 block text-xs text-slate-600">
+          {finished ? "Gracias: tu prueba quedó completa." : "Último paso, obligatorio. Sin ella tu prueba no queda completa."}
+        </span>
+      </span>
+      <span
+        className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+          finished ? "bg-emerald-100 text-emerald-800" : ready ? "bg-amber-100 text-amber-900" : "bg-slate-100 text-slate-600"
+        }`}
+      >
+        {status}
+      </span>
+    </>
+  );
+  if (!finished && !reachable && !ready)
+    return (
+      <div aria-disabled="true" data-testid="final-survey-card" className={`flex w-full items-start gap-3 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-4 text-left ${className}`}>
+        {inner}
+      </div>
+    );
+  return (
+    <motion.button
+      data-testid="final-survey-card"
+      whileHover={reduce ? undefined : { y: -2 }}
+      whileTap={reduce ? { opacity: 0.85 } : { scale: 0.98 }}
+      onClick={finished || ready ? onView : onOpen}
+      className={`flex w-full items-start gap-3 rounded-2xl p-4 text-left shadow-sm transition-shadow hover:shadow-md ${
+        finished ? "bg-white ring-1 ring-slate-300" : ready ? "attn attn-amber bg-amber-50 ring-2 ring-amber-400" : "border-2 border-dashed border-brand-500/60 bg-white"
+      } ${className}`}
+    >
+      {inner}
+    </motion.button>
   );
 }
 
@@ -1386,7 +1509,16 @@ function Summary({
   const reduce = useReducedMotion();
   return (
     <div className={"animate-pop space-y-5 pb-8" + dk("lg:max-w-5xl lg:space-y-6")}>
-      <h1 className={"text-2xl font-bold" + dk("lg:text-3xl")}>Resumen de tu prueba</h1>
+      <h1 className={"text-2xl font-bold" + dk("lg:text-3xl")}>{state.finished ? "Resumen de tu prueba" : "Último paso: encuesta final"}</h1>
+      {!state.finished && (
+        <div className="rounded-2xl bg-amber-50 p-4 ring-2 ring-amber-300" data-testid="summary-final-callout">
+          <p className="font-semibold text-amber-950">📝 Te falta contestar la encuesta final</p>
+          <p className="mt-1 text-sm text-amber-900">Es obligatoria: sin ella tu prueba no queda completa. Son unas cuantas preguntas.</p>
+          <Button size="lg" pulse className={"mt-3 w-full attn-amber !bg-amber-600 hover:!bg-amber-700" + dk("lg:w-auto lg:min-w-80")} onClick={onSurvey}>
+            Contestar la encuesta final →
+          </Button>
+        </div>
+      )}
       <motion.div {...staggerList()} className={"grid grid-cols-3 gap-2 text-center" + dk("lg:gap-4")}>
         <Stat n={guide.activities.length - pending.length} label="Actividades listas" />
         <Stat
