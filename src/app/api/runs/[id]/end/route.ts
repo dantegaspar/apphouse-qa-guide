@@ -1,5 +1,6 @@
 import { getDb, now } from "@/lib/db";
 import { checkRunToken } from "@/lib/auth";
+import { runRounds } from "@/lib/rounds";
 import { verifyGuidePassword } from "@/lib/guide-auth";
 import { err, hasErrors, invalid, json, readJsonObject } from "@/lib/http";
 import { collect, text, textError } from "@/lib/validate";
@@ -34,5 +35,5 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       "UPDATE help_requests SET status='ended', resolved_at=?, resolution=? WHERE run_id=? AND status='open'"
     ).run(ts, `Prueba terminada por el guía: ${reason}`, id);
   })();
-  return json({ ok: true, endedAt: ts });
+  return json({ ok: true, endedAt: ts, ...runRounds(id) });
 }

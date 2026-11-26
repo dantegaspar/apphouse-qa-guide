@@ -1,6 +1,7 @@
 import { getDb, now } from "@/lib/db";
 import { getGuide } from "@/lib/guides";
 import { checkRunToken } from "@/lib/auth";
+import { runRounds } from "@/lib/rounds";
 import { err, hasErrors, invalid, json, readJsonObject } from "@/lib/http";
 import { ACTIVITY_RESULTS, LEGACY_SEVERITY, SEVERITIES, type Activity, type Guide } from "@/lib/types";
 import { expectedConditional } from "@/lib/guide-utils";
@@ -83,7 +84,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     db.prepare("UPDATE runs SET updated_at=? WHERE id=?").run(ctx.ts, id);
   })();
   if (rejected.length) console.warn(`[events] corrida ${id}: ${rejected.length} evento(s) rechazado(s)`, JSON.stringify(rejected).slice(0, 2000));
-  return json({ ok: true, applied: ops.length, rejected, warnings });
+  // Los eventos de una prueba de una encuesta anterior se guardan igual (son de esa prueba); con la
+  // ronda activa en la respuesta, el navegador nota la encuesta nueva y cierra la prueba vieja.
+  return json({ ok: true, applied: ops.length, rejected, warnings, ...runRounds(id) });
 }
 
 function checkEvent(ctx: Ctx, ev: unknown): Checked {

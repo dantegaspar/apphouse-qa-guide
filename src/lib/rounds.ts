@@ -55,6 +55,15 @@ export function parseRoundId(v: unknown): number | null {
   return listRounds().some((r) => r.id === id) ? id : null;
 }
 
+/**
+ * Ronda de una prueba y la ronda activa. Va en las respuestas a la página del tester para que una
+ * pestaña abierta note que el admin abrió una encuesta nueva (y deje de mandar a la anterior).
+ */
+export function runRounds(runId: string): { roundId?: number; activeRoundId: number } {
+  const row = getDb().prepare("SELECT round_id FROM runs WHERE id = ?").get(runId) as { round_id: number } | undefined;
+  return { roundId: row?.round_id, activeRoundId: activeRoundId() };
+}
+
 /** Ronda que el panel está mostrando. */
 export function viewRoundId(): number {
   const rows = listRounds();
