@@ -8,6 +8,7 @@ import { LogoutButton } from "@/components/admin/LogoutButton";
 import { InsightsPanel } from "@/components/admin/InsightsPanel";
 import { computeInsights } from "@/lib/insights";
 import { CourierChartsSection } from "@/components/admin/CourierSection";
+import { loadPlainSummary, plainTask } from "@/lib/plain-summary";
 import { Bars, ChartCard, COLORS, Columns, Empty, fmt, Kpi, SegmentedBar, StackedBars, type Series } from "@/components/admin/charts/Charts";
 
 export const dynamic = "force-dynamic";
@@ -113,7 +114,22 @@ export default async function ChartsPage({ searchParams }: { searchParams: Promi
         ))}
       </nav>
 
-      <InsightsPanel insights={computeInsights(guideId)} exportQs={guideId ? `?guide=${encodeURIComponent(guideId)}` : ""} />
+      {(() => {
+        const ps = loadPlainSummary();
+        const tone = ps.ready === null ? "bg-slate-50 ring-slate-200" : ps.ready ? "bg-emerald-50 ring-emerald-200" : "bg-red-50 ring-red-200";
+        return (
+          <section data-testid="plain-banner" className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl p-4 ring-1 ${tone}`}>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Resultado de la prueba</p>
+              <p className="text-lg font-bold text-slate-900">{ps.headline}</p>
+              <p className="text-sm text-slate-700">{ps.why}</p>
+            </div>
+            <Link href="/admin/veredicto" className="rounded-lg bg-[#2F5DA8] px-4 py-2 text-sm font-semibold text-white hover:bg-[#264d8c]">
+              Ver resumen completo
+            </Link>
+          </section>
+        );
+      })()}
 
       {/* 1. KPIs */}
       <section aria-label="Indicadores">
@@ -153,7 +169,7 @@ export default async function ChartsPage({ searchParams }: { searchParams: Promi
               return (
                 <ChartCard
                   key={g.guide.id}
-                  title={`Resultado de cada actividad · ${g.guide.title}`}
+                  title={`Resultado de cada tarea · ${g.guide.title}`}
                   subtitle={`Respuestas de ${g.runs} corrida${g.runs === 1 ? "" : "s"}, en el orden de la guía`}
                   table={{
                     head: ["Actividad", "Bien", "Falla", "No pude", "No le tocó", "Pendiente"],
@@ -171,7 +187,7 @@ export default async function ChartsPage({ searchParams }: { searchParams: Promi
                         aria: `${a.id} ${a.title}`,
                         label: (
                           <>
-                            <span className="font-mono text-xs text-slate-500">{a.id}</span> {a.title}
+                            {plainTask(a.id, a.title)} <span className="font-mono text-[11px] text-slate-400">{a.id}</span>
                           </>
                         ),
                         values: RESULT_ORDER.map((r) => a.counts[r]),
@@ -209,7 +225,7 @@ export default async function ChartsPage({ searchParams }: { searchParams: Promi
         </ChartCard>
 
         <ChartCard
-          title="Fallas reportadas por actividad"
+          title="Fallas reportadas por tarea"
           subtitle="Reportes de falla (sin evidencias), bloqueantes y no bloqueantes"
           table={{ head: ["Actividad", "Bloqueantes", "No bloqueantes"], rows: s.failuresByActivity.map((r) => [`${r.id} ${r.title}`, r.blocking, r.nonBlocking]) }}
         >
@@ -223,7 +239,7 @@ export default async function ChartsPage({ searchParams }: { searchParams: Promi
                 aria: `${r.id} ${r.title}`,
                 label: (
                   <>
-                    <span className="font-mono text-xs text-slate-500">{r.id}</span> {r.title}
+                    {plainTask(r.id, r.title)} <span className="font-mono text-[11px] text-slate-400">{r.id}</span>
                   </>
                 ),
                 values: [r.blocking, r.nonBlocking],
@@ -370,6 +386,16 @@ export default async function ChartsPage({ searchParams }: { searchParams: Promi
           )}
         </ChartCard>
       </section>
+
+      {/* Para Sistemas: frases automáticas con códigos de actividad */}
+      <details className="group">
+        <summary className="cursor-pointer select-none text-lg font-semibold text-slate-900">
+          Para Sistemas: resumen automático detallado <span className="text-sm font-normal text-slate-500">(con códigos de actividad)</span>
+        </summary>
+        <div className="mt-3">
+          <InsightsPanel insights={computeInsights(guideId)} exportQs={guideId ? `?guide=${encodeURIComponent(guideId)}` : ""} />
+        </div>
+      </details>
     </main>
   );
 }

@@ -8,6 +8,8 @@ import { GUIDES } from "@/lib/guides";
 import { BUG_TYPES, PRIORITIES, SEVERITIES, TRIAGE, type BugType, type Severity } from "@/lib/types";
 import { computeVerdict, EXCLUSION_LABEL } from "@/lib/verdict";
 import { latestDictamen, NORMAS, umbralesAprobacion } from "@/lib/claude-dictamen";
+import { PlainSummaryView } from "@/components/admin/PlainSummary";
+import { loadPlainSummary } from "@/lib/plain-summary";
 import { PrintButton } from "@/components/admin/PrintButton";
 import { ExportButton } from "@/components/admin/ExportButton";
 
@@ -77,8 +79,18 @@ export default async function VerdictReportPage() {
         <p className="text-slate-600">¿Listo para producción? · {viewRound().name} · Generado {fmtDate(v.generatedAt)}</p>
       </header>
 
+      <section className="space-y-2">
+        <h2 className="text-xl font-semibold">Resumen para todo el personal</h2>
+        <PlainSummaryView s={loadPlainSummary(v)} />
+      </section>
+
+      <header className="border-b border-slate-300 pb-2 pt-4 print:break-before-page">
+        <h2 className="text-xl font-semibold">Anexo para Sistemas</h2>
+        <p className="text-slate-600">Detalle técnico: criterios de salida (ISO/IEC/IEEE 29119-2 y 29119-3:2021), dictamen, casos y hallazgos.</p>
+      </header>
+
       <section>
-        <h2 className="text-lg font-semibold">Veredicto: {v.ready ? "Sí" : "No"}</h2>
+        <h2 className="text-lg font-semibold">Veredicto (cálculo fijo): {v.ready ? "Sí" : "No"}</h2>
         <p>{v.ready ? "El sistema cumple los criterios para pasar a producción." : "El sistema todavía no cumple los criterios para pasar a producción."}</p>
         <ul className="mt-1 list-disc pl-5">
           {v.reasons.map((r) => <li key={r}>{r}</li>)}
