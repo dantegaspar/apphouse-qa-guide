@@ -109,49 +109,135 @@ export function hasStoredRun(guideId: string, roundId?: number) {
   return roundId === undefined || s.roundId === undefined || s.roundId === roundId;
 }
 
+/** Ronda de la prueba y ronda activa, tal como las informa el servidor en sus respuestas. */
+export type RoundInfo = { roundId?: number; activeRoundId?: number };
+
+function roundInfoOf(data: unknown): RoundInfo {
+  const d = (data ?? {}) as Record<string, unknown>;
+  return {
+    roundId: typeof d.roundId === "number" ? d.roundId : undefined,
+    activeRoundId: typeof d.activeRoundId === "number" ? d.activeRoundId : undefined,
+  };
+}
+
+/**
+ * Avisos de ronda de las llamadas directas (ayuda, archivos, terminar): `useRun` los escucha para
+ * cerrar la prueba si el admin abrió una encuesta nueva.
+ */
+const roundListeners = new Set<(runId: string, info: RoundInfo) => void>();
+export function reportRound(runId: string, data: unknown) {
+  const info = roundInfoOf(data);
+  if (info.activeRoundId === undefined) return;
+  for (const fn of roundListeners) fn(runId, info);
+}
+
+function writeStored(guideId: string, s: RunState | null) {
+  try {
+    if (s) localStorage.setItem(storageKey(guideId), JSON.stringify(s));
+    else localStorage.removeItem(storageKey(guideId));
+  } catch {
+    /* almacenamiento lleno o modo privado */
+  }
+}
+
+/** Manda a su propia prueba todo lo que quedó en cola (sin reintentos). Devuelve lo que no se pudo enviar. */
+async function sendOutbox(s: RunState): Promise<QAEvent[]> {
+  let left = s.outbox ?? [];
+  while (left.length) {
+    const batch = left.slice(0, 100);
+    try {
+      const res = await fetch(`/api/runs/${s.runId}/events`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-run-token": s.token },
+        body: JSON.stringify({ events: batch }),
+      });
+      if (!res.ok) break;
+    } catch {
+      break;
+    }
+    left = left.slice(batch.length);
+  }
+  return left;
+}
+
 /**
  * Aparta la prueba guardada (de otra ronda) para que el tester empiece de nuevo. Si le quedaban
- * cambios sin enviar, se intenta mandarlos una vez antes de dejarla de lado.
+ * cambios sin enviar, se intenta mandarlos a esa misma prueba antes de dejarla de lado.
+ * Solo se quita del navegador si sigue siendo la guardada (otra pestaña pudo registrar otra).
  */
 function archiveStored(guideId: string, s: RunState) {
+  const key = archiveKey(guideId, s.roundId ?? "anterior");
   try {
-    localStorage.setItem(archiveKey(guideId, s.roundId ?? "anterior"), JSON.stringify(s));
-    localStorage.removeItem(storageKey(guideId));
+    localStorage.setItem(key, JSON.stringify(s));
+    if (readStored(guideId)?.runId === s.runId) localStorage.removeItem(storageKey(guideId));
   } catch {
     /* almacenamiento lleno o modo privado */
   }
   if (s.outbox?.length) {
-    void fetch(`/api/runs/${s.runId}/events`, {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-run-token": s.token },
-      body: JSON.stringify({ events: s.outbox.slice(0, 100) }),
-    }).catch(() => undefined);
+    void sendOutbox(s).then((left) => {
+      try {
+        // La copia apartada se queda solo con lo que no se pudo enviar
+        const raw = localStorage.getItem(key);
+        const saved = raw ? (JSON.parse(raw) as RunState) : null;
+        if (saved?.runId === s.runId) localStorage.setItem(key, JSON.stringify({ ...saved, outbox: left }));
+      } catch {
+        /* modo privado */
+      }
+    });
   }
 }
 
-/** Ronda de una prueba guardada sin `roundId`: se pregunta al servidor (null si no se sabe). */
-async function fetchRunRound(s: RunState): Promise<number | null> {
+/** Ronda de una prueba guardada y ronda activa: se pregunta al servidor (null si no se sabe). */
+async function fetchRunRound(s: RunState): Promise<RoundInfo | null> {
   try {
-    const res = await fetch(`/api/runs/${s.runId}/round`, { headers: { "x-run-token": s.token } });
+    const res = await fetch(`/api/runs/${s.runId}/round`, { headers: { "x-run-token": s.token }, cache: "no-store" });
     if (!res.ok) return null;
-    const data = (await res.json()) as { roundId?: number };
-    return typeof data.roundId === "number" ? data.roundId : null;
+    const info = roundInfoOf(await res.json());
+    return info.roundId === undefined ? null : info;
   } catch {
     return null;
   }
 }
 
+/** Quita de la cola los eventos de un lote ya enviado (por contenido: la cola pudo llegar de otra pestaña). */
+function withoutSent(outbox: QAEvent[], batch: QAEvent[]): QAEvent[] {
+  const sent = batch.map((e) => JSON.stringify(e));
+  return outbox.filter((e) => {
+    const i = sent.indexOf(JSON.stringify(e));
+    if (i === -1) return true;
+    sent.splice(i, 1);
+    return false;
+  });
+}
+
+/** Al volver a la pestaña (focus y visibilitychange llegan juntos) se pregunta una sola vez. */
+const ROUND_CHECK_MIN_MS = 3000;
+
 /**
  * Estado de la corrida: vive en localStorage (el progreso sobrevive a recargas) y cada cambio
  * se encola en `outbox` y se envía al servidor. Si no hay red, se reintenta solo.
+ *
+ * Encuesta nueva: la ronda activa que manda la página es solo el valor inicial; manda la que
+ * informa el servidor (en cada envío, cada 15 s y al volver a la pestaña). Si la prueba es de una
+ * ronda anterior, se cierra en este navegador: lo pendiente se envía a su propia prueba, se aparta
+ * y el tester ve el registro con un aviso (`roundClosed`).
+ *
+ * Varias pestañas de la misma guía comparten la prueba guardada: cada una sigue los cambios de las
+ * otras (evento `storage`) y ninguna escribe encima la prueba de una encuesta anterior.
  */
 export function useRun(guideId: string, roundId?: number) {
   const [state, setState] = useState<RunState | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState(false);
+  /** La prueba se cerró porque el admin abrió una encuesta nueva (el registro muestra un aviso). */
+  const [roundClosed, setRoundClosed] = useState(false);
   const stateRef = useRef<RunState | null>(null);
   const flushing = useRef<Promise<boolean> | null>(null);
+  /** Ronda activa: la de la página al cargar; después, la que diga el servidor. */
+  const activeRound = useRef<number | undefined>(roundId);
+  const lastCheck = useRef(0);
+  const checking = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -170,20 +256,18 @@ export function useRun(guideId: string, roundId?: number) {
       use(null);
     } else {
       // Guardada antes de que existieran las rondas: el servidor dice a cuál pertenece
-      void fetchRunRound(parsed).then((r) => {
+      void fetchRunRound(parsed).then((info) => {
         if (cancelled) return;
-        if (r !== null && r !== roundId) {
-          archiveStored(guideId, { ...parsed, roundId: r });
+        if (info?.activeRoundId !== undefined) activeRound.current = info.activeRoundId;
+        const active = info?.activeRoundId ?? roundId;
+        if (info && info.roundId !== active) {
+          archiveStored(guideId, { ...parsed, roundId: info.roundId });
           use(null);
           return;
         }
-        // Misma ronda (o no se pudo saber): se sigue con la prueba guardada
-        const next = r !== null ? { ...parsed, roundId: r } : parsed;
-        try {
-          localStorage.setItem(storageKey(guideId), JSON.stringify(next));
-        } catch {
-          /* modo privado */
-        }
+        // Misma ronda, o no se pudo saber (sin conexión): se vuelve a preguntar con la página abierta
+        const next = info ? { ...parsed, roundId: info.roundId } : parsed;
+        writeStored(guideId, next);
         use(next);
       });
     }
@@ -192,25 +276,89 @@ export function useRun(guideId: string, roundId?: number) {
     };
   }, [guideId, roundId]);
 
+  /** ¿`s` es de una encuesta anterior a la de `than` o a la ronda activa conocida? */
+  const isOlder = useCallback((s: RunState, than?: RunState | null) => {
+    if (s.roundId === undefined) return false;
+    return s.roundId < Math.max(than?.roundId ?? -Infinity, activeRound.current ?? -Infinity);
+  }, []);
+
+  /** Toma el estado que dejó otra pestaña (sin volver a guardarlo: así no hay ida y vuelta). */
+  const adopt = useCallback((s: RunState | null) => {
+    stateRef.current = s;
+    setState(s);
+    if (s) setRoundClosed(false);
+  }, []);
+
+  /** Esta pestaña deja su prueba porque otra la reemplazó: lo pendiente se manda a su propia prueba. */
+  const leave = useCallback(
+    (s: RunState) => {
+      if (isOlder(s)) archiveStored(guideId, s);
+      else if (s.outbox.length) void sendOutbox(s);
+    },
+    [guideId, isOlder]
+  );
+
   const commit = useCallback(
     (next: RunState | null) => {
+      const prevRunId = stateRef.current?.runId;
+      if (next && prevRunId) {
+        const stored = readStored(guideId);
+        // Otra pestaña guardó otra prueba (p. ej. registró la de la encuesta nueva): se sigue esa en
+        // vez de escribirle encima la de esta pestaña. Si la guardada es de una encuesta anterior, gana esta.
+        if (stored && stored.runId !== next.runId && stored.runId !== prevRunId && !isOlder(stored, next)) {
+          leave(next);
+          adopt(stored);
+          return;
+        }
+      }
       stateRef.current = next;
       setState(next);
-      try {
-        if (next) localStorage.setItem(storageKey(guideId), JSON.stringify(next));
-        else localStorage.removeItem(storageKey(guideId));
-      } catch {
-        /* almacenamiento lleno o modo privado */
-      }
+      if (next) setRoundClosed(false);
+      writeStored(guideId, next);
+    },
+    [guideId, isOlder, leave, adopt]
+  );
+
+  /** Cierra la prueba de una encuesta anterior: se aparta (enviando lo pendiente) y se avisa. */
+  const closeOldRound = useCallback(
+    (s: RunState) => {
+      if (stateRef.current?.runId !== s.runId) return;
+      stateRef.current = null;
+      setState(null);
+      setRoundClosed(true);
+      archiveStored(guideId, s);
     },
     [guideId]
   );
+
+  /** Aplica lo que dijo el servidor sobre la ronda de la prueba `runId`. */
+  const applyRound = useCallback(
+    (runId: string, info: RoundInfo) => {
+      if (info.activeRoundId !== undefined) activeRound.current = info.activeRoundId;
+      const s = stateRef.current;
+      if (!s || s.runId !== runId) return;
+      const runRound = s.roundId ?? info.roundId;
+      // Prueba guardada sin ronda (de antes de las rondas): ya se sabe a cuál pertenece
+      if (s.roundId === undefined && info.roundId !== undefined) commit({ ...s, roundId: info.roundId });
+      if (runRound !== undefined && info.activeRoundId !== undefined && runRound !== info.activeRoundId)
+        closeOldRound(stateRef.current ?? s);
+    },
+    [commit, closeOldRound]
+  );
+
+  useEffect(() => {
+    roundListeners.add(applyRound);
+    return () => {
+      roundListeners.delete(applyRound);
+    };
+  }, [applyRound]);
 
   const flush = useCallback(async (): Promise<boolean> => {
     if (flushing.current) {
       await flushing.current;
     }
     let recovered = false;
+    let info: { runId: string; round: RoundInfo } | undefined;
     const run = async (): Promise<boolean> => {
       const s = stateRef.current;
       if (!s || s.outbox.length === 0) return true;
@@ -222,6 +370,8 @@ export function useRun(guideId: string, roundId?: number) {
           headers: { "content-type": "application/json", "x-run-token": s.token },
           body: JSON.stringify({ events: batch }),
         });
+        // Mientras tanto la prueba se cerró o la reemplazó otra pestaña: no se toca la nueva
+        if (stateRef.current?.runId !== s.runId) return true;
         if ((res.status === 401 || res.status === 404) && !recovered) {
           recovered = true;
           // El servidor ya no conoce esta prueba (p. ej. se reinició su base de datos): se registra
@@ -234,10 +384,13 @@ export function useRun(guideId: string, roundId?: number) {
           console.warn("[sync] el servidor respondió", res.status);
           throw new Error(String(res.status));
         }
-        const cur = stateRef.current!;
-        commit({ ...cur, outbox: cur.outbox.slice(batch.length) });
+        info = { runId: s.runId, round: roundInfoOf(await res.json().catch(() => ({}))) };
+        const cur = stateRef.current;
+        if (cur?.runId !== s.runId) return true;
+        commit({ ...cur, outbox: withoutSent(cur.outbox, batch) });
         setSyncError(false);
-        return stateRef.current!.outbox.length === 0 ? true : await run();
+        // Lo pendiente se termina de enviar a esta misma prueba; la ronda se revisa al final
+        return !stateRef.current || stateRef.current.outbox.length === 0 ? true : await run();
       } catch {
         setSyncError(true);
         return false;
@@ -248,8 +401,33 @@ export function useRun(guideId: string, roundId?: number) {
     flushing.current = run();
     const ok = await flushing.current;
     flushing.current = null;
+    if (info) applyRound(info.runId, info.round);
     return ok;
-  }, [commit, guideId]);
+  }, [commit, guideId, applyRound]);
+
+  /**
+   * ¿Sigue activa la encuesta de esta prueba? Con cambios en cola se envían (la respuesta trae la
+   * ronda); si no, se pregunta al servidor. También completa la ronda de las pruebas sin `roundId`.
+   */
+  const checkRound = useCallback(
+    async (force = false) => {
+      const s = stateRef.current;
+      if (!s || checking.current) return;
+      if (!force && Date.now() - lastCheck.current < ROUND_CHECK_MIN_MS) return;
+      checking.current = true;
+      lastCheck.current = Date.now();
+      try {
+        if (s.outbox.length) await flush();
+        else {
+          const info = await fetchRunRound(s);
+          if (info) applyRound(s.runId, info);
+        }
+      } finally {
+        checking.current = false;
+      }
+    },
+    [flush, applyRound]
+  );
 
   /** Aplica un cambio local y encola los eventos para el servidor. */
   const update = useCallback(
@@ -263,29 +441,87 @@ export function useRun(guideId: string, roundId?: number) {
     [commit, flush]
   );
 
-  // Reintento automático
+  // Reintento automático y revisión de la ronda: cada 15 s (con la pestaña a la vista) y al volver a ella
   useEffect(() => {
     const retry = () => {
       if (stateRef.current?.outbox.length) void flush();
     };
+    const tick = () => {
+      if (stateRef.current?.outbox.length) void flush();
+      else if (document.visibilityState === "visible") void checkRound(true);
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void checkRound();
+    };
+    const onFocus = () => void checkRound();
     window.addEventListener("online", retry);
-    const t = setInterval(retry, 15000);
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+    const t = setInterval(tick, 15000);
     retry();
     return () => {
       window.removeEventListener("online", retry);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
       clearInterval(t);
     };
-  }, [flush, loaded]);
+  }, [flush, checkRound, loaded]);
+
+  // Otra pestaña de la misma guía cambió la prueba guardada: esta la sigue
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.storageArea !== localStorage || (e.key !== null && e.key !== storageKey(guideId))) return;
+      let incoming: RunState | null = null;
+      try {
+        incoming = e.key && e.newValue ? (JSON.parse(e.newValue) as RunState) : null;
+      } catch {
+        return;
+      }
+      const mine = stateRef.current;
+      if (incoming && mine && incoming.runId === mine.runId) {
+        // Misma prueba: la otra pestaña tiene lo más reciente
+        adopt(incoming);
+        return;
+      }
+      if (incoming) {
+        if (isOlder(incoming, mine)) {
+          // Una pestaña vieja guardó la prueba de una encuesta anterior: se vuelve a dejar la de esta
+          // (una sola vez: la pestaña vieja sigue a la nueva sin volver a escribir)
+          if (mine) writeStored(guideId, mine);
+          return;
+        }
+        // Otra pestaña registró otra prueba (o la recuperó): se sigue esa
+        if (mine) leave(mine);
+        adopt(incoming);
+        return;
+      }
+      // La otra pestaña apartó la prueba (encuesta nueva o «Empezar otra prueba»)
+      if (!mine) return;
+      adopt(null);
+      void (async () => {
+        if (mine.outbox.length) await sendOutbox(mine);
+        const info = await fetchRunRound(mine);
+        if (info?.activeRoundId === undefined) return;
+        activeRound.current = info.activeRoundId;
+        if (info.roundId !== info.activeRoundId && !stateRef.current) setRoundClosed(true);
+      })();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [guideId, adopt, leave, isOlder]);
 
   /** Aparta la prueba terminada y deja el navegador listo para registrar otra (otra persona). */
   const restart = useCallback(() => {
     const cur = stateRef.current;
-    if (cur) archiveStored(guideId, { ...cur, roundId: cur.roundId ?? roundId });
+    if (cur) archiveStored(guideId, { ...cur, roundId: cur.roundId ?? activeRound.current });
     stateRef.current = null;
     setState(null);
-  }, [guideId, roundId]);
+  }, [guideId]);
 
-  return { state, loaded, syncing, syncError, commit, update, flush, stateRef, restart };
+  /** Quita el aviso de encuesta nueva. */
+  const dismissRoundClosed = useCallback(() => setRoundClosed(false), []);
+
+  return { state, loaded, syncing, syncError, commit, update, flush, stateRef, restart, roundClosed, dismissRoundClosed };
 }
 
 /**
@@ -357,6 +593,8 @@ export async function callRun<T = Record<string, unknown>>(
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) return { ok: false, status: res.status, error: (data as { error?: string }).error || "No se pudo completar. Inténtalo de nuevo." };
+    // La respuesta trae la ronda: si el admin abrió una encuesta nueva, useRun cierra esta prueba
+    reportRound(run.runId, data);
     return { ok: true, data: data as T };
   } catch {
     return { ok: false, error: "No hay conexión con el servidor. Revisa tu internet y vuelve a intentarlo." };
