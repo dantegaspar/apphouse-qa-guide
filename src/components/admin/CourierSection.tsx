@@ -1,4 +1,5 @@
 import { deviceSummary, fmtDate, isImage, parseRec } from "@/lib/admin-data";
+import PhotoGallery from "@/components/admin/PhotoGallery";
 import { COURIER_QUESTIONS, FACES, faceOf } from "@/lib/courier";
 import { answerOf, courierStats, isCourierNa, loadCourier } from "@/lib/courier-data";
 import { ExportButton } from "@/components/admin/ExportButton";
@@ -144,16 +145,17 @@ export function CourierAdminSection() {
                         <p className="whitespace-pre-wrap text-sm text-slate-800">⚠️ {i.description}</p>
                         {(attsBy.get(i.id) ?? []).length > 0 && (
                           <div className="mt-2 flex flex-wrap gap-2">
-                            {(attsBy.get(i.id) ?? []).map((a) => (
-                              <a key={a.id} href={`/api/admin/courier-files/${a.id}`} target="_blank" rel="noreferrer" className="block">
-                                {isImage(a.mime) ? (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img src={`/api/admin/courier-files/${a.id}`} alt={a.original_name} loading="lazy" className="h-20 w-20 rounded-lg object-cover ring-1 ring-slate-200" />
-                                ) : (
-                                  <span className="inline-flex h-20 items-center rounded-lg bg-slate-100 px-3 text-xs text-slate-700 ring-1 ring-slate-200">{a.original_name}</span>
-                                )}
-                              </a>
-                            ))}
+                            <PhotoGallery
+                              photos={(attsBy.get(i.id) ?? []).filter((a) => isImage(a.mime)).map((a) => ({ id: a.id, src: `/api/admin/courier-files/${a.id}`, name: a.original_name }))}
+                            >
+                              {(attsBy.get(i.id) ?? [])
+                                .filter((a) => !isImage(a.mime))
+                                .map((a) => (
+                                  <a key={a.id} href={`/api/admin/courier-files/${a.id}`} target="_blank" rel="noreferrer" className="block">
+                                    <span className="inline-flex h-20 items-center rounded-lg bg-slate-100 px-3 text-xs text-slate-700 ring-1 ring-slate-200">{a.original_name}</span>
+                                  </a>
+                                ))}
+                            </PhotoGallery>
                           </div>
                         )}
                       </li>

@@ -1,4 +1,5 @@
 import { activityFieldDefs, expectedText } from "@/lib/guide-utils";
+import PhotoGallery from "@/components/admin/PhotoGallery";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { isAdmin } from "@/lib/auth";
@@ -214,23 +215,21 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
                 {i.description && <p className="mt-1 whitespace-pre-wrap">{i.description}</p>}
                 {i.expected && <p className="mt-1 whitespace-pre-wrap text-slate-500">Esperaba: {i.expected}</p>}
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {atts.filter((x) => x.issue_id === i.id).map((x) => {
-                    const src = `/api/admin/files/${x.id}`;
-                    if (isImage(x.mime))
+                  <PhotoGallery
+                    big
+                    photos={atts.filter((x) => x.issue_id === i.id && isImage(x.mime)).map((x) => ({ id: x.id, src: `/api/admin/files/${x.id}`, name: x.original_name }))}
+                  >
+                    {atts.filter((x) => x.issue_id === i.id && !isImage(x.mime)).map((x) => {
+                      const src = `/api/admin/files/${x.id}`;
+                      if (isVideo(x.mime))
+                        return <video key={x.id} src={src} controls preload="metadata" className="max-h-72 max-w-full rounded-lg" />;
                       return (
-                        <a key={x.id} href={src} target="_blank" rel="noreferrer">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={src} alt={x.original_name} loading="lazy" className="max-h-64 max-w-full rounded-lg ring-1 ring-slate-200" />
+                        <a key={x.id} href={`${src}?download=1`} className="rounded-lg bg-white px-3 py-2 text-xs text-[#2F5DA8] ring-1 ring-slate-200">
+                          {x.original_name}
                         </a>
                       );
-                    if (isVideo(x.mime))
-                      return <video key={x.id} src={src} controls preload="metadata" className="max-h-72 max-w-full rounded-lg" />;
-                    return (
-                      <a key={x.id} href={`${src}?download=1`} className="rounded-lg bg-white px-3 py-2 text-xs text-[#2F5DA8] ring-1 ring-slate-200">
-                        {x.original_name}
-                      </a>
-                    );
-                  })}
+                    })}
+                  </PhotoGallery>
                 </div>
               </div>
             ))}
