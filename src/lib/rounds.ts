@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { getDb, now } from "./db";
 
 /**
@@ -33,9 +34,32 @@ export function activeRoundId(): number {
   return rows[rows.length - 1].id;
 }
 
+/**
+ * Ronda fijada para una petición (p. ej. una descarga pide la ronda que el admin tiene en pantalla).
+ * Mientras corre `withRound`, `viewRoundId()` devuelve esa ronda en lugar de la vista compartida.
+ */
+const roundOverride = new AsyncLocalStorage<number>();
+
+/** Ejecuta `fn` como si la ronda a la vista fuera `id` (sin cambiar app_settings.view_round). */
+export function withRound<T>(id: number | null | undefined, fn: () => T): T {
+  return id ? roundOverride.run(id, fn) : fn();
+}
+
+/**
+ * Lee la ronda que manda el cliente (?round= o body.round): la que el admin tiene en pantalla.
+ * Devuelve null si no viene o no existe; quien llama usa entonces viewRoundId().
+ */
+export function parseRoundId(v: unknown): number | null {
+  const id = Number(v);
+  if (!Number.isInteger(id) || id < 1) return null;
+  return listRounds().some((r) => r.id === id) ? id : null;
+}
+
 /** Ronda que el panel está mostrando. */
 export function viewRoundId(): number {
   const rows = listRounds();
+  const fixed = roundOverride.getStore();
+  if (fixed && rows.some((r) => r.id === fixed)) return fixed;
   const v = getDb().prepare("SELECT value FROM app_settings WHERE key = 'view_round'").get() as { value: string } | undefined;
   const id = Number(v?.value);
   return rows.some((r) => r.id === id) ? id : rows[rows.length - 1].id;

@@ -1,4 +1,4 @@
-import { roundSlug } from "@/lib/rounds";
+import { parseRoundId, roundSlug, withRound } from "@/lib/rounds";
 import ExcelJS from "exceljs";
 import { isAdmin } from "@/lib/auth";
 import { getDb } from "@/lib/db";
@@ -29,7 +29,11 @@ const EXCEL_MAX_CELL = 32767;
 
 export async function GET(req: Request) {
   if (!(await isAdmin())) return err("No autorizado", 401);
+  // ?round= opcional: la ronda que el admin tiene en pantalla (si no viene, la vista compartida)
+  return withRound(parseRoundId(new URL(req.url).searchParams.get("round")), () => buildWorkbook(req));
+}
 
+async function buildWorkbook(req: Request) {
   // ?guide= opcional y de una guía conocida
   const guideId = new URL(req.url).searchParams.get("guide") || null;
   const guideErr = idError(guideId, { known: GUIDES.map((g) => g.id), required: false, label: "la guía" });

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useViewRound } from "@/components/admin/ViewRound";
 
 /** Lo que va haciendo Claude, según el tiempo transcurrido (aproximado: la API no informa el avance). */
 const STAGES: [number, string][] = [
@@ -16,6 +17,8 @@ const STAGES: [number, string][] = [
 /** Botón «Procesar con Claude» con indicador de «pensando» mientras la API responde (1–3 min). */
 export default function ClaudeDictamenButton({ disabled, reclasificar, label }: { disabled?: boolean; reclasificar?: boolean; label?: string }) {
   const router = useRouter();
+  // Ronda que el admin tiene en pantalla: el dictamen se hace sobre esa
+  const round = useViewRound();
   const [busy, setBusy] = useState(false);
   const [secs, setSecs] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +35,11 @@ export default function ClaudeDictamenButton({ disabled, reclasificar, label }: 
     setBusy(true);
     setError(null);
     try {
-      const r = await fetch(`/api/admin/claude-dictamen${reclasificar ? "?reclasificar=1" : ""}`, { method: "POST" });
+      const r = await fetch(`/api/admin/claude-dictamen${reclasificar ? "?reclasificar=1" : ""}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(round ? { round } : {}),
+      });
       const body = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(body.error || "No se pudo procesar con Claude");
       if (body.error) setError(body.error);
