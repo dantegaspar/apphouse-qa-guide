@@ -130,10 +130,11 @@ async function ask<T>(schema: z.ZodType<T>, prompt: string, effort: "medium" | "
 type RunRow = { id: string; guide_id: string; status: string };
 type IssueRow = { id: string; run_id: string; activity_id: string; severity: string; triage: string; description: string; expected: string; triage_note?: string };
 
-export async function runDictamen(opts: { reclasificar?: boolean } = {}): Promise<DictamenRow> {
+export async function runDictamen(opts: { reclasificar?: boolean; round?: number } = {}): Promise<DictamenRow> {
   const db = getDb();
-  // Todo el dictamen es de la ronda que estaba a la vista al empezar (aunque el admin cambie de ronda mientras corre).
-  const round = viewRoundId();
+  // Todo el dictamen es de una sola ronda: la que pidió el admin (la que tenía en pantalla) o, si no la
+  // mandó, la que estaba a la vista al empezar (aunque el admin cambie de ronda mientras corre).
+  const round = opts.round ?? viewRoundId();
   const inRound = runInRound("run_id", round);
   // Volver a clasificar con las reglas vigentes lo que clasificó Claude antes y lo confirmado sin nota. Lo que Mesa
   // decidió con una nota no se toca.

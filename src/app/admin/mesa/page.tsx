@@ -2,10 +2,14 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { isAdmin } from "@/lib/auth";
 import { getGuide, GUIDES } from "@/lib/guides";
-import { ABANDON_MIN, fmtDate, guideShortTitle, loadMesa, MESA_STATE, qaTiles, STALL_MIN, timeAgo, type MesaRow, type MesaState } from "@/lib/admin-data";
+import {
+  ABANDON_MIN, fmtDate, guideShortTitle, loadMesa, loadOpenHelp, loadOtherRoundsActivity, MESA_STATE, OTHER_ROUND_ACTIVE_H, qaTiles, STALL_MIN, timeAgo,
+  type MesaRow, type MesaState,
+} from "@/lib/admin-data";
 import { AutoRefresh } from "@/components/admin/AutoRefresh";
 import { HelpRequestWatcher } from "@/components/admin/HelpRequestWatcher";
 import { LogoutButton } from "@/components/admin/LogoutButton";
+import { OtherRoundsAlert } from "@/components/admin/OtherRoundsAlert";
 import { QaGrid } from "@/components/admin/QaGrid";
 
 export const dynamic = "force-dynamic";
@@ -103,17 +107,22 @@ export default async function MesaPage({ searchParams }: { searchParams: Promise
   const { rows, at: nowMs } = loadMesa(guideId);
   const countOf = (k: MesaState) => rows.filter((r) => r.state === k || (k === "finished" && r.state === "ended_blocked")).length;
   const firstCalm = rows.findIndex((r) => !r.reason);
+  // La tabla es solo de la ronda a la vista; lo que sigue vivo en otras rondas (y sus solicitudes de ayuda) va en un aviso
+  const otherRounds = loadOtherRoundsActivity(nowMs);
+  const otherHelp = loadOpenHelp().rows.filter((h) => h.other_round);
+  const whereOf = (guideId: string, activityId: string) => {
+    const act = getGuide(guideId)?.activities.find((a) => a.id === activityId);
+    return act ? `${act.id} ${act.title}` : activityId || "la guía";
+  };
 
   return (
     <main className="mx-auto w-full max-w-7xl space-y-5 px-3 py-5 sm:px-4 sm:py-6">
       <AutoRefresh seconds={REFRESH_S} />
       <HelpRequestWatcher
-        open={rows
-          .filter((r) => r.openHelp)
-          .map((r) => {
-            const act = getGuide(r.run.guide_id)?.activities.find((a) => a.id === r.openHelp!.activity_id);
-            return { id: r.openHelp!.id, tester: r.run.name, where: act ? `${act.id} ${act.title}` : r.openHelp!.activity_id || "la guía" };
-          })}
+        open={[
+          ...rows.filter((r) => r.openHelp).map((r) => ({ id: r.openHelp!.id, tester: r.run.name, where: whereOf(r.run.guide_id, r.openHelp!.activity_id) })),
+          ...otherHelp.map((h) => ({ id: h.id, tester: h.tester, where: `${whereOf(h.guide_id, h.activity_id)} («${h.round_name}»)` })),
+        ]}
       />
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -131,6 +140,19 @@ export default async function MesaPage({ searchParams }: { searchParams: Promise
           <LogoutButton />
         </div>
       </header>
+
+      <OtherRoundsAlert
+        rounds={otherRounds}
+        activeHours={OTHER_ROUND_ACTIVE_H}
+        help={otherHelp.map((h) => ({
+          id: h.id,
+          runId: h.run_id,
+          tester: h.tester,
+          where: whereOf(h.guide_id, h.activity_id),
+          ago: timeAgo(h.created_at, nowMs),
+          roundId: h.round_id,
+        }))}
+      />
 
       <nav className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 text-sm sm:mx-0 sm:flex-wrap sm:px-0" aria-label="Filtrar por guía">
         {[{ id: "", title: "Todas las guías" }, ...GUIDES].map((g) => (

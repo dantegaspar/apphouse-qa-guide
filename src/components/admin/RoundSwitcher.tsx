@@ -19,6 +19,9 @@ export function RoundSwitcher({ rounds, view, active, nextName }: { rounds: Roun
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<"" | "new" | "rename">("");
   const [name, setName] = useState("");
+  // Ronda que se está renombrando: la que estaba en pantalla al picar «Renombrar» (si otra pestaña cambia
+  // la vista mientras escribe, el nombre no cae en otra ronda)
+  const [renameId, setRenameId] = useState<number | null>(null);
   const current = rounds.find((r) => r.id === view);
   const activeRound = rounds.find((r) => r.id === active);
   const archived = view !== active;
@@ -107,6 +110,7 @@ export function RoundSwitcher({ rounds, view, active, nextName }: { rounds: Roun
               disabled={busy}
               onClick={() => {
                 setName(current?.name ?? "");
+                setRenameId(view);
                 setMode("rename");
               }}
               className="rounded-lg px-2 py-1 text-slate-600 underline-offset-2 hover:underline disabled:opacity-50"
@@ -134,7 +138,7 @@ export function RoundSwitcher({ rounds, view, active, nextName }: { rounds: Roun
             onSubmit={async (e) => {
               e.preventDefault();
               if (mode === "new") return startNew();
-              if (await post({ action: "rename", id: view, name })) setMode("");
+              if (await post({ action: "rename", id: renameId ?? view, name })) setMode("");
             }}
           >
             <label className="sr-only" htmlFor="round-name">
@@ -146,7 +150,7 @@ export function RoundSwitcher({ rounds, view, active, nextName }: { rounds: Roun
               value={name}
               maxLength={60}
               onChange={(e) => setName(e.target.value)}
-              placeholder={mode === "new" ? nextName : current?.name}
+              placeholder={mode === "new" ? nextName : rounds.find((r) => r.id === (renameId ?? view))?.name}
               className="w-56 rounded-lg border border-slate-300 px-2 py-1"
             />
             <button type="submit" disabled={busy || (mode === "rename" && !name.trim())} className="rounded-lg bg-[#2F5DA8] px-3 py-1 font-semibold text-white disabled:opacity-50">
