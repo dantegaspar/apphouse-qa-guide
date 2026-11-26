@@ -8,7 +8,7 @@
  */
 import type { FieldDef, SurveyQuestion } from "./types";
 import { daysError, folioTimeError, timeError, timeRangeError } from "./time-fields";
-import { COURIER_NA } from "./courier";
+import { COURIER_NA, COURIER_RATING } from "./courier";
 
 export type FieldErrors = Record<string, string>;
 
@@ -338,6 +338,9 @@ export const courierIssueError = (v: unknown) => textError(v, { ...COURIER_RULES
 /** Carita 1–5; con `allowNa`, también «no aplica» (COURIER_NA). */
 export const courierAnswerError = (v: unknown, allowNa = false): string | null =>
   allowNa && v === COURIER_NA ? null : intError(v, 1, 5) ? "Toca una carita." : null;
+/** Calificación 0–10 (COURIER_RATING). */
+export const courierRatingError = (v: unknown): string | null =>
+  intError(v, COURIER_RATING.min, COURIER_RATING.max) ? "Toca un número del 0 al 10." : null;
 
 /* ---------- Utilidades ---------- */
 

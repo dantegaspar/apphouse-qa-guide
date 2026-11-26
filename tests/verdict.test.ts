@@ -230,3 +230,20 @@ describe("repartidores", () => {
     expect(v.ready).toBe(true);
   });
 });
+
+describe("repartidores: calificación 0–10", () => {
+  it("no cambia el puntaje de las caritas ni el veredicto", () => {
+    const { round } = readyScenario();
+    const ins = getDb().prepare(
+      "INSERT INTO courier_feedback (id, token_hash, name, answers, created_at, updated_at, round_id) VALUES ('c1', 'x', 'Rep', ?, ?, ?, ?)"
+    );
+    const ts = new Date().toISOString();
+    ins.run(JSON.stringify({ facil: 5, general: 5 }), ts, ts, round);
+    const before = computeVerdict(round);
+    getDb().prepare("DELETE FROM courier_feedback").run();
+    ins.run(JSON.stringify({ facil: 5, general: 5, recomienda: 0 }), ts, ts, round);
+    const after = computeVerdict(round);
+    expect(after.courier.score).toBe(before.courier.score);
+    expect(after.ready).toBe(before.ready);
+  });
+});

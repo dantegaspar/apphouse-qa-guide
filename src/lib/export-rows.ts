@@ -3,8 +3,8 @@ import { getGuide, GUIDES } from "@/lib/guides";
 import {
   checkValue, deviceSummary, flatten, guideTitle, HELP_STATUS, loadAll, parseRec, resultLabel, runStatusLabel,
 } from "@/lib/admin-data";
-import { COURIER_QUESTIONS, faceOf } from "@/lib/courier";
-import { answerOf, isCourierNa, loadCourier } from "@/lib/courier-data";
+import { COURIER_QUESTIONS, COURIER_RATING } from "@/lib/courier";
+import { answerOf, isCourierNa, loadCourier, ratingOf } from "@/lib/courier-data";
 import { insightsExport } from "@/lib/insights";
 import { computeVerdict } from "@/lib/verdict";
 import { PRIORITIES, SEVERITIES, TRIAGE } from "@/lib/types";
@@ -16,7 +16,7 @@ export const EXPORT_KINDS: ExportKind[] = ["verdict", "cases", "insights", "runs
 /** Encabezados que contienen fechas ISO (para exportaciones que soportan fechas reales). */
 export const DATE_HEADERS = new Set(["terminada por bloqueo", "creada", "actualizada", "terminada", "creado", "pedida", "cerrada"]);
 
-/** Encuesta de repartidores (no depende del filtro de guía). Respuestas como número 1–5 y carita. */
+/** Encuesta de repartidores (no depende del filtro de guía). Respuestas como número 1–5 y su etiqueta, más la calificación 0–10. */
 function buildCourierExport(kind: "courier" | "courier_issues", origin: string): { headers: string[]; rows: Cell[][] } {
   const { feedback, issues, attachments } = loadCourier();
   const fileUrls = (pred: (a: (typeof attachments)[number]) => boolean) =>
@@ -24,8 +24,8 @@ function buildCourierExport(kind: "courier" | "courier_issues", origin: string):
   if (kind === "courier") {
     const headers = [
       "encuesta", "nombre", "teléfono", "dispositivo", "ip",
-      ...COURIER_QUESTIONS.flatMap((q) => [q.label, `${q.short} (carita)`]),
-      "promedio", "comentario", "problemas", "fotos", "creado", "actualizada",
+      ...COURIER_QUESTIONS.flatMap((q) => [q.label, `${q.short} (respuesta)`]),
+      "promedio", COURIER_RATING.short, "comentario", "problemas", "fotos", "creado", "actualizada",
     ];
     const rows = feedback.map((f) => {
       const ans = parseRec(f.answers);
@@ -37,9 +37,10 @@ function buildCourierExport(kind: "courier" | "courier_issues", origin: string):
         ...COURIER_QUESTIONS.flatMap((q, i) => {
           const v = vals[i];
           if (isCourierNa(ans, q.id)) return [null, "No aplica"];
-          return [v, v ? `${faceOf(v)?.emoji} ${q.faces[v - 1]}` : ""];
+          return [v, v ? q.faces[v - 1] : ""];
         }),
         nums.length ? Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 10) / 10 : null,
+        ratingOf(ans),
         f.comment, issues.filter((i) => i.feedback_id === f.id).length, fileUrls((a) => a.feedback_id === f.id),
         f.created_at, f.updated_at,
       ];
