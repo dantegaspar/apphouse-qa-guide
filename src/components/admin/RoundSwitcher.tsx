@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast, useConfirm } from "@/components/feedback";
 
@@ -75,36 +75,12 @@ export function RoundSwitcher({ rounds, view, active, nextName }: { rounds: Roun
       data-testid="round-switcher"
       className={`border-b print:hidden ${archived ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-white"}`}
     >
-      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-2 px-4 py-2 text-sm">
+      <div className="relative mx-auto flex w-full max-w-6xl flex-wrap items-center gap-2 px-4 py-2 text-sm">
         <span className="font-semibold text-slate-700">Encuesta:</span>
-        <div role="radiogroup" aria-label="Ronda de encuestas" className="flex flex-wrap gap-1.5">
-          {rounds.map((r) => {
-            const on = r.id === view;
-            return (
-              <button
-                key={r.id}
-                type="button"
-                role="radio"
-                aria-checked={on}
-                disabled={busy}
-                title={`Desde ${fmtDay(r.created_at)} · ${r.runs} pruebas · ${r.couriers} repartidores`}
-                onClick={() => !on && post({ action: "view", id: r.id })}
-                className={`rounded-full px-3 py-1 font-medium ring-1 disabled:opacity-60 ${
-                  on ? "bg-[#2F5DA8] text-white ring-[#2F5DA8]" : "bg-white text-slate-700 ring-slate-300 hover:bg-slate-50"
-                }`}
-              >
-                {r.name}
-                <span className={`ml-1.5 text-xs ${on ? "text-blue-100" : "text-slate-400"}`}>{r.runs + r.couriers}</span>
-                {r.id === active && rounds.length > 1 && (
-                  <span className={`ml-1.5 rounded px-1 text-[10px] font-bold uppercase ${on ? "bg-white/20" : "bg-emerald-100 text-emerald-800"}`}>actual</span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+        <RoundMenu rounds={rounds} view={view} active={active} busy={busy} onPick={(id) => post({ action: "view", id })} />
 
         {mode === "" && (
-          <div className="ml-auto flex flex-wrap items-center gap-2">
+          <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:ml-auto sm:w-auto">
             <button
               type="button"
               disabled={busy}
@@ -134,7 +110,7 @@ export function RoundSwitcher({ rounds, view, active, nextName }: { rounds: Roun
 
         {mode !== "" && (
           <form
-            className="ml-auto flex flex-wrap items-center gap-2"
+            className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto"
             onSubmit={async (e) => {
               e.preventDefault();
               if (mode === "new") return startNew();
@@ -151,7 +127,7 @@ export function RoundSwitcher({ rounds, view, active, nextName }: { rounds: Roun
               maxLength={60}
               onChange={(e) => setName(e.target.value)}
               placeholder={mode === "new" ? nextName : rounds.find((r) => r.id === (renameId ?? view))?.name}
-              className="w-56 rounded-lg border border-slate-300 px-2 py-1"
+              className="min-w-0 flex-1 rounded-lg sm:w-56 sm:flex-none border border-slate-300 px-2 py-1"
             />
             <button type="submit" disabled={busy || (mode === "rename" && !name.trim())} className="rounded-lg bg-[#2F5DA8] px-3 py-1 font-semibold text-white disabled:opacity-50">
               {mode === "new" ? "Empezar" : "Guardar"}
@@ -169,6 +145,154 @@ export function RoundSwitcher({ rounds, view, active, nextName }: { rounds: Roun
           </p>
         )}
       </div>
+    </div>
+  );
+}
+
+function Badge({ on }: { on?: boolean }) {
+  return <span className={`rounded px-1 text-[10px] font-bold uppercase ${on ? "bg-white/20 text-white" : "bg-emerald-100 text-emerald-800"}`}>actual</span>;
+}
+
+/**
+ * Menú desplegable de rondas: en la barra solo se ve la encuesta elegida; al abrirlo salen todas,
+ * de la más reciente a la más antigua, con su fecha y conteos. Escala a muchas rondas sin ocupar la barra.
+ */
+function RoundMenu({
+  rounds,
+  view,
+  active,
+  busy,
+  onPick,
+}: {
+  rounds: RoundItem[];
+  view: number;
+  active: number;
+  busy: boolean;
+  onPick: (id: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [focus, setFocus] = useState(0);
+  const wrap = useRef<HTMLDivElement>(null);
+  const btn = useRef<HTMLButtonElement>(null);
+  const list = useRef<HTMLUListElement>(null);
+  const sorted = [...rounds].sort((a, b) => b.id - a.id);
+  const current = rounds.find((r) => r.id === view);
+  const many = rounds.length > 1;
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (wrap.current && !wrap.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [open]);
+
+  useEffect(() => {
+    if (open) list.current?.querySelectorAll<HTMLElement>("[role=option]")[focus]?.focus();
+  }, [open, focus]);
+
+  const show = () => {
+    setFocus(Math.max(0, sorted.findIndex((r) => r.id === view)));
+    setOpen(true);
+  };
+  const close = () => {
+    setOpen(false);
+    btn.current?.focus();
+  };
+  const pick = (id: number) => {
+    close();
+    if (id !== view) onPick(id);
+  };
+
+  return (
+    <div ref={wrap} className="min-w-0 flex-1 sm:relative sm:flex-none">
+      <button
+        ref={btn}
+        type="button"
+        data-testid="round-menu"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={`Ronda de encuestas: ${current?.name ?? ""}`}
+        disabled={busy}
+        onClick={() => (open ? close() : show())}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+            e.preventDefault();
+            show();
+          }
+        }}
+        className="flex w-full items-center gap-1.5 rounded-full bg-[#2F5DA8] py-1 pl-3 pr-2 font-medium text-white ring-1 ring-[#2F5DA8] disabled:opacity-60 sm:w-auto sm:max-w-md"
+      >
+        <span className="truncate">{current?.name ?? "—"}</span>
+        <span className="text-xs text-blue-100">{current ? current.runs + current.couriers : 0}</span>
+        {many && view === active && <Badge on />}
+        <svg aria-hidden viewBox="0 0 20 20" className={`ml-auto size-4 shrink-0 transition-transform sm:ml-0 ${open ? "rotate-180" : ""}`} fill="currentColor">
+          <path d="M5.3 7.3a1 1 0 0 1 1.4 0L10 10.6l3.3-3.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 0 1 0-1.4Z" />
+        </svg>
+      </button>
+
+      {open && (
+        <ul
+          ref={list}
+          role="listbox"
+          aria-label="Rondas de encuestas, de la más reciente a la más antigua"
+          data-testid="round-list"
+          onKeyDown={(e) => {
+            if (e.key === "Escape" || e.key === "Tab") {
+              if (e.key === "Escape") e.preventDefault();
+              close();
+            } else if (e.key === "ArrowDown") {
+              e.preventDefault();
+              setFocus((f) => Math.min(sorted.length - 1, f + 1));
+            } else if (e.key === "ArrowUp") {
+              e.preventDefault();
+              setFocus((f) => Math.max(0, f - 1));
+            } else if (e.key === "Home") {
+              e.preventDefault();
+              setFocus(0);
+            } else if (e.key === "End") {
+              e.preventDefault();
+              setFocus(sorted.length - 1);
+            }
+          }}
+          className="absolute inset-x-4 z-40 mt-1 max-h-[60vh] sm:inset-x-auto sm:left-0 sm:w-[22rem] overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg"
+        >
+          {sorted.map((r) => {
+            const on = r.id === view;
+            return (
+              <li
+                key={r.id}
+                role="option"
+                aria-selected={on}
+                tabIndex={-1}
+                onClick={() => pick(r.id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    pick(r.id);
+                  }
+                }}
+                className={`flex cursor-pointer items-start gap-2 rounded-lg px-3 py-2 outline-none focus:bg-slate-100 ${on ? "bg-blue-50" : "hover:bg-slate-50"}`}
+              >
+                <span className={`mt-0.5 size-4 shrink-0 text-[#2F5DA8] ${on ? "" : "invisible"}`} aria-hidden>
+                  ✓
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-1.5">
+                    <span className={`truncate ${on ? "font-semibold text-[#2F5DA8]" : "font-medium text-slate-800"}`}>{r.name}</span>
+                    {many && r.id === active && <Badge />}
+                  </span>
+                  <span className="block text-xs text-slate-500">
+                    Desde {fmtDay(r.created_at)} · {r.runs} {r.runs === 1 ? "prueba" : "pruebas"} · {r.couriers}{" "}
+                    {r.couriers === 1 ? "repartidor" : "repartidores"}
+                  </span>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }
