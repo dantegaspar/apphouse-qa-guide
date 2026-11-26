@@ -2,6 +2,7 @@ import { isAdmin } from "@/lib/auth";
 import { activeRoundId, defaultRoundName, listRounds, roundCounts, viewRoundId } from "@/lib/rounds";
 import { RoundSwitcher } from "@/components/admin/RoundSwitcher";
 import { ViewRoundProvider } from "@/components/admin/ViewRound";
+import { QueryProvider } from "@/components/admin/QueryProvider";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         active={active}
         nextName={defaultRoundName(active + 1)}
       />
-      <ViewRoundProvider round={view}>{children}</ViewRoundProvider>
+      <ViewRoundProvider round={view}>
+        <QueryProvider>{children}</QueryProvider>
+      </ViewRoundProvider>
     </>
   );
 }

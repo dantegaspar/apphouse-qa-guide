@@ -7,7 +7,7 @@ import type { QaTile, QaTileKind } from "@/lib/admin-data";
 /**
  * Mapa de testers de la Mesa de control: una ficha por tester, como un mapa de asientos.
  * Verde = avanzando; rojo con pulso = bloqueado. Se actualiza con el refresco de la página
- * (AutoRefresh → router.refresh), sin recargar: las fichas animan su avance y destellan al
+ * (MesaLive → TanStack Query), sin recargar: las fichas animan su avance y destellan al
  * cambiar de estado.
  */
 
@@ -173,6 +173,7 @@ export function QaGrid({
   refreshS,
   guides,
   grouped,
+  stale = false,
 }: {
   tiles: QaTile[];
   /** Hora del servidor de estos datos (ms). */
@@ -181,6 +182,8 @@ export function QaGrid({
   guides: { id: string; title: string }[];
   /** Mostrar encabezados por guía (cuando la página no filtra por guía). */
   grouped: boolean;
+  /** La última consulta falló: mostrar el indicador en ámbar aunque los datos sean recientes. */
+  stale?: boolean;
 }) {
   const [nowMs, setNowMs] = useState(at);
   const [tab, setTab] = useState("");
@@ -201,7 +204,7 @@ export function QaGrid({
   const active = present.some((g) => g.id === tab) ? tab : "";
   const shown = active ? tiles.filter((t) => t.guideId === active) : tiles;
   const secs = Math.max(0, Math.round((Math.max(nowMs, at) - at) / 1000));
-  const late = secs > refreshS * 3;
+  const late = stale || secs > refreshS * 3;
 
   const toggleFs = () => {
     if (document.fullscreenElement) void document.exitFullscreen();
@@ -233,7 +236,7 @@ export function QaGrid({
               <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-60 ${late ? "bg-amber-400" : "bg-emerald-400"}`} />
               <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${late ? "bg-amber-500" : "bg-emerald-500"}`} />
             </span>
-            En vivo · actualizado hace {secs} s
+            {late ? "Sin actualizar" : "En vivo"} · actualizado hace {secs} s
           </span>
           <button
             type="button"
