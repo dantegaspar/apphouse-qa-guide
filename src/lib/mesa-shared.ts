@@ -38,3 +38,25 @@ export const MESA_STATE: Record<MesaState, { label: string; cls: string; rank: n
   ended_blocked: { label: "Terminada por bloqueo", cls: "bg-red-100 text-red-800", rank: 5 },
   finished: { label: "Terminada", cls: "bg-emerald-100 text-emerald-800", rank: 6 },
 };
+
+// ---------------------------------------------------------------------------------------------
+// Ritmo de consulta de la Mesa en vivo (MesaLive)
+
+/** Intervalo normal de la Mesa. */
+export const MESA_BASE_S = 5;
+/** Sin cambios en los datos durante N consultas seguidas → consulta más espaciado (vuelve a 5 s al primer cambio). */
+export const CALM_STEPS = [
+  { after: 18, s: 15 }, // 18 consultas iguales (≈1.5 min) → cada 15 s
+  { after: 6, s: 10 }, // 6 consultas iguales (30 s) → cada 10 s
+];
+/** Consultas fallidas seguidas → espera creciente: 5, 10, 20 y luego 30 s. */
+export const ERROR_S = [5, 10, 20, 30];
+
+/** Consultas seguidas sin cambios (calm) y fallidas seguidas (fails). */
+export type MesaPollState = { calm: number; fails: number };
+
+/** Segundos hasta la próxima consulta: espera creciente si falla; más espaciado si nada cambia. */
+export function nextIntervalS(l: MesaPollState) {
+  if (l.fails) return ERROR_S[Math.min(l.fails, ERROR_S.length) - 1];
+  return CALM_STEPS.find((c) => l.calm >= c.after)?.s ?? MESA_BASE_S;
+}

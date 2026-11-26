@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ABANDON_MIN, fmtDate, MESA_STATE, OTHER_ROUND_ACTIVE_MIN, STALL_MIN, timeAgo, type MesaState } from "@/lib/mesa-shared";
+import {
+  ABANDON_MIN, fmtDate, MESA_BASE_S, MESA_STATE, nextIntervalS, OTHER_ROUND_ACTIVE_MIN, STALL_MIN, timeAgo, type MesaPollState, type MesaState,
+} from "@/lib/mesa-shared";
 import type { MesaRow } from "@/lib/admin-data";
 import type { MesaPayload } from "@/lib/mesa-payload";
 import { useViewRound } from "@/components/admin/ViewRound";
@@ -16,16 +18,6 @@ import { QaGrid } from "@/components/admin/QaGrid";
 // ---------------------------------------------------------------------------------------------
 // Consulta en vivo (TanStack Query)
 
-/** Intervalo normal de la Mesa. */
-export const MESA_BASE_S = 5;
-/** Sin cambios en los datos durante N consultas seguidas → consulta más espaciado (vuelve a 5 s al primer cambio). */
-const CALM_STEPS = [
-  { after: 18, s: 15 }, // 18 consultas iguales (≈1.5 min) → cada 15 s
-  { after: 6, s: 10 }, // 6 consultas iguales (30 s) → cada 10 s
-];
-/** Consultas fallidas seguidas → espera creciente: 5, 10, 20 y luego 30 s. */
-const ERROR_S = [5, 10, 20, 30];
-
 class MesaHttpError extends Error {
   constructor(
     readonly status: number,
@@ -35,12 +27,7 @@ class MesaHttpError extends Error {
   }
 }
 
-type LiveState = { sig: string; calm: number; fails: number; expired: boolean };
-
-function nextIntervalS(l: LiveState) {
-  if (l.fails) return ERROR_S[Math.min(l.fails, ERROR_S.length) - 1];
-  return CALM_STEPS.find((c) => l.calm >= c.after)?.s ?? MESA_BASE_S;
-}
+type LiveState = MesaPollState & { sig: string; expired: boolean };
 
 function useMesaQuery(initial: MesaPayload) {
   const guideId = initial.guideId;
