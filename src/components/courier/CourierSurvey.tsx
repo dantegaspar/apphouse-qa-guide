@@ -10,6 +10,7 @@ import {
   COURIER_QUESTIONS,
   FACES,
   guessPhotoMime,
+  ROUND_CLOSED,
   type CourierAnswer,
 } from "@/lib/courier";
 import {
@@ -70,6 +71,8 @@ function loadDraft(): Draft | null {
 
 /** Último error de validación del servidor (`{ error, fields }`), para marcar los campos. */
 let lastFields: FieldErrors = {};
+/** Código del último error del servidor (`{ error, code }`), p. ej. ROUND_CLOSED. */
+let lastCode: string | undefined;
 
 /**
  * Llama al servidor. Devuelve null si salió bien, o el mensaje de error (OFFLINE si no hay red).
@@ -77,16 +80,44 @@ let lastFields: FieldErrors = {};
  */
 async function api(url: string, init: RequestInit): Promise<string | null> {
   lastFields = {};
+  lastCode = undefined;
   if (typeof navigator !== "undefined" && navigator.onLine === false) return OFFLINE;
   try {
     const res = await fetch(url, init);
     if (res.ok) return null;
-    const data = (await res.json().catch(() => ({}))) as { error?: string; fields?: FieldErrors };
+    const data = (await res.json().catch(() => ({}))) as { error?: string; fields?: FieldErrors; code?: string };
     if (data.fields && typeof data.fields === "object") lastFields = data.fields;
+    if (typeof data.code === "string") lastCode = data.code;
     return data.error || "No se pudo enviar. Inténtalo de nuevo.";
   } catch {
     return OFFLINE;
   }
+}
+
+/**
+ * Ids nuevos para la encuesta, sus problemas y sus fotos (las fotos se copian en IndexedDB con su id
+ * nuevo). Se usa cuando el servidor dice que la encuesta es de una ronda anterior (ROUND_CLOSED):
+ * así se manda otra vez como encuesta nueva, con las mismas respuestas, sin tocar la anterior.
+ * Devuelve también el cambio de ids de las fotos (viejo → nuevo).
+ */
+async function rekeyDraft(d: Draft): Promise<{ draft: Draft; photoIds: Map<string, string> }> {
+  const photoIds = new Map<string, string>();
+  const issues: DraftIssue[] = [];
+  for (const it of d.issues) {
+    let photo = it.photo;
+    if (photo) {
+      const pid = uid();
+      const blob = await getPhoto(photo.id);
+      if (blob) {
+        await putPhoto(pid, blob);
+        await deletePhoto(photo.id);
+      }
+      photoIds.set(photo.id, pid);
+      photo = { ...photo, id: pid };
+    }
+    issues.push({ ...it, id: uid(), photo });
+  }
+  return { draft: { ...d, id: uid(), token: newToken(), issues }, photoIds };
 }
 
 /** Mismas reglas que el servidor (src/lib/validate.ts). */
@@ -262,8 +293,23 @@ export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) 
         maxUploadMb={maxUploadMb}
         os={String(device.os ?? "")}
         onIssueSent={() => setSent({ ...sent, issues: sent.issues + 1 })}
-        onAgain={() => {
-          ref.current = newDraft();
+        onAgain={async (carry) => {
+          const next = newDraft();
+          // Problema que no se pudo agregar a la encuesta anterior (ronda cerrada): queda anotado en la nueva
+          if (carry) {
+            let photo: DraftPhoto | undefined;
+            if (carry.photo) {
+              photo = { id: uid(), name: carry.photo.name || "captura.jpg", size: carry.photo.size };
+              await putPhoto(photo.id, carry.photo);
+            }
+            next.issues = [{ id: uid(), description: carry.description, photo }];
+            try {
+              localStorage.setItem(KEY, JSON.stringify(next));
+            } catch {
+              /* modo privado o almacenamiento lleno: el borrador queda solo en pantalla */
+            }
+          }
+          ref.current = next;
           setDraft(ref.current);
           setSent(null);
           setShowErrors(false);
@@ -301,6 +347,37 @@ export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) 
     return null;
   };
 
+  /** Manda la encuesta y luego cada foto. Se detiene en el primer error (queda en `lastCode`/`lastFields`). */
+  const sendDraft = async (d: Draft) => {
+    let error = await api("/api/repartidor", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        id: d.id,
+        token: d.token,
+        name: d.name,
+        phone: d.phone,
+        device,
+        answers: d.answers,
+        comment: d.comment,
+        issues: d.issues.map((i) => ({ id: i.id, description: i.description })),
+      }),
+    });
+    let lostPhotos = 0;
+    for (const it of d.issues) {
+      if (error) break;
+      if (!it.photo) continue;
+      const blob = await getPhoto(it.photo.id);
+      // La foto ya no está en el celular (p. ej. modo privado y se recargó): se avisa abajo y al terminar
+      if (!blob) {
+        lostPhotos++;
+        continue;
+      }
+      error = await uploadPhoto(d.id, d.token, it.id, it.photo.id, blob, it.photo.name);
+    }
+    return { error, lostPhotos };
+  };
+
   /** `auto`: reintento solo al volver la señal; si ahora falta algo, espera a que la persona toque «Enviar». */
   const send = async (auto = false) => {
     if (auto && (problems.length || sending)) return;
@@ -313,34 +390,18 @@ export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) 
       requestAnimationFrame(() => focusField(first));
       return;
     }
-    const d = ref.current!;
+    let d = ref.current!;
     setSending(true);
     try {
-      let error = await api("/api/repartidor", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          id: d.id,
-          token: d.token,
-          name: d.name,
-          phone: d.phone,
-          device,
-          answers: d.answers,
-          comment: d.comment,
-          issues: d.issues.map((i) => ({ id: i.id, description: i.description })),
-        }),
-      });
-      let lostPhotos = 0;
-      for (const it of d.issues) {
-        if (error) break;
-        if (!it.photo) continue;
-        const blob = await getPhoto(it.photo.id);
-        // La foto ya no está en el celular (p. ej. modo privado y se recargó): se avisa abajo y al terminar
-        if (!blob) {
-          lostPhotos++;
-          continue;
-        }
-        error = await uploadPhoto(d.id, d.token, it.id, it.photo.id, blob, it.photo.name);
+      let { error, lostPhotos } = await sendDraft(d);
+      if (error && lastCode === ROUND_CLOSED) {
+        // Se abrió una ronda nueva desde que esta encuesta se mandó (a medias): se manda otra vez como
+        // encuesta nueva (otro id), con las mismas respuestas, problemas y fotos. La anterior no se toca.
+        const { draft: next, photoIds } = await rekeyDraft(ref.current!);
+        update(() => next);
+        if (photoIds.size) setMissingPhotos((m) => (m.size ? new Set([...m].map((pid) => photoIds.get(pid) ?? pid)) : m));
+        d = next;
+        ({ error, lostPhotos } = await sendDraft(d));
       }
       if (error) {
         setSendError(error);
@@ -978,10 +1039,13 @@ function ThankYou({
   maxUploadMb: number;
   os?: string;
   onIssueSent: () => void;
-  onAgain: () => void;
+  /** Empieza otra encuesta; `carry`: problema que se lleva a la encuesta nueva. */
+  onAgain: (carry?: NewIssue) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [lastOk, setLastOk] = useState(false);
+  /** Se abrió una ronda nueva: esta encuesta ya no acepta problemas. Guarda el que se intentó mandar. */
+  const [roundClosed, setRoundClosed] = useState<NewIssue | null>(null);
   const reduce = useReducedMotion();
   return (
     <main className="mx-auto w-full max-w-xl flex-1 px-4 pb-10 pt-10">
@@ -1029,6 +1093,12 @@ function ThankYou({
               });
               // El id de la foto se deriva del problema: si se reintenta no se duplica
               if (!error && it.photo) error = await uploadPhoto(sent.id, sent.token, it.id, `${it.id}-f`, it.photo, it.photo.name);
+              if (error && lastCode === ROUND_CLOSED) {
+                // Se abrió una encuesta nueva: el problema va en la nueva, no en esta
+                setEditing(false);
+                setRoundClosed(it);
+                return null;
+              }
               if (error) return error;
               setEditing(false);
               setLastOk(true);
@@ -1037,6 +1107,20 @@ function ThankYou({
               return null;
             }}
           />
+        </div>
+      ) : roundClosed ? (
+        <div role="alert" className="mt-5 rounded-3xl bg-amber-50 p-5 ring-1 ring-amber-300" data-testid="round-closed">
+          <p className="text-lg font-bold text-amber-900">Se abrió una nueva encuesta.</p>
+          <p className="mt-1 text-base text-slate-800">
+            Contesta la encuesta de nuevo para reportar este problema. Ya lo dejamos anotado en la encuesta nueva.
+          </p>
+          <button
+            type="button"
+            onClick={() => onAgain(roundClosed)}
+            className={`mt-4 flex min-h-16 w-full items-center justify-center rounded-2xl bg-brand-500 px-4 text-lg font-bold text-white active:scale-[0.98] ${FOCUS}`}
+          >
+            Contestar la encuesta nueva
+          </button>
         </div>
       ) : (
         <button
@@ -1054,7 +1138,7 @@ function ThankYou({
       <div className="mt-4 grid gap-3">
         <button
           type="button"
-          onClick={onAgain}
+          onClick={() => onAgain()}
           className={`min-h-14 rounded-2xl bg-white px-4 text-lg font-semibold text-slate-700 ring-1 ring-slate-300 active:scale-[0.98] ${FOCUS}`}
         >
           Llenar otra encuesta

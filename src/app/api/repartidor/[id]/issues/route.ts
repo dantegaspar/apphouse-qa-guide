@@ -1,5 +1,5 @@
 import { getDb, now } from "@/lib/db";
-import { checkCourierToken } from "@/lib/courier-data";
+import { checkCourierToken, courierRoundClosed, ROUND_CLOSED, ROUND_CLOSED_MESSAGE } from "@/lib/courier-data";
 import { err, hasErrors, invalid, json, readJsonObject } from "@/lib/http";
 import { collect, courierIssueError, idError, text } from "@/lib/validate";
 
@@ -11,6 +11,8 @@ import { collect, courierIssueError, idError, text } from "@/lib/validate";
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!checkCourierToken(id, req.headers.get("x-courier-token"))) return err("No autorizado", 401);
+  // La encuesta es de una ronda anterior: ya no se le agrega nada
+  if (courierRoundClosed(id)) return err(ROUND_CLOSED_MESSAGE, 409, ROUND_CLOSED);
   const { body, res } = await readJsonObject(req, 16 * 1024);
   if (res) return res;
   const errors = collect([
