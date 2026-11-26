@@ -201,6 +201,44 @@ export default async function ChartsPage({ searchParams }: { searchParams: Promi
         )}
       </section>
 
+      {/* 2b. Facilidad de cada tarea (Single Ease Question, 1 a 7), si la guía la pregunta */}
+      {s.perGuide.some((g) => g.activities.some((a) => a.seq.n > 0)) && (
+        <section>
+          <div className={`grid gap-4 ${multi ? "lg:grid-cols-2" : ""}`}>
+            {s.perGuide
+              .filter((g) => g.activities.some((a) => a.seq.n > 0))
+              .map((g) => (
+                <ChartCard
+                  key={g.guide.id}
+                  title={`Facilidad de cada tarea · ${g.guide.title}`}
+                  subtitle="Promedio de «¿Qué tan fácil o difícil fue?» (1 = muy difícil, 7 = muy fácil). Menos de 5 indica que la tarea costó trabajo."
+                  table={{
+                    head: ["Actividad", "Promedio (1 a 7)", "Respuestas"],
+                    rows: g.activities.map((a) => [`${a.id} ${a.title}`, a.seq.avg === null ? "—" : fmt(a.seq.avg, 1), a.seq.n]),
+                  }}
+                >
+                  <Bars
+                    max={7}
+                    color={COLORS.series}
+                    format={(n) => (n ? fmt(n, 1) : "—")}
+                    rows={g.activities.map((a) => ({
+                      key: a.id,
+                      aria: `${a.id} ${a.title}`,
+                      label: (
+                        <>
+                          {plainTask(a.id, a.title)} <span className="font-mono text-[11px] text-slate-400">{a.id}</span>
+                        </>
+                      ),
+                      sub: a.seq.n ? `${a.seq.n} respuesta${a.seq.n === 1 ? "" : "s"}${a.seq.avg !== null && a.seq.avg < 5 ? " · costó trabajo" : ""}` : "sin respuestas",
+                      value: a.seq.avg ?? 0,
+                    }))}
+                  />
+                </ChartCard>
+              ))}
+          </div>
+        </section>
+      )}
+
       {/* 3 y 4. Pasos con "No pude" y fallas por actividad */}
       <section className="grid gap-4 lg:grid-cols-2">
         <ChartCard

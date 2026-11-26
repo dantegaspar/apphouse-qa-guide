@@ -1,10 +1,10 @@
 {
   "id": "establecimiento",
-  "version": "4.1.0",
+  "version": "5.0.0",
   "role": "Establecimiento",
   "title": "Manual del Establecimiento",
   "subtitle": "Guía de prueba del panel web de tu sucursal",
-  "summary": "Esta guía te dice qué hacer en el panel de AppHouse durante la prueba. No necesitas experiencia previa: sigue los pasos y marca cada actividad al terminar. Ningún cobro es real.",
+  "summary": "Cada actividad es una pantalla del panel: haz los pasos, revisa «Comprueba» y guarda. No necesitas experiencia previa ni tomar capturas: la grabación de pantalla guarda todo. Ningún cobro es real.",
   "source": "Manual_Establecimiento-5.pdf (panel web, 10 actividades, 32 páginas)",
   "notice": "Haz la prueba desde el programa de internet (Chrome, Safari o Edge). No uses la app «AppHouse Establecimientos» instalada en el iPad.",
   "glossary": "**Toca** = tocar con el dedo o hacer clic · **Escribe** = escribir letras o números · **Toma una captura** = foto de la pantalla · **El grupo** = el grupo de WhatsApp de la prueba.",
@@ -56,11 +56,12 @@
       {
         "title": "Cómo va la prueba",
         "items": [
-          "Primero preparas tu sucursal (E01 a E04). Al terminar, manda al grupo de WhatsApp: **Sucursal (nombre de tu sucursal) lista**. Es el único mensaje que mandas en toda la prueba.",
-          "Tu sucursal se abre sola con el horario que configuraste en E02 (E05).",
+          "Cada actividad es **una pantalla del panel**: arriba ves para qué sirve y dónde está; a un lado la captura con números y al otro los pasos. Al final, en la misma página, marcas **Comprueba**, anotas lo que se pida, dices qué tan fácil fue (1 a 7) y guardas.",
+          "Primero preparas tu sucursal (E01 a E04-D). Al terminar, manda al grupo de WhatsApp: **Sucursal (nombre de tu sucursal) lista**. Es el único mensaje que mandas en toda la prueba.",
+          "Tu sucursal se abre sola con el horario que pusiste en E02 (E05).",
           "Después llegan los pedidos de los clientes: E06, E07 y E10 con cada uno.",
           "Con 3 pedidos que tú elijas: rechaza uno, confirma y luego cancela otro, y deja uno sin responder (E08 y E09). Los demás, atiéndelos normal.",
-          "Al final, cuando Mesa de control dé por terminada la prueba, revisa **Al terminar la prueba**, contesta la encuesta y toca **Enviar encuesta y terminar**."
+          "Al final, cuando Mesa de control dé por terminada la prueba, contesta la encuesta (4 preguntas) y toca **Enviar encuesta y terminar**."
         ]
       }
     ],
@@ -89,8 +90,9 @@
     "rules": [
       "Ningún cobro es real. Todos los pagos son de prueba.",
       "Rechazar, cancelar o dejar sin responder pedidos en E08 y E09 no es un error: es parte de la prueba.",
+      "No tienes que tomar capturas: la grabación de pantalla guarda todo. Adjunta una solo si reportas una falla.",
       "No necesitas esperar mensajes del grupo para avanzar: la guía te dice qué sigue.",
-      "Si algo no pasa como dice la guía, toca **Tuve un problema** en ese paso, o **Reportar falla**, y escribe qué pasó."
+      "Si algo no pasa como dice **Debe pasar**, toca **Tuve un problema** y escribe qué pasó."
     ]
   },
   "reference": {
@@ -168,7 +170,7 @@
         "rows": [
           [
             "Horario de la prueba",
-            "Martes 24 de noviembre de 2026, de 2:00 p.m. a 5:00 p.m. (E02)."
+            "Hoy (el día de la prueba), de 2:00 p.m. a 5:00 p.m. (E02)."
           ],
           [
             "Repartidores",
@@ -261,7 +263,7 @@
   "activities": [
     {
       "id": "E01",
-      "title": "Inicia sesión en el panel",
+      "title": "Entra al panel",
       "priority": "alta",
       "quality": "Seguridad",
       "estMin": 3,
@@ -270,28 +272,36 @@
       "steps": [
         {
           "id": "1",
-          "text": "Escribe en la barra de hasta arriba: https://logistica-establecimientos.tupide.mx"
+          "text": "En la barra de direcciones (no en el buscador de Google) escribe **https://logistica-establecimientos.tupide.mx**.",
+          "screen": "Entrada al panel y pantalla Inicio"
         },
         {
           "id": "2",
-          "text": "Escribe tu **Correo electrónico** y tu **Contraseña** y toca **Ingresar →**. En iPad, observa si la pantalla tiembla mientras escribes."
+          "text": "Escribe tu **correo** y tu **contraseña** y toca **Ingresar →**.",
+          "screen": "Entrada al panel y pantalla Inicio",
+          "check": "La pantalla se queda fija mientras escribes (en iPad no tiembla)."
         },
         {
           "id": "3",
-          "text": "Si te pide una contraseña nueva: primero toca **Pedidos** (no debe dejarte pasar). Luego crea tu clave nueva. Si no te la pide, sigue.",
+          "text": "**Si te pide una contraseña nueva:** primero toca **Pedidos** y luego crea tu clave nueva.",
+          "screen": "Entrada al panel y pantalla Inicio",
+          "check": "No te deja abrir Pedidos hasta que cambias la clave.",
           "conditional": true
         },
         {
           "id": "4",
-          "text": "Si sale el recuadro «Para operar, el panel necesita avisarte», toca **Activar avisos y sonido** y luego **Permitir**. Si arriba sale la barra amarilla «Los avisos están bloqueados», sigue lo que dice en **Cómo activarlos**.",
+          "text": "**Si sale «Para operar, el panel necesita avisarte»:** toca **Activar avisos y sonido** y luego **Permitir**. Si arriba sale la barra amarilla «Los avisos están bloqueados», sigue lo que dice en **Cómo activarlos**.",
+          "screen": "Entrada al panel y pantalla Inicio",
           "conditional": true
         },
         {
           "id": "5",
-          "text": "Revisa la pantalla **Inicio** (imagen). Si arriba **(2)** aparece otra sucursal, tócala y elige la tuya. No toques los botones del centro **(5)**.",
-          "image": "/guides/establecimiento/m-e01-01-inicio.jpg",
-          "caption": "1 = menú izquierdo · 2 = tu sucursal · 3 = estado · 4 = campana de avisos · 5 = no tocar.",
-          "warning": "No toques los botones del centro **(5)**."
+          "text": "Revisa **Inicio**: arriba **(2)** debe decir el nombre de tu sucursal; si dice otra, tócala y elige la tuya. El menú izquierdo **(1)** te lleva a cada sección.",
+          "screen": "Entrada al panel y pantalla Inicio",
+          "image": "/guides/establecimiento/w2-e01-inicio.jpg",
+          "caption": "1 = menú izquierdo · 2 = tu sucursal · 3 = estado de la sucursal · 4 = campana de avisos · 5 = no tocar.",
+          "check": "Ves Inicio de tu sucursal, con el estado **(3)** y la campana de avisos **(4)** arriba.",
+          "warning": "No toques los botones de **Acciones rápidas (5)**."
         }
       ],
       "expected": [
@@ -322,77 +332,72 @@
           "placeholder": "Ej. Contraseña",
           "maxLength": 100
         }
-      ]
+      ],
+      "goal": "Entrar al panel con tu cuenta y dejar listos los avisos de pedidos."
     },
     {
       "id": "E02",
-      "title": "Configura el horario de tu sucursal",
+      "title": "Pon el horario de hoy",
       "priority": "alta",
       "quality": "Adecuación funcional",
       "estMin": 4,
       "when": "Justo después de E01.",
-      "where": "Menú izquierdo › **CONFIGURACIÓN DE SUCURSAL › Horario** (toca el grupo en mayúsculas y luego la opción). Página: https://logistica-establecimientos.tupide.mx/mi-app/horario",
+      "where": "Menú izquierdo › **CONFIGURACIÓN DE SUCURSAL › Horario**",
       "warnings": [
-        "Solo cambia el renglón del **martes**: los demás días déjalos como están."
+        "Cambia solo el renglón de **hoy**. No toques **Cerrar ahora (7)**: cierra tu sucursal el resto del día."
       ],
-      "notes": "**Horario de la prueba:** martes 24 de noviembre de 2026, de 2:00 p.m. a 5:00 p.m.",
+      "notes": "Si Mesa de control te da otro horario para la prueba, usa ese en lugar de 2:00 a 5:00 p.m.",
       "steps": [
         {
           "id": "1",
-          "text": "En el menú izquierdo abre **CONFIGURACIÓN DE SUCURSAL** y toca **Horario (1)**. No toques **Cerrar ahora (3)**: cierra tu sucursal el resto del día.",
-          "image": "/guides/establecimiento/w-e02_02_horario_arriba.jpg",
-          "caption": "1 = Horario · 2 = así se lee tu horario · 3 = no tocar.",
-          "warning": "No toques **Cerrar ahora (3)**: cierra tu sucursal el resto del día."
+          "text": "En el menú izquierdo toca **Horario (1)**.",
+          "screen": "Horario (una sola pantalla)",
+          "image": "/guides/establecimiento/w2-e02-horario.jpg",
+          "caption": "1 = Horario · 2 = el día de hoy · 3 = horas · 4 = Guardar horario · 5 = así se lee tu horario · 6 = días que no abres · 7 = no tocar."
         },
         {
           "id": "2",
-          "text": "Busca el renglón **Martes**. Si dice **Cerrado**, toca el interruptor **(4)** para que diga **Abierto**.",
-          "image": "/guides/establecimiento/m-e02-02-martes.jpg",
-          "caption": "2 = así se lee tu horario · 4 = martes Abierto · 5 = abre 02:00 p. m. · 6 = cierra 05:00 p. m."
+          "text": "Busca el renglón de **hoy** **(2)** (en la imagen, Martes). Si dice **Cerrado**, toca el interruptor para que diga **Abierto**. Si hoy tiene otro tramo, bórralo con el bote de basura 🗑.",
+          "screen": "Horario (una sola pantalla)"
         },
         {
           "id": "3",
-          "text": "En la primera hora **(5)** pon **02:00 p. m.** y en la segunda **(6)** pon **05:00 p. m.** Si el martes tiene otro tramo, bórralo con el bote de basura que está a su derecha.",
-          "image": "/guides/establecimiento/m-e02-02-martes.jpg",
-          "caption": "2 = así se lee tu horario · 4 = martes Abierto · 5 = abre 02:00 p. m. · 6 = cierra 05:00 p. m.",
+          "text": "En las horas **(3)** pon **02:00 p. m.** a **05:00 p. m.**",
+          "screen": "Horario (una sola pantalla)",
+          "check": "**Así se lee tu horario (5)** cambia al momento y para hoy dice **2:00 p.m. – 5:00 p.m.**",
           "dataButton": true
         },
         {
           "id": "4",
-          "text": "Toca **Guardar horario (7)**.",
-          "image": "/guides/establecimiento/m-e02-03-guardar-dias.jpg",
-          "caption": "7 = Guardar horario · 8 = días que no abres."
+          "text": "Toca **Guardar horario (4)**.",
+          "screen": "Horario (una sola pantalla)",
+          "check": "Sale «Horario guardado. Ya rige en tu app.» y desaparece «Cambios sin guardar»."
         },
         {
           "id": "5",
-          "text": "Revisa el recuadro negro **Así se lee tu horario (2)**: debe decir **Mar 2:00 p.m. – 5:00 p.m.** Actualiza la página (flecha circular de arriba · **Mac:** ⌘ Cmd + R · **Windows:** Ctrl + R o F5) y revisa que se quedó así.",
-          "image": "/guides/establecimiento/m-e02-02-martes.jpg",
-          "caption": "2 = así se lee tu horario · 4 = martes Abierto · 5 = abre 02:00 p. m. · 6 = cierra 05:00 p. m."
-        },
-        {
-          "id": "6",
-          "text": "Baja a **Días que no abres (8)** y revisa que no aparezca el **24/11/2026**. Si aparece, toca **Tuve un problema**.",
-          "image": "/guides/establecimiento/m-e02-03-guardar-dias.jpg",
-          "caption": "7 = Guardar horario · 8 = días que no abres."
+          "text": "Actualiza la página (**Mac:** ⌘ Cmd + R · **Windows:** Ctrl + R o F5).",
+          "screen": "Horario (una sola pantalla)",
+          "check": "Hoy sigue de 2:00 a 5:00 p.m. y en **Días que no abres (6)** no aparece la fecha de hoy."
         }
       ],
       "expected": [
-        "El martes quedó Abierto de 2:00 p.m. a 5:00 p.m., sin otros tramos.",
-        "Al guardar, «Así se lee tu horario» mostró el horario nuevo del martes.",
+        "Hoy quedó Abierto de 2:00 p.m. a 5:00 p.m., sin otros tramos.",
+        "«Así se lee tu horario» mostró el horario nuevo de hoy.",
         "Después de actualizar la página, el horario se conservó.",
-        "El 24 de noviembre no aparece en Días que no abres."
+        "La fecha de hoy no aparece en Días que no abres."
       ],
       "fields": [
         {
           "id": "tuesdaySchedule",
-          "label": "Horario del martes que quedó guardado",
+          "label": "Horario de hoy que quedó guardado",
           "type": "timeRange",
           "required": true,
           "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d\\s?([aApP]\\.?\\s?[mM]\\.?)?\\s*(a|-|–|—)\\s*([01]?\\d|2[0-3]):[0-5]\\d\\s?([aApP]\\.?\\s?[mM]\\.?)?$",
           "patternHint": "Elige la hora en que abre y la hora en que cierra (en la prueba: 2:00 p.m. a 5:00 p.m.).",
           "maxLength": 40
         }
-      ]
+      ],
+      "goal": "Que tu sucursal abra sola **hoy de 2:00 a 5:00 p.m.**, el horario de la prueba."
     },
     {
       "id": "E03",
@@ -401,47 +406,49 @@
       "quality": "Adecuación funcional",
       "estMin": 6,
       "when": "Después de E02.",
-      "where": "Menú izquierdo › **REPARTO › Repartidores** (toca el grupo en mayúsculas y luego la opción). Página: https://logistica-establecimientos.tupide.mx/mensajeros",
+      "where": "Menú izquierdo › **REPARTO › Repartidores**",
       "warnings": [
-        "Mesa de control te entrega los datos de cada repartidor: nombre, correo y teléfono. Da de alta a todos los que te indique."
+        "Mesa de control te da el nombre, correo y teléfono de cada repartidor. Da de alta a todos los que te indique."
       ],
       "steps": [
         {
           "id": "1",
-          "text": "Toca **Nuevo repartidor (1)**.",
-          "image": "/guides/establecimiento/w-e03_04_repartidores.jpg",
-          "caption": "1 = Nuevo repartidor · 8 = Activos · 9 = Disponibles ahora."
+          "text": "En el menú izquierdo toca **Repartidores (1)** y luego **Nuevo repartidor (2)**.",
+          "screen": "Repartidores y «Dar de alta a un repartidor»",
+          "image": "/guides/establecimiento/w2-e03-repartidores.jpg",
+          "caption": "1 = Repartidores · 2 = Nuevo repartidor · 6 = Activos · 7 = Disponibles ahora."
         },
         {
           "id": "2",
-          "text": "Sin escribir nada, toca **Dar de alta (2)**. Debe salir «Hay 4 datos por revisar para poder guardar» **(3)** y los campos en rojo. Toma una captura (**Mac:** ⌘ Cmd + Mayús + 4 · **Windows:** tecla Windows + Mayús + S).",
-          "image": "/guides/establecimiento/w-e03_05_repartidor_faltan.jpg",
-          "caption": "2 = Dar de alta · 3 = aviso de datos faltantes · 4 a 7 = datos del repartidor.",
-          "evidence": true
+          "text": "Sin escribir nada, toca **Dar de alta (3)**.",
+          "screen": "Repartidores y «Dar de alta a un repartidor»",
+          "image": "/guides/establecimiento/w2-e03-nuevo-repartidor.jpg",
+          "caption": "3 = Dar de alta · 4 = aviso de datos que faltan · 5 = datos del repartidor.",
+          "check": "Sale «Hay 4 datos por revisar para poder guardar» **(4)** y los campos que faltan en rojo."
         },
         {
           "id": "3",
-          "text": "Escribe **Nombre (4)**, **Apellido paterno (5)**, el apellido materno si lo tiene, **Correo (6)** y **Teléfono (7)**, tal como te los dio Mesa de control. Deja el código del país en 52.",
-          "image": "/guides/establecimiento/w-e03_05_repartidor_faltan.jpg",
-          "caption": "2 = Dar de alta · 3 = aviso de datos faltantes · 4 a 7 = datos del repartidor."
+          "text": "Escribe **Nombre**, **Apellido paterno**, el materno si lo tiene, **Correo** y **Teléfono (5)**, tal como te los dio Mesa de control. Deja el código del país en 52.",
+          "screen": "Repartidores y «Dar de alta a un repartidor»",
+          "dataButton": true
         },
         {
           "id": "4",
-          "text": "Toca **Dar de alta (2)**. El repartidor recibe por correo su usuario y una contraseña temporal.",
-          "image": "/guides/establecimiento/w-e03_05_repartidor_faltan.jpg",
-          "caption": "2 = Dar de alta · 3 = aviso de datos faltantes · 4 a 7 = datos del repartidor."
+          "text": "Toca **Dar de alta (3)**.",
+          "screen": "Repartidores y «Dar de alta a un repartidor»",
+          "check": "Regresas a la lista y aparece el repartidor con su nombre, correo y teléfono."
         },
         {
           "id": "5",
-          "text": "Repite con cada repartidor. En la lista, **Activos (8)** debe mostrar cuántos diste de alta.",
-          "image": "/guides/establecimiento/w-e03_04_repartidores.jpg",
-          "caption": "1 = Nuevo repartidor · 8 = Activos · 9 = Disponibles ahora."
+          "text": "Repite los pasos 1 a 4 con cada repartidor.",
+          "screen": "Repartidores y «Dar de alta a un repartidor»",
+          "check": "**Activos (6)** muestra cuántos diste de alta."
         },
         {
           "id": "6",
-          "text": "Cuando cada repartidor entre a su app y toque **Disponible**, debe subir **Disponibles ahora (9)**. Si todavía no entran, sigue con E04-A y revísalo después.",
-          "image": "/guides/establecimiento/w-e03_04_repartidores.jpg",
-          "caption": "1 = Nuevo repartidor · 8 = Activos · 9 = Disponibles ahora.",
+          "text": "Cuando un repartidor entre a su app y toque **Disponible**, mira **Disponibles ahora (7)**. Si todavía no entran, guarda esta actividad y sigue: lo revisas después.",
+          "screen": "Repartidores y «Dar de alta a un repartidor»",
+          "check": "Sube el número de Disponibles ahora.",
           "conditional": true
         }
       ],
@@ -464,298 +471,260 @@
           "patternHint": "Escribe solo el número, por ejemplo 3.",
           "maxLength": 2
         }
-      ]
+      ],
+      "goal": "Que cada repartidor que te indique Mesa de control quede registrado y reciba su acceso por correo."
     },
     {
       "id": "E04-A",
-      "title": "Prepara tu sucursal · Crea tu menú",
+      "title": "Crea tu menú",
       "priority": "critica",
       "quality": "Adecuación funcional",
       "estMin": 12,
       "when": "Después de E03.",
-      "where": "Menú izquierdo del panel › **MI APP › Menú**",
+      "where": "Menú izquierdo › **MI APP › Menú**",
       "warnings": [
         "Tu sucursal empieza sin nada creado: no hay categorías, productos, variantes ni complementos. Si ya ves productos o categorías, **no los borres**: toca **Tuve un problema** y crea solo lo que falte."
       ],
-      "notes": "Vas a crear **1 categoría (Pizzas)**, **2 pizzas** y **3 grupos**: 1 de variantes y 2 de complementos. Primero la categoría y después las pizzas. Cada cosa se crea una sola vez. **Cómo leer las tablas:** el precio del producto es el de la Chica. La variante es el tamaño con su precio: va en **Variaciones**. Los extras van en **Complementos**. Con los tamaños quedan: Hawaiana $120 · $150 · $180 y Pepperoni $110 · $140 · $170.",
+      "notes": "Vas a crear 1 categoría, 2 pizzas y 3 grupos (1 de tamaños y 2 de extras), cada cosa una sola vez. Los nombres y precios exactos están en **Datos para tu sucursal**.",
       "expected": [
-        "El menú quedó completo: categoría Pizzas, 2 pizzas con sus 3 tamaños y extras, sin grupos repetidos."
+        "Se creó la categoría Pizzas una sola vez.",
+        "Las 2 pizzas están en Pizzas con sus 3 tamaños y sus extras.",
+        "La Pepperoni usa el mismo grupo «Tamaño de pizza» que la Hawaiana; no hay grupos repetidos."
       ],
       "steps": [
         {
-          "id": "A0",
-          "text": "**Parte A · Crea tu menú desde cero.** En el menú izquierdo abre **MI APP › Menú** (toca el grupo en mayúsculas y luego la opción). Página: https://logistica-establecimientos.tupide.mx/mi-app/menu. Debe decir «Aún no hay productos. Agrega el primero.» **(1)**. Si ya ves productos o categorías, no los borres: toca **Tuve un problema** y crea solo lo que falte.",
-          "image": "/guides/establecimiento/m-e04-01-menu-vacio.jpg",
-          "caption": "1 = menú vacío · 2 = Agregar producto."
-        },
-        {
-          "id": "A00",
-          "text": "Vas a crear 1 categoría (Pizzas), 2 pizzas y 3 grupos: 1 de variantes y 2 de complementos. Primero la categoría y después las pizzas. Cada cosa se crea una sola vez. Las tablas están en **Datos para tu sucursal**.",
-          "dataButton": true
-        },
-        {
           "id": "A1.1",
-          "text": "**Crea la categoría Pizzas.** Toca **Agregar producto (2)**. Como todavía no hay categorías, se abre primero la ventana «Categoría de esta sucursal».",
+          "text": "En el menú izquierdo abre **MI APP › Menú** y toca **Agregar producto (2)**.",
+          "screen": "Menú › ventana «Categoría de esta sucursal»",
           "image": "/guides/establecimiento/m-e04-01-menu-vacio.jpg",
-          "caption": "1 = menú vacío · 2 = Agregar producto."
+          "caption": "1 = menú vacío · 2 = Agregar producto.",
+          "check": "El menú dice «Aún no hay productos» **(1)** y, como no hay categorías, se abre primero la ventana «Categoría de esta sucursal»."
         },
         {
           "id": "A1.2",
-          "text": "En **Nombre (A)** escribe **Pizzas**. La **Descripción (B)** y el **Ícono (C)** son opcionales.",
+          "text": "En **Nombre (A)** escribe **Pizzas** y toca **Guardar (D)**. La descripción **(B)** y el ícono **(C)** son opcionales.",
+          "screen": "Menú › ventana «Categoría de esta sucursal»",
           "image": "/guides/establecimiento/m-e04-02-categoria.jpg",
-          "caption": "A = Nombre · B = Descripción (opcional) · C = Ícono (opcional) · D = Guardar."
+          "caption": "A = Nombre · B = Descripción (opcional) · C = Ícono (opcional) · D = Guardar.",
+          "dataButton": true
         },
         {
           "id": "A1.3",
-          "text": "Toca **Guardar (D)**. La ventana se cierra y en la lista aparece la categoría **Pizzas** con «Sin productos todavía» **(1)**.",
+          "text": "Revisa la lista del menú.",
+          "screen": "Menú › ventana «Categoría de esta sucursal»",
           "image": "/guides/establecimiento/m-e04-03-categoria-creada.jpg",
-          "caption": "1 = categoría Pizzas creada · 2 = + Producto."
+          "caption": "1 = categoría Pizzas creada · 2 = + Producto.",
+          "check": "Aparece la categoría **Pizzas** con «Sin productos todavía» **(1)**."
         },
         {
           "id": "A2.1",
-          "text": "**Crea la Pizza Hawaiana con su variante y su complemento.** En la fila de Pizzas toca **+ Producto (2)**. Se abre la ficha **Nuevo producto** con la categoría ya elegida.",
-          "image": "/guides/establecimiento/m-e04-03-categoria-creada.jpg",
-          "caption": "1 = categoría Pizzas creada · 2 = + Producto."
-        },
-        {
-          "id": "A2.2",
-          "text": "Escribe el **Nombre** «Pizza Hawaiana» **(3)** y el **Precio** 120 **(4)**. Deja marcada **Disponible hoy (5)** y revisa que la **Categoría** diga «Pizzas» **(6)**.",
+          "text": "En la fila de **Pizzas** toca **+ Producto (2)**. En la ficha escribe **Nombre** «Pizza Hawaiana» **(3)** y **Precio** 120 **(4)**. Deja **Disponible hoy (5)** y revisa que **Categoría** diga «Pizzas» **(6)**.",
+          "screen": "Menú › ficha «Nuevo producto»: Pizza Hawaiana",
           "image": "/guides/establecimiento/m-e04-04-hawaiana-ficha.jpg",
           "caption": "3 = Nombre · 4 = Precio · 5 = Disponible hoy · 6 = Categoría · 7 = Crear grupo de variaciones · 8 = Crear grupo de complementos.",
           "dataButton": true
         },
         {
-          "id": "A2.3",
-          "text": "**Variante:** en **Variaciones** toca **Crear grupo (7)**. En **Nombre del grupo** escribe «Tamaño de pizza» **(9)** y deja **Una, obligatoria (10)**. Escribe las opciones con su **Precio adicional (11)**: **Chica 0**, **Mediana 30** y **Grande 60**. Para agregar otra fila toca **+ Opción (12)**.",
+          "id": "A2.2",
+          "text": "**Tamaños:** en **Variaciones** toca **Crear grupo (7)**. Nombre del grupo «Tamaño de pizza» **(9)**, deja **Una, obligatoria (10)** y escribe **Chica 0 · Mediana 30 · Grande 60 (11)**. Para otra fila toca **+ Opción (12)**.",
+          "screen": "Menú › ficha «Nuevo producto»: Pizza Hawaiana",
           "image": "/guides/establecimiento/m-e04-05-variaciones.jpg",
           "caption": "9 = Nombre del grupo · 10 = Una, obligatoria · 11 = tamaños y lo que suman · 12 = + Opción.",
           "dataButton": true
         },
         {
-          "id": "A2.4",
-          "text": "**Complemento:** baja a **Complementos** y toca **Crear grupo (8)**. En **Nombre del grupo** escribe «Extras pizza Hawaiana» **(13)** y deja **Los que quiera (14)**. Escribe **Queso extra 20** y **Orilla rellena 30** **(15)**; para otra fila toca **+ Complemento (16)**.",
+          "id": "A2.3",
+          "text": "**Extras:** en **Complementos** toca **Crear grupo (8)**. Nombre del grupo «Extras pizza Hawaiana» **(13)**, deja **Los que quiera (14)** y escribe **Queso extra 20 · Orilla rellena 30 (15)**. Para otra fila toca **+ Complemento (16)**.",
+          "screen": "Menú › ficha «Nuevo producto»: Pizza Hawaiana",
           "image": "/guides/establecimiento/m-e04-06-complementos.jpg",
           "caption": "13 = Nombre del grupo · 14 = Los que quiera · 15 = extras y su precio · 16 = + Complemento · 17 = Agregar al menú.",
           "dataButton": true
         },
         {
-          "id": "A2.5",
-          "text": "Toca **Agregar al menú (17)**. Los grupos se guardan junto con la pizza: no hay otro botón para guardarlos. La Hawaiana aparece dentro de **Pizzas** con **$120** y «1 variación · 1 grupo de complementos» **(18)**.",
+          "id": "A2.4",
+          "text": "Toca **Agregar al menú (17)**. Los grupos se guardan con la pizza: no hay otro botón para guardarlos.",
+          "screen": "Menú › ficha «Nuevo producto»: Pizza Hawaiana",
           "image": "/guides/establecimiento/m-e04-07-hawaiana-creada.jpg",
-          "caption": "18 = Pizza Hawaiana en Pizzas · 19 = + Producto."
+          "caption": "18 = Pizza Hawaiana en Pizzas · 19 = + Producto.",
+          "check": "La Hawaiana aparece en **Pizzas** con **$120** y «1 variación · 1 grupo de complementos» **(18)**."
         },
         {
           "id": "A3.1",
-          "text": "**Crea la Pizza Pepperoni.** En la fila de Pizzas toca otra vez **+ Producto (19)**. Escribe el **Nombre** «Pizza Pepperoni» y el **Precio** 110. Deja marcada **Disponible hoy** y revisa que la **Categoría** diga «Pizzas».",
-          "image": "/guides/establecimiento/m-e04-07-hawaiana-creada.jpg",
-          "caption": "18 = Pizza Hawaiana en Pizzas · 19 = + Producto.",
+          "text": "En la fila de **Pizzas** toca otra vez **+ Producto (19)**. Escribe «Pizza Pepperoni», precio **110**, deja **Disponible hoy** y revisa que la categoría diga «Pizzas».",
+          "screen": "Menú › ficha «Nuevo producto»: Pizza Pepperoni",
           "dataButton": true
         },
         {
           "id": "A3.2",
-          "text": "**Variante:** en **Variaciones**, en **Usar uno que ya tienes (20)** elige «Tamaño de pizza». Revisa sus 3 tamaños **(21)** y toca **Agregar a este producto (22)**. No lo crees otra vez.",
+          "text": "**Tamaños:** en **Variaciones › Usar uno que ya tienes (20)** elige «Tamaño de pizza» y toca **Agregar a este producto (22)**.",
+          "screen": "Menú › ficha «Nuevo producto»: Pizza Pepperoni",
           "image": "/guides/establecimiento/m-e04-08-usar-grupo.jpg",
           "caption": "20 = Usar uno que ya tienes · 21 = los 3 tamaños · 22 = Agregar a este producto.",
-          "warning": "No crees «Tamaño de pizza» otra vez. Si en **Usar uno que ya tienes** aparece un grupo que tú no creaste (por ejemplo, uno de la marca), no lo uses: usa solo los de la tabla."
+          "check": "Se agregan los mismos 3 tamaños **(21)**.",
+          "warning": "No crees «Tamaño de pizza» otra vez. Si en **Usar uno que ya tienes** aparece un grupo que tú no creaste (por ejemplo, uno de la marca), no lo uses."
         },
         {
           "id": "A3.3",
-          "text": "**Complemento:** en **Complementos** toca **Crear grupo (23)**. Nómbralo «Queso extra pizza» **(24)**, deja **Los que quiera (25)** y escribe **Queso extra 20 (26)**.",
+          "text": "**Extras:** en **Complementos** toca **Crear grupo (23)**. Nombre del grupo «Queso extra pizza» **(24)**, deja **Los que quiera (25)** y escribe **Queso extra 20 (26)**.",
+          "screen": "Menú › ficha «Nuevo producto»: Pizza Pepperoni",
           "image": "/guides/establecimiento/m-e04-09-queso-extra.jpg",
           "caption": "23 = Crear grupo · 24 = Nombre del grupo · 25 = Los que quiera · 26 = Queso extra 20 · 27 = Agregar al menú.",
           "dataButton": true
         },
         {
           "id": "A3.4",
-          "text": "Toca **Agregar al menú (27)**. Dentro de **Pizzas** deben quedar **2 productos (28)**: **Hawaiana $120 (29)** y **Pepperoni $110 (30)**.",
+          "text": "Toca **Agregar al menú (27)**.",
+          "screen": "Menú › ficha «Nuevo producto»: Pizza Pepperoni",
           "image": "/guides/establecimiento/m-e04-10-pizzas-2.jpg",
-          "caption": "28 = Pizzas con 2 productos · 29 = Pizza Hawaiana $120 · 30 = Pizza Pepperoni $110."
-        },
-        {
-          "id": "A-OK",
-          "text": "Antes de seguir, confirma que terminaste la Parte A.",
-          "checkpoint": {
-            "title": "Parte A · Tu menú quedó listo",
-            "items": [
-              "Creé la categoría Pizzas una sola vez.",
-              "Las 2 pizzas están en Pizzas, con sus 3 tamaños y sus extras.",
-              "La Pepperoni usa el mismo grupo «Tamaño de pizza» que la Hawaiana; no hay grupos repetidos."
-            ]
-          }
+          "caption": "28 = Pizzas con 2 productos · 29 = Pizza Hawaiana $120 · 30 = Pizza Pepperoni $110.",
+          "check": "En **Pizzas** quedan **2 productos (28)**: **Hawaiana $120 (29)** y **Pepperoni $110 (30)**."
         }
-      ]
+      ],
+      "goal": "Que tu app muestre la categoría **Pizzas** con 2 pizzas, sus 3 tamaños y sus extras."
     },
     {
       "id": "E04-B",
-      "title": "Prepara tu sucursal · Crea la promoción",
+      "title": "Crea la promoción",
       "priority": "critica",
       "quality": "Adecuación funcional",
       "estMin": 5,
       "when": "Después de E04-A.",
-      "where": "Menú izquierdo del panel › **MI APP › Promociones y banners**",
+      "where": "Menú izquierdo › **MI APP › Promociones y banners**",
       "expected": [
-        "La promoción Pizza Hawaiana 20 % aparece como Vigente."
+        "La promoción Pizza Hawaiana 20 % quedó guardada con 20 % (no con 0 %).",
+        "Aparece como Vigente y con su banner."
       ],
       "steps": [
         {
-          "id": "B0",
-          "text": "**Parte B · Crea la promoción.** En el menú izquierdo abre **MI APP › Promociones y banners** (toca el grupo en mayúsculas y luego la opción). Página: https://logistica-establecimientos.tupide.mx/mi-app/promociones. Crea la promoción **Pizza Hawaiana 20 %**. Hazlo después de crear las pizzas de la Parte A.",
-          "dataButton": true
-        },
-        {
           "id": "B1",
-          "text": "Toca **Nueva promoción (1)**.",
+          "text": "En el menú izquierdo abre **MI APP › Promociones y banners** y toca **Nueva promoción (1)**.",
+          "screen": "Promociones y banners › ventana «Nueva promoción»",
           "image": "/guides/establecimiento/m-e04-11-nueva-promocion.jpg",
           "caption": "1 = Nueva promoción."
         },
         {
           "id": "B2",
-          "text": "En **¿Qué tipo de promoción?** deja **Precio rebajado en el menú (2)**. Escribe el **Nombre** «Pizza Hawaiana 20 %» **(3)**. En **Cómo se descuenta** deja «Porcentaje» **(4)** y en **Cuánto** escribe 20 **(5)**.",
+          "text": "Deja **Precio rebajado en el menú (2)**. Escribe **Nombre** «Pizza Hawaiana 20 %» **(3)**, deja **Cómo se descuenta** en «Porcentaje» **(4)**, en **Cuánto** escribe 20 **(5)** y en **¿Sobre qué se aplica?** deja «Solo el producto base» **(6)**. Así baja la pizza y los tamaños y extras cuestan igual.",
+          "screen": "Promociones y banners › ventana «Nueva promoción»",
           "image": "/guides/establecimiento/m-e04-12-promo-datos.jpg",
           "caption": "2 = Precio rebajado en el menú · 3 = Nombre · 4 = Cómo se descuenta · 5 = Cuánto · 6 = Solo el producto base.",
           "dataButton": true
         },
         {
           "id": "B3",
-          "text": "En **¿Sobre qué se aplica?** deja **Solo el producto base (6)**. Así baja el precio de la pizza y los tamaños y extras cuestan igual.",
-          "image": "/guides/establecimiento/m-e04-12-promo-datos.jpg",
-          "caption": "2 = Precio rebajado en el menú · 3 = Nombre · 4 = Cómo se descuenta · 5 = Cuánto · 6 = Solo el producto base."
+          "text": "En **A qué se aplica** elige «Unos productos» **(7)** y marca **Pizza Hawaiana** dentro de **PIZZAS (8)**.",
+          "screen": "Promociones y banners › ventana «Nueva promoción»",
+          "image": "/guides/establecimiento/m-e04-13-promo-productos.jpg",
+          "caption": "7 = A qué se aplica · 8 = Productos: Pizza Hawaiana marcada.",
+          "check": "Dice «1 producto elegido»."
         },
         {
           "id": "B4",
-          "text": "En **A qué se aplica** elige «Unos productos» **(7)**. En **Productos (8)** marca **Pizza Hawaiana**, dentro de **PIZZAS**; debe decir «1 producto elegido».",
-          "image": "/guides/establecimiento/m-e04-13-promo-productos.jpg",
-          "caption": "7 = A qué se aplica · 8 = Productos: Pizza Hawaiana marcada."
-        },
-        {
-          "id": "B5",
-          "text": "Deja vacías las fechas **Empieza** y **Termina (9)**. Deja encendidos **Activa (10)** y **Generar banner para esta promoción (11)**.",
+          "text": "Deja vacías **Empieza** y **Termina (9)**, y encendidos **Activa (10)** y **Generar banner para esta promoción (11)**. Toca **Guardar en esta sucursal (12)**.",
+          "screen": "Promociones y banners › ventana «Nueva promoción»",
           "image": "/guides/establecimiento/m-e04-14-promo-guardar.jpg",
           "caption": "9 = fechas vacías · 10 = Activa · 11 = Generar banner · 12 = Guardar en esta sucursal."
         },
         {
-          "id": "B6",
-          "text": "Toca **Guardar en esta sucursal (12)**. Aparece el aviso «Se publicará ahora en esta sucursal» **(13)**: toca **Publicar ahora (14)**.",
+          "id": "B5",
+          "text": "En el aviso «Se publicará ahora en esta sucursal» **(13)** toca **Publicar ahora (14)**.",
+          "screen": "Promociones y banners › ventana «Nueva promoción»",
           "image": "/guides/establecimiento/m-e04-15-promo-publicar.jpg",
           "caption": "13 = aviso de publicación · 14 = Publicar ahora."
         },
         {
-          "id": "B7",
-          "text": "La promoción aparece en la lista con el punto verde **Vigente (15)** y en **Banners de portada** aparece su banner **(16)**. Toma una captura (**Mac:** ⌘ Cmd + Mayús + 4 · **Windows:** tecla Windows + Mayús + S).",
+          "id": "B6",
+          "text": "Revisa la lista de promociones y los banners.",
+          "screen": "Promociones y banners (lista)",
           "image": "/guides/establecimiento/m-e04-16-promo-vigente.jpg",
           "caption": "15 = promoción Vigente · 16 = banner creado.",
-          "evidence": true
-        },
-        {
-          "id": "B-OK",
-          "text": "Antes de seguir, confirma que terminaste la Parte B.",
-          "checkpoint": {
-            "title": "Parte B · La promoción quedó lista",
-            "items": [
-              "La promoción Pizza Hawaiana 20 % quedó guardada y aparece como Vigente."
-            ]
-          }
+          "check": "«Pizza Hawaiana 20 %» tiene el punto verde **Vigente (15)**, dice «Porcentaje · 20 %» y en **Banners de portada** aparece su banner **(16)**."
         }
-      ]
+      ],
+      "goal": "Que la Pizza Hawaiana salga con **20 % de descuento** en tu app, con su banner.",
+      "notes": "Hazla después de crear las pizzas (E04-A)."
     },
     {
       "id": "E04-C",
-      "title": "Prepara tu sucursal · Escribe el costo de envío",
+      "title": "Pon el costo de envío",
       "priority": "critica",
       "quality": "Adecuación funcional",
       "estMin": 4,
       "when": "Después de E04-B.",
-      "where": "Menú izquierdo del panel › **CONFIGURACIÓN DE SUCURSAL › Envío y zona de entrega**",
+      "where": "Menú izquierdo › **CONFIGURACIÓN DE SUCURSAL › Envío y zona de entrega**",
       "expected": [
-        "El envío quedó en 3 km con $25 / $35 / $45, sin envío gratis, y se conservó al actualizar la página."
+        "El envío quedó en 3 km con $25 / $35 / $45, sin envío gratis.",
+        "Después de actualizar la página, los valores se conservaron."
       ],
       "steps": [
         {
-          "id": "C0",
-          "text": "**Parte C · Escribe el costo de envío.** En el menú izquierdo abre **CONFIGURACIÓN DE SUCURSAL › Envío y zona de entrega** (toca el grupo en mayúsculas y luego la opción). Página: https://logistica-establecimientos.tupide.mx/envio."
-        },
-        {
           "id": "C1",
-          "text": "Los campos empiezan vacíos. Escribe: **Tarifa base** 25 **(1)**, **Kilómetros incluidos** 1 **(2)**, **Cada kilómetro adicional** 10 **(3)**, **Radio de entrega** 3 **(4)**. Deja vacío **Envío gratis** («No aplica», **5**).",
-          "image": "/guides/establecimiento/m-e04-17-envio.jpg",
-          "caption": "1 a 5 = datos del envío · 6 = Guardar tarifas · 7 = no tocar · 8 = cómo se cobra.",
-          "dataButton": true
+          "text": "En el menú izquierdo toca **Envío y zona de entrega (1)**.",
+          "screen": "Envío y zona de entrega (una sola pantalla)",
+          "image": "/guides/establecimiento/w2-e04c-envio.jpg",
+          "caption": "1 = Envío y zona de entrega · 2 = precio por distancia · 3 = radio y envío gratis · 4 = Guardar tarifas · 5 = así se cobraría · 6 = no tocar."
         },
         {
           "id": "C2",
-          "text": "Toca **Guardar tarifas (6)**. No toques **Quitar tarifas (7)**. Revisa «Así se cobraría» **(8)**: A 1 km $25 · A 2 km $35 · A 3 km $45.",
-          "image": "/guides/establecimiento/m-e04-17-envio.jpg",
-          "caption": "1 a 5 = datos del envío · 6 = Guardar tarifas · 7 = no tocar · 8 = cómo se cobra.",
-          "warning": "No toques **Quitar tarifas (7)**."
+          "text": "En **Precio por distancia (2)** escribe **Tarifa base** 25, **Kilómetros incluidos** 1 y **Cada kilómetro adicional** 10. En **Límites (3)** pon **Radio de entrega** 3 y deja vacío **Envío gratis** («No aplica»).",
+          "screen": "Envío y zona de entrega (una sola pantalla)",
+          "check": "**Así se cobraría (5)** dice: A 1 km $25 · A 2 km $35 · A 3 km $45.",
+          "dataButton": true
         },
         {
           "id": "C3",
-          "text": "Actualiza la página (flecha circular de arriba · **Mac:** ⌘ Cmd + R · **Windows:** Ctrl + R o F5) y revisa que los números se quedaron. Si después aparece **Activar sonido**, tócalo."
+          "text": "Toca **Guardar tarifas (4)**.",
+          "screen": "Envío y zona de entrega (una sola pantalla)",
+          "check": "Sale «Tarifas guardadas…» y desaparece «Cambios sin guardar»."
         },
         {
-          "id": "C-OK",
-          "text": "Antes de seguir, confirma que terminaste la Parte C.",
-          "checkpoint": {
-            "title": "Parte C · El envío quedó guardado",
-            "items": [
-              "Radio de 3 km y tarifas de $25 / $35 / $45.",
-              "Envío gratis vacío («No aplica»).",
-              "Después de actualizar la página, los valores se conservaron."
-            ]
-          }
+          "id": "C4",
+          "text": "Actualiza la página (**Mac:** ⌘ Cmd + R · **Windows:** Ctrl + R o F5). Si después aparece **Activar sonido**, tócalo.",
+          "screen": "Envío y zona de entrega (una sola pantalla)",
+          "check": "Los números se quedaron igual."
         }
+      ],
+      "goal": "Que el envío cueste **$25 hasta 1 km** y **$10 por cada km más**, hasta 3 km.",
+      "warnings": [
+        "No toques **Quitar tarifas (6)**."
       ]
     },
     {
       "id": "E04-D",
-      "title": "Prepara tu sucursal · Revisa pagos, topes y horario",
+      "title": "Revisa las reglas de pedidos y pagos",
       "priority": "critica",
       "quality": "Adecuación funcional",
       "estMin": 4,
       "when": "Después de E04-C. Al terminar mandas el único mensaje de la prueba.",
-      "where": "Menú izquierdo del panel › **CONFIGURACIÓN DE SUCURSAL › Reglas de pedidos y pagos**",
+      "where": "Menú izquierdo › **CONFIGURACIÓN DE SUCURSAL › Reglas de pedidos y pagos**",
       "expected": [
-        "Tu sucursal quedó lista: 5 minutos para aceptar, pago con tarjeta, topes de $1,000 y $700, y el horario cubre la prueba."
+        "Minutos para confirmar quedó en 5.",
+        "El pago con tarjeta está marcado y los topes dicen $1,000 y $700."
       ],
       "steps": [
         {
-          "id": "D0",
-          "text": "**Parte D · Revisa tiempo para confirmar, pagos, topes y horario.** En el menú izquierdo abre **CONFIGURACIÓN DE SUCURSAL › Reglas de pedidos y pagos** (toca el grupo en mayúsculas y luego la opción). Página: https://logistica-establecimientos.tupide.mx/ajustes."
-        },
-        {
           "id": "D1",
-          "text": "Baja a **En tu app**. En **Minutos para confirmar** debe decir **5 (1)**. Si dice otro número, escribe 5 y toca **Guardar cambios (3)**.",
-          "image": "/guides/establecimiento/w-e04_17_plazo_pagos.jpg",
-          "caption": "1 = 5 minutos para confirmar · 2 = pago con tarjeta · 3 = Guardar cambios.",
-          "dataButton": true
+          "text": "En el menú izquierdo toca **Reglas de pedidos y pagos (1)** y baja a **En tu app**.",
+          "screen": "Reglas de pedidos y pagos (una sola pantalla)",
+          "image": "/guides/establecimiento/w2-e04d-reglas.jpg",
+          "caption": "1 = Reglas de pedidos y pagos · 2 = minutos para confirmar · 3 = pago con tarjeta · 4 = Guardar cambios · 5 = topes del pedido."
         },
         {
           "id": "D2",
-          "text": "Revisa que esté marcada **Aceptar pago con tarjeta en tu app (2)** y, más abajo, que los **Topes del pedido** digan **$1,000.00** y **$700.00**. Estos los deja listos Mesa de control: solo revísalos.",
-          "image": "/guides/establecimiento/w-e04_17_plazo_pagos.jpg",
-          "caption": "1 = 5 minutos para confirmar · 2 = pago con tarjeta · 3 = Guardar cambios.",
+          "text": "Revisa **Minutos para confirmar (2)**: debe decir **5**. Si dice otro número, escribe 5 y toca **Guardar cambios (4)**.",
+          "screen": "Reglas de pedidos y pagos (una sola pantalla)",
           "dataButton": true
         },
         {
           "id": "D3",
-          "text": "En el menú izquierdo abre **CONFIGURACIÓN DE SUCURSAL › Horario** y revisa que el martes siga de 2:00 p.m. a 5:00 p.m. (lo configuraste en E02)."
+          "text": "Revisa que **Aceptar pago con tarjeta en tu app (3)** esté marcada y que los **Topes del pedido (5)** digan **$1,000.00** y **$700.00**. Solo revísalos: los deja listos Mesa de control.",
+          "screen": "Reglas de pedidos y pagos (una sola pantalla)",
+          "dataButton": true
         },
         {
           "id": "D4",
-          "text": "Envía al grupo de WhatsApp: **Sucursal (nombre de tu sucursal) lista**. Es el único mensaje que mandas en la prueba."
-        },
-        {
-          "id": "D-OK",
-          "text": "Para cerrar, confirma que tu sucursal quedó lista.",
-          "checkpoint": {
-            "title": "Parte D · Tu sucursal quedó lista",
-            "items": [
-              "Tiempo para aceptar: 5 minutos.",
-              "Pago con tarjeta activo.",
-              "Pedido máximo de $1,000 y máximo en efectivo de $700.",
-              "El horario de hoy cubre toda la prueba."
-            ]
-          }
+          "text": "Envía al grupo de WhatsApp: **Sucursal (nombre de tu sucursal) lista**. Es el único mensaje que mandas en la prueba.",
+          "screen": "Reglas de pedidos y pagos (una sola pantalla)"
         }
       ],
       "fields": [
@@ -774,11 +743,12 @@
           "patternHint": "Toca el campo para elegir la hora, o «Ahora» si es en este momento.",
           "maxLength": 11
         }
-      ]
+      ],
+      "goal": "Confirmar que tienes **5 minutos** para aceptar cada pedido, pago con tarjeta y los topes de la prueba."
     },
     {
       "id": "E05",
-      "title": "Abre la sucursal",
+      "title": "Revisa que la sucursal abra sola",
       "priority": "alta",
       "quality": "Fiabilidad",
       "estMin": 3,
@@ -790,37 +760,25 @@
       "steps": [
         {
           "id": "1",
-          "text": "Mira el botón de arriba **(1)**. Mientras preparas tu sucursal puede decir **Cerrada**: es normal.",
+          "text": "Mira el botón de estado de arriba **(1)**. Mientras preparas tu sucursal puede decir **Cerrada**: es normal.",
+          "screen": "Estado de la sucursal (arriba, en cualquier pantalla)",
           "image": "/guides/establecimiento/w-e05_18_estado.jpg",
-          "caption": "1 = sucursal Abierta y hora de cierre · 2 = Ver horario · 3 = Cerrar ahora (no tocar)."
+          "caption": "1 = estado de la sucursal y hora de cierre · 2 = Ver horario · 3 = Cerrar ahora (no tocar)."
         },
         {
           "id": "2",
-          "text": "Cuando llegue la hora de apertura que pusiste en E02, debe cambiar solo a **Abierta**, sin que toques nada. Si sigue **Cerrada** después de esa hora, actualiza la página (**Mac:** ⌘ Cmd + R · **Windows:** Ctrl + R o F5); si sigue igual, toca **Tuve un problema**.",
-          "image": "/guides/establecimiento/w-e05_18_estado.jpg",
-          "caption": "1 = sucursal Abierta y hora de cierre · 2 = Ver horario · 3 = Cerrar ahora (no tocar)."
+          "text": "Espera la hora de apertura que pusiste en E02, sin tocar nada.",
+          "screen": "Estado de la sucursal (arriba, en cualquier pantalla)",
+          "check": "A esa hora cambia solo a **Abierta**. Si sigue Cerrada, actualiza la página (**Mac:** ⌘ Cmd + R · **Windows:** Ctrl + R o F5); si sigue igual, toca **Tuve un problema**."
         },
         {
           "id": "3",
-          "text": "No toques **Cerrar ahora (3)**: cierra tu sucursal el resto del día.",
-          "image": "/guides/establecimiento/w-e05_18_estado.jpg",
-          "caption": "1 = sucursal Abierta y hora de cierre · 2 = Ver horario · 3 = Cerrar ahora (no tocar).",
-          "warning": "No toques **Cerrar ahora (3)**."
-        },
-        {
-          "id": "4",
-          "text": "Si arriba ves **Activar sonido** o la barra de avisos, tócala y sube el volumen. Toma una captura del estado **Abierta** (**Mac:** ⌘ Cmd + Mayús + 4 · **Windows:** tecla Windows + Mayús + S).",
-          "evidence": true
-        },
-        {
-          "id": "5",
-          "text": "Sin actualizar la página, espera el primer pedido: debe sonar y salir un número rojo en la campana. Al abrirla dice **Actividad** y **En vivo**."
+          "text": "Si arriba ves **Activar sonido** o la barra de avisos, tócala y sube el volumen.",
+          "screen": "Estado de la sucursal (arriba, en cualquier pantalla)"
         }
       ],
       "expected": [
-        "La sucursal aparece como Abierta.",
-        "Los pedidos llegaron sin recargar la página.",
-        "Cada pedido nuevo sonó y mostró un aviso."
+        "La sucursal cambió sola a Abierta a la hora de apertura."
       ],
       "fields": [
         {
@@ -831,7 +789,50 @@
           "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d(\\s?[aApP]\\.?\\s?[mM]\\.?)?$",
           "patternHint": "Toca el campo para elegir la hora, o «Ahora» si es en este momento.",
           "maxLength": 11
+        }
+      ],
+      "goal": "Que a la hora que pusiste en E02 la sucursal se abra sola, sin tocar nada."
+    },
+    {
+      "id": "E06",
+      "title": "Recibe cada pedido",
+      "priority": "critica",
+      "quality": "Adecuación funcional",
+      "estMin": 2,
+      "pairWith": "Cliente: C06 y C08",
+      "when": "Apenas llegue cada pedido. Se hace junto con E07.",
+      "where": "Menú izquierdo › **PEDIDOS › Pedidos de hoy**",
+      "warnings": [
+        "No toques **Crear pedido**."
+      ],
+      "steps": [
+        {
+          "id": "1",
+          "text": "Deja abierta **Pedidos de hoy** sin actualizar la página y espera el pedido.",
+          "screen": "Pedidos de hoy",
+          "image": "/guides/establecimiento/m-e06-01-pedidos.jpg",
+          "caption": "1 = folio · 2 = pedidos esperando tu respuesta · 3 = Rechazar / Confirmar.",
+          "check": "Al llegar suena, la campana muestra un número rojo y arriba sale «pedidos esperando tu respuesta» **(2)**."
         },
+        {
+          "id": "2",
+          "text": "Toca el **folio (1)** para abrir el pedido. Si la lista se corta a la derecha, deslízala.",
+          "screen": "Pedidos de hoy",
+          "check": "El aviso de la esquina dice hasta qué hora puedes confirmar."
+        },
+        {
+          "id": "3",
+          "text": "Arriba del pedido revisa que diga **PEDIDO · (tu sucursal)**.",
+          "screen": "Pedidos de hoy",
+          "check": "Es de tu sucursal. Si es de otra, no lo confirmes ni lo rechaces y anota su folio abajo."
+        }
+      ],
+      "expected": [
+        "Los pedidos llegaron solos, sin actualizar la página.",
+        "Cada pedido nuevo sonó y mostró un aviso.",
+        "Todos los pedidos que recibí son de mi sucursal."
+      ],
+      "fields": [
         {
           "id": "firstOrderTime",
           "label": "Hora del primer pedido",
@@ -840,47 +841,7 @@
           "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d(\\s?[aApP]\\.?\\s?[mM]\\.?)?$",
           "patternHint": "Toca el campo para elegir la hora, o «Ahora» si es en este momento.",
           "maxLength": 11
-        }
-      ]
-    },
-    {
-      "id": "E06",
-      "title": "Revisa la sucursal de cada pedido",
-      "priority": "critica",
-      "quality": "Adecuación funcional",
-      "estMin": 2,
-      "pairWith": "Cliente: C06 y C08",
-      "when": "Apenas llegue cada pedido. Se hace junto con E07.",
-      "where": "Menú izquierdo › **PEDIDOS › Pedidos de hoy** (toca el grupo en mayúsculas y luego la opción). Página: https://logistica-establecimientos.tupide.mx/pedidos",
-      "warnings": [
-        "No toques **Crear pedido**."
-      ],
-      "steps": [
-        {
-          "id": "1",
-          "text": "Arriba aparece «pedidos esperando tu respuesta» **(2)**. Toca el **folio (1)** para abrir un pedido. No toques **Crear pedido**.",
-          "image": "/guides/establecimiento/m-e06-01-pedidos.jpg",
-          "caption": "1 = folio · 2 = pedidos esperando tu respuesta · 3 = Rechazar / Confirmar.",
-          "warning": "No toques **Crear pedido**."
         },
-        {
-          "id": "2",
-          "text": "El aviso de la esquina dice hasta qué hora puedes confirmar. Si ves **Sonando · silenciar**, el sonido está activo."
-        },
-        {
-          "id": "3",
-          "text": "Si en computadora o iPad la lista se corta a la derecha, deslízala o toca el folio.",
-          "conditional": true
-        },
-        {
-          "id": "4",
-          "text": "Dentro del pedido, arriba dice **PEDIDO · (tu sucursal)**. Si es de otra sucursal, no lo confirmes ni lo rechaces y anota el folio abajo, en **Folios de otra sucursal**."
-        }
-      ],
-      "expected": [
-        "Todos los pedidos que recibí son de mi sucursal."
-      ],
-      "fields": [
         {
           "id": "otherFolios",
           "label": "Folios de otra sucursal (si hubo)",
@@ -889,48 +850,50 @@
           "patternHint": "Escribe cada folio como 261124-0004, separados por coma.",
           "maxLength": 200
         }
-      ]
+      ],
+      "goal": "Que cada pedido de tu app llegue solo, con sonido, y sea de tu sucursal."
     },
     {
       "id": "E07",
-      "title": "Confirma y avanza los pedidos",
+      "title": "Confirma y marca listo cada pedido",
       "priority": "critica",
       "quality": "Adecuación funcional",
       "estMin": 8,
       "pairWith": "Cliente: C06 y C08",
       "when": "Con cada pedido, excepto los 3 que elijas para E08 y E09.",
-      "where": "Menú izquierdo › **PEDIDOS › Pedidos de hoy** (toca el grupo en mayúsculas y luego la opción). Página: https://logistica-establecimientos.tupide.mx/pedidos",
+      "where": "**PEDIDOS › Pedidos de hoy** › toca el folio del pedido",
       "warnings": [
-        "No toques **Reasignar** ni **Quitar asignación**: cuando el pedido está en **Asignado**, **En ruta** o **Entregado**, lo mueve el repartidor."
+        "No toques **Reasignar**, **Quitar asignación** ni **Autorizar entrega sin código**: desde **Asignado**, el pedido lo mueve el repartidor."
       ],
       "notes": "Qué haces según lo que dice el pedido: **Por confirmar**: tocas **Confirmar** antes de 5 minutos y eliges el tiempo de preparación. **En preparación**: cocinas; no hay que tocar nada más. **En la cocina**: al terminar de empacar tocas **Marcar listo**. **Asignado · En ruta · Entregado**: lo mueve el repartidor; no toques **Reasignar** ni **Quitar asignación**.",
       "steps": [
         {
           "id": "1",
-          "text": "Abre el pedido nuevo y toma una captura con los botones **Rechazar** y **Confirmar** (**Mac:** ⌘ Cmd + Mayús + 4 · **Windows:** tecla Windows + Mayús + S).",
-          "evidence": true
+          "text": "Toca **Confirmar**, elige **10 minutos (1)** y toca **Confirmar pedido (2)**.",
+          "screen": "Detalle del pedido",
+          "image": "/guides/establecimiento/m-e07-01-confirmar.jpg",
+          "caption": "1 = tiempo de preparación · 2 = Confirmar pedido.",
+          "check": "El pedido pasa a preparación y hasta entonces aparece **Marcar listo**."
         },
         {
           "id": "2",
-          "text": "Toca **Confirmar**, elige **10 minutos** de preparación **(1)** y toca **Confirmar pedido (2)**.",
-          "image": "/guides/establecimiento/m-e07-01-confirmar.jpg",
-          "caption": "1 = tiempo de preparación · 2 = Confirmar pedido."
+          "text": "Espera unos 5 minutos antes de marcarlo listo: en ese tiempo el cliente intenta cancelarlo.",
+          "screen": "Detalle del pedido",
+          "check": "El pedido sigue activo en tu lista; no te llega como cancelado."
         },
         {
           "id": "3",
-          "text": "Con todos los pedidos: después de confirmar, espera unos 5 minutos antes de tocar **Marcar listo**. En ese tiempo el cliente prueba que ya no puede cancelarlo; a ti no debe llegarte como cancelado."
+          "text": "Cuando esté empacado toca **Marcar listo (3)**.",
+          "screen": "Detalle del pedido",
+          "image": "/guides/establecimiento/m-e07-02-marcar-listo.jpg",
+          "caption": "3 = Marcar listo · 4 = el pedido ya está en preparación · 5 = Autorizar entrega sin código (no tocar).",
+          "check": "Pasa a buscar repartidor (**En cola** o **Asignado**)."
         },
         {
           "id": "4",
-          "text": "Cuando esté empacado, toca **Marcar listo (3)** y toma una captura (**Mac:** ⌘ Cmd + Mayús + 4 · **Windows:** tecla Windows + Mayús + S).",
-          "image": "/guides/establecimiento/m-e07-02-marcar-listo.jpg",
-          "caption": "3 = Marcar listo · 4 = el pedido ya está en preparación · 5 = Autorizar entrega sin código (no tocar).",
-          "evidence": true,
-          "warning": "No toques **Autorizar entrega sin código (5)**."
-        },
-        {
-          "id": "5",
-          "text": "Al terminar la ronda, abajo anota **cuántos pedidos se entregaron** y **cuántos no se entregaron por una falla** (no cuentes el rechazado y el cancelado de E08 ni el de E09: esos son a propósito). De cada pedido que falló, escribe su folio y **por qué falló**."
+          "text": "Al terminar la ronda anota abajo cuántos pedidos se **entregaron** y cuántos **no se entregaron por una falla** (sin contar los de E08 y E09, que son a propósito). De cada uno que falló: folio y por qué.",
+          "screen": "Detalle del pedido",
+          "dataButton": true
         }
       ],
       "expected": [
@@ -965,7 +928,8 @@
           "maxLength": 1000,
           "requiredWhen": "ordersFailed"
         }
-      ]
+      ],
+      "goal": "Que cada pedido avance: confirmado → en preparación → listo para el repartidor."
     },
     {
       "id": "E08",
@@ -975,48 +939,47 @@
       "estMin": 5,
       "pairWith": "Cliente: C11",
       "when": "Con 2 pedidos que tú elijas: uno lo rechazas y otro lo confirmas y luego lo cancelas. Los demás, atiéndelos normal (E07).",
-      "where": "Menú izquierdo › **PEDIDOS › Pedidos de hoy** (toca el grupo en mayúsculas y luego la opción). Página: https://logistica-establecimientos.tupide.mx/pedidos",
+      "where": "**PEDIDOS › Pedidos de hoy** › toca el folio del pedido",
       "notes": "**Rechazar** = pedido nuevo que aún no confirmas. **Cancelar** = pedido que ya confirmaste. Usa pedidos distintos para rechazar, para cancelar y para dejar sin responder (E09). Escribir «ab» es una prueba: el panel no debe aceptar motivos de menos de 3 letras. El cliente lee el motivo tal cual. ¿Dice **IMPORTE $0 · Tarjeta · reembolsado**? Es normal: el sistema devuelve solo el pago con tarjeta al cliente.",
       "steps": [
         {
           "id": "R1",
-          "text": "**Rechazar:** elige un pedido nuevo que todavía no hayas confirmado, toca **Rechazar** y elige **Otro motivo**."
+          "text": "Elige un pedido nuevo que no hayas confirmado. Toca **Rechazar** y elige **Otro motivo**.",
+          "screen": "Pedido nuevo › Rechazar"
         },
         {
           "id": "R2",
-          "text": "Escribe solo **ab (1)** y toca **Rechazar el pedido (3)**. Debe salir el aviso «Falta el motivo (de 3 a 255 caracteres)» **(2)**. Toma una captura (**Mac:** ⌘ Cmd + Mayús + 4 · **Windows:** tecla Windows + Mayús + S).",
+          "text": "Escribe solo **ab (1)** y toca **Rechazar el pedido (3)**.",
+          "screen": "Pedido nuevo › Rechazar",
           "image": "/guides/establecimiento/m-e08-01-rechazar-ab.jpg",
           "caption": "1 = motivo · 2 = aviso con «ab» · 3 = Rechazar el pedido.",
-          "evidence": true
+          "check": "Sale «Falta el motivo (de 3 a 255 caracteres)» **(2)** y no se rechaza."
         },
         {
           "id": "R3",
-          "text": "Borra «ab», escribe **Prueba: producto no disponible** y toca **Rechazar el pedido**. Debe quedar como **Rechazado**.",
-          "image": "/guides/establecimiento/m-e08-01-rechazar-ab.jpg",
-          "caption": "1 = motivo · 2 = aviso con «ab» · 3 = Rechazar el pedido."
+          "text": "Borra «ab», escribe **Prueba: producto no disponible** y toca **Rechazar el pedido**.",
+          "screen": "Pedido nuevo › Rechazar",
+          "check": "Queda como **Rechazado**."
         },
         {
           "id": "C1",
-          "text": "**Cancelar:** elige otro pedido, toca **Confirmar** y elige 10 minutos."
+          "text": "Elige otro pedido, toca **Confirmar** y elige 10 minutos. Luego, arriba del pedido, toca **Cancelar**.",
+          "screen": "Pedido confirmado › Cancelar",
+          "check": "Sale un recuadro rosa con «Motivo (obligatorio)»."
         },
         {
           "id": "C2",
-          "text": "Arriba del pedido toca **Cancelar**. Sale un recuadro rosa con «Motivo (obligatorio)».",
+          "text": "Escribe **ab** y toca el botón rojo **Confirmar (2)**.",
+          "screen": "Pedido confirmado › Cancelar",
           "image": "/guides/establecimiento/m-e08-02-cancelar-ab.jpg",
-          "caption": "1 = recuadro para cancelar con el aviso de «ab» · 2 = Confirmar."
+          "caption": "1 = recuadro para cancelar con el aviso de «ab» · 2 = Confirmar.",
+          "check": "Sale «Escribe el motivo de la cancelación (de 3 a 255 caracteres)» **(1)** y no se cancela."
         },
         {
           "id": "C3",
-          "text": "Escribe **ab** y toca el botón rojo **Confirmar**: debe salir el aviso «Escribe el motivo de la cancelación (de 3 a 255 caracteres)» **(1)**. Toma una captura (**Mac:** ⌘ Cmd + Mayús + 4 · **Windows:** tecla Windows + Mayús + S).",
-          "image": "/guides/establecimiento/m-e08-02-cancelar-ab.jpg",
-          "caption": "1 = recuadro para cancelar con el aviso de «ab» · 2 = Confirmar.",
-          "evidence": true
-        },
-        {
-          "id": "C4",
-          "text": "Borra «ab», escribe **Prueba: producto no disponible** y toca **Confirmar (2)**. Debe quedar como **Cancelado**.",
-          "image": "/guides/establecimiento/m-e08-02-cancelar-ab.jpg",
-          "caption": "1 = recuadro para cancelar con el aviso de «ab» · 2 = Confirmar."
+          "text": "Borra «ab», escribe **Prueba: producto no disponible** y toca **Confirmar (2)**.",
+          "screen": "Pedido confirmado › Cancelar",
+          "check": "Queda como **Cancelado** con su motivo."
         }
       ],
       "expected": [
@@ -1045,7 +1008,8 @@
           "patternHint": "Escribe el folio (6 números; el guion se pone solo) y elige la hora en que lo cancelaste.",
           "maxLength": 30
         }
-      ]
+      ],
+      "goal": "Que el panel pida un motivo válido para rechazar o cancelar y lo guarde en el pedido."
     },
     {
       "id": "E09",
@@ -1055,22 +1019,26 @@
       "estMin": 7,
       "pairWith": "Cliente",
       "when": "Con un pedido que tú elijas, distinto de los de E08.",
-      "where": "Menú izquierdo › **PEDIDOS › Pedidos de hoy** (toca el grupo en mayúsculas y luego la opción). Página: https://logistica-establecimientos.tupide.mx/pedidos",
+      "where": "Menú izquierdo › **PEDIDOS › Pedidos de hoy**",
       "steps": [
         {
           "id": "1",
-          "text": "Elige un pedido nuevo, anota la hora y no lo toques. Deja abierta la pantalla **Pedidos** sin actualizarla."
+          "text": "Elige un pedido nuevo, anota abajo su folio y la hora de llegada, y no lo toques. Deja abierta **Pedidos de hoy** sin actualizar.",
+          "screen": "Pedidos de hoy"
         },
         {
           "id": "2",
-          "text": "A los 5 minutos (máximo 6) debe decir **Plazo vencido** y salir el aviso de que se rechazó. El sonido debe apagarse."
+          "text": "Espera 5 minutos.",
+          "screen": "Pedidos de hoy",
+          "check": "A los 5 minutos (máximo 6) dice **Plazo vencido**, sale el aviso de que se rechazó y el sonido se apaga."
         },
         {
           "id": "3",
-          "text": "Actualiza la página (**Mac:** ⌘ Cmd + R · **Windows:** Ctrl + R o F5): debe decir **Rechazado** con el motivo «La sucursal no confirmó a tiempo» **(1)** y la hora **(2)**. Toma una captura (**Mac:** ⌘ Cmd + Mayús + 4 · **Windows:** tecla Windows + Mayús + S).",
+          "text": "Actualiza la página (**Mac:** ⌘ Cmd + R · **Windows:** Ctrl + R o F5) y abre el pedido.",
+          "screen": "Pedidos de hoy",
           "image": "/guides/establecimiento/w-e09_24_rechazo_auto.jpg",
           "caption": "1 = rechazado, con el motivo que lee el cliente · 2 = hora del rechazo.",
-          "evidence": true
+          "check": "Dice **Rechazado** con el motivo «La sucursal no confirmó a tiempo» **(1)** y la hora **(2)**."
         }
       ],
       "expected": [
@@ -1105,7 +1073,8 @@
           "patternHint": "Toca el campo para elegir la hora, o «Ahora» si es en este momento.",
           "maxLength": 11
         }
-      ]
+      ],
+      "goal": "Que un pedido que nadie confirma se rechace solo a los 5 minutos y deje de sonar."
     },
     {
       "id": "E10",
@@ -1115,30 +1084,34 @@
       "estMin": 5,
       "pairWith": "Cliente: C08 · Repartidor",
       "when": "Con cada pedido que marques como listo.",
-      "where": "Menú izquierdo › **PEDIDOS › Pedidos de hoy** (toca el grupo en mayúsculas y luego la opción). Página: https://logistica-establecimientos.tupide.mx/pedidos",
+      "where": "**PEDIDOS › Pedidos de hoy** › toca el folio del pedido",
       "warnings": [
         "No toques **Cancelar**, **Reasignar**, **Quitar asignación** ni **Autorizar entrega sin código**."
       ],
       "steps": [
         {
           "id": "1",
-          "text": "Mira la etiqueta del pedido: **En cola** = busca repartidor; **Asignado** o **Asignado · sin confirmar** = ya tiene uno (tú no haces nada)."
+          "text": "Después de **Marcar listo**, mira la etiqueta del pedido.",
+          "screen": "Detalle del pedido",
+          "check": "Dice **Asignado** con el nombre del repartidor. **En cola** quiere decir que todavía busca uno."
         },
         {
           "id": "2",
-          "text": "Si pasa más de 3 minutos en **En cola**, toca **Tuve un problema** y escribe el folio. No toques **Cancelar**, **Reasignar** ni **Quitar asignación**.",
-          "warning": "No toques **Cancelar**, **Reasignar** ni **Quitar asignación**."
+          "text": "Si pasa más de 3 minutos en **En cola**, toca **Tuve un problema** y escribe el folio.",
+          "screen": "Detalle del pedido"
         },
         {
           "id": "3",
-          "text": "Cuando el pedido sale a entregar, la app del cliente le muestra un código de entrega; al llegar, el repartidor lo escribe en su app para marcarlo **Entregado**. El mismo código se ve en el detalle del pedido, en **Código de entrega**. Tú no haces nada: no toques **Autorizar entrega sin código** y solo revisa que el pedido termine en **Entregado**.",
-          "warning": "No toques **Autorizar entrega sin código**."
+          "text": "Cuando sale a entregar no haces nada: al llegar, el repartidor escribe en su app el código que ve el cliente.",
+          "screen": "Detalle del pedido"
         },
         {
           "id": "4",
-          "text": "Al final abre el pedido: el historial **(1)** debe decir **Asignado al repartidor → Salió a entregar → Entregado (2)**.",
+          "text": "Al final abre el pedido y revisa el **Estado (1)**.",
+          "screen": "Detalle del pedido",
           "image": "/guides/establecimiento/m-e11-01-historial.jpg",
-          "caption": "1 = historial del pedido con sus horas · 2 = estado final."
+          "caption": "1 = historial del pedido con sus horas · 2 = estado final.",
+          "check": "El historial dice **Asignado al repartidor → Salió a entregar → Entregado (2)**."
         }
       ],
       "expected": [
@@ -1156,7 +1129,8 @@
           "patternHint": "Escribe solo los minutos, por ejemplo 2.",
           "maxLength": 3
         }
-      ]
+      ],
+      "goal": "Que cada pedido listo reciba un repartidor y termine en **Entregado**."
     }
   ],
   "finish": {
@@ -1172,17 +1146,13 @@
       },
       {
         "id": "screenRecOff",
-        "label": "Apagué la grabación de pantalla."
-      },
-      {
-        "id": "capturesSaved",
-        "label": "Guardé mis capturas para entregarlas a Mesa de control."
+        "label": "Apagué la grabación de pantalla y la guardé para entregarla a Mesa de control."
       }
     ]
   },
   "survey": {
     "title": "Encuesta del Establecimiento",
-    "intro": "Son 5 preguntas cortas; toma 1 minuto.",
+    "intro": "Son 4 preguntas y un comentario opcional; toma 1 minuto.",
     "questions": [
       {
         "id": "umux1",
@@ -1217,30 +1187,22 @@
         "required": true
       },
       {
-        "id": "hardest",
-        "type": "choice",
-        "label": "¿Qué parte te costó más trabajo?",
-        "options": [
-          "Entrar al panel",
-          "Configurar el horario",
-          "Dar de alta repartidores",
-          "Crear el menú (pizzas, tamaños y extras)",
-          "Crear la promoción",
-          "Envío y reglas",
-          "Recibir, confirmar y marcar listo",
-          "Rechazar o cancelar pedidos",
-          "Pedido sin responder",
-          "Asignación de repartidor",
-          "Ninguna, todo fue fácil"
-        ],
+        "id": "guia",
+        "type": "scale",
+        "min": 1,
+        "max": 7,
+        "minLabel": "Muy difícil",
+        "maxLabel": "Muy fácil",
+        "label": "¿Qué tan fácil o difícil fue seguir esta guía mientras usabas el panel?",
         "required": true
       },
       {
         "id": "improve",
         "type": "text",
-        "label": "¿Qué fue lo más difícil o confuso, y qué mejorarías primero? (opcional)",
+        "label": "¿Qué fue lo más difícil o confuso del panel, y qué mejorarías primero? (opcional)",
         "placeholder": "Lo más difícil o confuso fue…\nPrimero mejoraría…"
       }
     ]
-  }
+  },
+  "seq": true
 }

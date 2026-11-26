@@ -4,7 +4,7 @@ import { checkRunToken } from "@/lib/auth";
 import { runRounds } from "@/lib/rounds";
 import { err, hasErrors, invalid, json, readJsonObject } from "@/lib/http";
 import { ACTIVITY_RESULTS, LEGACY_SEVERITY, SEVERITIES, type Activity, type Guide } from "@/lib/types";
-import { expectedConditional } from "@/lib/guide-utils";
+import { activityFieldDefs, expectedConditional } from "@/lib/guide-utils";
 import {
   boolError,
   boolRecordErrors,
@@ -184,7 +184,7 @@ function activityEvent(ctx: Ctx, p: Record<string, unknown>): Checked {
   if (hasErrors(errors)) return { errors };
 
   const result = typeof p.result === "string" ? p.result : null;
-  const f = fieldsCheck(p.fields, act.fields ?? [], "fields", { enforceRequired: !!result && DONE_RESULTS.includes(result) });
+  const f = fieldsCheck(p.fields, activityFieldDefs(ctx.guide, act), "fields", { enforceRequired: !!result && DONE_RESULTS.includes(result) });
   if (hasErrors(f.errors)) return { errors: f.errors };
   const checks = (p.checks ?? {}) as Record<string, boolean | "na">;
   const { db, runId, ts } = ctx;

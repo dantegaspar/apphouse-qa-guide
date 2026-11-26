@@ -1,4 +1,4 @@
-import { expectedText } from "./guide-utils";
+import { activityFieldDefs, expectedText } from "./guide-utils";
 import { getGuide, GUIDES } from "@/lib/guides";
 import {
   checkValue, deviceSummary, flatten, guideTitle, HELP_STATUS, loadAll, parseRec, resultLabel, runStatusLabel,
@@ -96,7 +96,8 @@ export function buildExport(kind: ExportKind, origin: string, guideId: string | 
     headers = ["run", "tester", "actividad", "título", "resultado", "verificaciones", "campos", "notas"];
     rows = d.activities.map((a) => {
       const r = runById.get(a.run_id)!;
-      const act = getGuide(r.guide_id)?.activities.find((x) => x.id === a.activity_id);
+      const g = getGuide(r.guide_id);
+      const act = g?.activities.find((x) => x.id === a.activity_id);
       const checks = parseRec(a.checks);
       const summary = (act?.expected ?? [])
         .map((item, i) => {
@@ -105,7 +106,7 @@ export function buildExport(kind: ExportKind, origin: string, guideId: string | 
           return `${v === undefined ? "?" : v === "na" ? "no aplica" : v ? "sí" : "no"}: ${t}`;
         })
         .join(" | ");
-      const labels = new Map((act?.fields ?? []).map((f) => [f.id, f.label]));
+      const labels = new Map(activityFieldDefs(g, act).map((f) => [f.id, f.label]));
       const fields = flatten(Object.fromEntries(Object.entries(parseRec(a.fields)).map(([k, v]) => [labels.get(k) ?? k, v])));
       return [runLabel(r.id), r.name, a.activity_id, act?.title, resultLabel(a.result), summary, fields, a.notes];
     });

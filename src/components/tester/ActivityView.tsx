@@ -5,7 +5,7 @@ import type { Activity, FieldDef } from "@/lib/types";
 import { ACTIVITY_RESULTS, type ActivityResult } from "@/lib/types";
 import { Coachmark, confirm, useToastOffset } from "@/components/feedback";
 import { motion, StepFrame, useReducedMotion } from "@/components/motion";
-import { expectedConditional, expectedText, NOT_APPLICABLE, screensOf } from "@/lib/guide-utils";
+import { expectedConditional, expectedText, NOT_APPLICABLE, screenImages, screensOf, SEQ } from "@/lib/guide-utils";
 import OrdersField, { ordersError } from "./OrdersField";
 import { DaysPicker, FolioTimePicker, TimePicker, TimeRangePicker } from "./pickers";
 import { Button, Callout, FieldError, FormField, ProgressBar, Rich, StepImage } from "./ui";
@@ -37,6 +37,7 @@ export default function ActivityView({
   onCheckpoint,
   onDraft,
   reopened = false,
+  seq = false,
 }: {
   activity: Activity;
   index: number;
@@ -63,12 +64,16 @@ export default function ActivityView({
   onDraft?: (a: ActivityState) => void;
   /** La actividad ya estaba guardada y se volvió a abrir para corregirla. */
   reopened?: boolean;
+  /** Pregunta de facilidad (SEQ, 1 a 7) al cerrar la actividad (`guide.seq`). */
+  seq?: boolean;
 }) {
   const steps = activity.steps;
-  // Los pasos se muestran por pantallas (varios pasos juntos); pos = pantalla, screens.length = cierre
+  // Los pasos se muestran por pantallas (una por pantalla del panel); pos = pantalla. El cierre (resultado
+  // esperado, datos, facilidad y resultado) va al final de la última pantalla, no en una página aparte.
   const screens = screensOf(steps);
-  const screenOfStep = (i: number) => (i >= steps.length ? screens.length : Math.max(0, screens.findIndex((sc) => i < sc.start + sc.steps.length)));
-  const [pos, setPos] = useState(() => screenOfStep(initialStep));
+  const last = screens.length - 1;
+  const screenOfStep = (i: number) => (i >= steps.length ? last : Math.max(0, screens.findIndex((sc) => i < sc.start + sc.steps.length)));
+  const [pos, setPos] = useState(() => Math.min(screenOfStep(initialStep), last));
   const saved = state.activities[activity.id] ?? emptyActivity();
   const [draft, setDraftState] = useState<ActivityState>(saved);
   /** Cada cambio del cierre se guarda al momento (sobrevive a recargas); se envía al servidor al guardar. */
@@ -88,6 +93,8 @@ export default function ActivityView({
   // Errores del cierre (se muestran después del primer intento de guardar)
   const [tried, setTried] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
+  // El resultado se marca solo según el resultado esperado; los 4 botones aparecen al tocar «Cambiar»
+  const [showResults, setShowResults] = useState(false);
   const closingRef = useRef<HTMLDivElement>(null);
   // Los avisos flotantes van arriba de la barra fija de botones (una sola fila en celular)
   useToastOffset(desktop ? 96 : 90);
@@ -112,7 +119,7 @@ export default function ActivityView({
   const screenDone = (sc: (typeof screens)[number]) =>
     sc.steps.every((s) => !!state.steps[stepKey(activity.id, s.id)] && checkpointDone(s));
   useEffect(() => {
-    keyState.current = { pos, canNext: pos < screens.length && !blocked && screenDone(screens[pos]) };
+    keyState.current = { pos, canNext: pos < last && !blocked && screenDone(screens[pos]) };
   });
   useEffect(() => {
     if (!desktop) return;
@@ -127,7 +134,7 @@ export default function ActivityView({
       if (e.key === "ArrowLeft" && p > 0) {
         e.preventDefault();
         setDir("prev");
-        setPos(Math.min(p, screens.length) - 1);
+        setPos(p - 1);
         window.scrollTo({ top: 0 });
       } else if (e.key === "ArrowRight" && canNext) {
         e.preventDefault();
@@ -187,19 +194,21 @@ export default function ActivityView({
       <h1 className={"line-clamp-2 text-lg font-bold leading-tight" + dk("lg:mt-1 lg:line-clamp-none lg:text-[26px]")}>
         <span className="text-teal-ink">{activity.id}</span> · {activity.title}
       </h1>
-      {pos < screens.length && parts.list.length > 1 && parts.of(screens[pos].steps[0].id) && (
+      {parts.list.length > 1 && parts.of(screens[pos].steps[0].id) && (
         <p className={"mt-0.5 text-xs font-semibold text-brand-700" + dk("lg:mt-1 lg:text-base")} data-testid="part-indicator">
           Parte {parts.of(screens[pos].steps[0].id)} de {parts.list[parts.list.length - 1]}
           {parts.titles[parts.of(screens[pos].steps[0].id)!] ? ` · ${parts.titles[parts.of(screens[pos].steps[0].id)!]}` : ""}
         </p>
       )}
-      <div className={"mt-1.5 flex items-center gap-2" + dk("lg:mt-3 lg:gap-3")}>
-        <ProgressBar value={pos / screens.length} />
-        <span className={"shrink-0 text-xs font-medium text-slate-600" + dk("lg:text-sm")}>
-          {pos < screens.length ? `Pantalla ${pos + 1}/${screens.length + 1}` : `Cierre · ${screens.length + 1}/${screens.length + 1}`}
-        </span>
-      </div>
-      {desktop && pos > 0 && pos < screens.length && (
+      {screens.length > 1 && (
+        <div className={"mt-1.5 flex items-center gap-2" + dk("lg:mt-3 lg:gap-3")}>
+          <ProgressBar value={(pos + 1) / screens.length} />
+          <span className={"shrink-0 text-xs font-medium text-slate-600" + dk("lg:text-sm")}>
+            Pantalla {pos + 1} de {screens.length}
+          </span>
+        </div>
+      )}
+      {desktop && pos > 0 && (
         <details className="group mt-3 hidden rounded-xl bg-white text-sm ring-1 ring-slate-200 lg:block">
           <summary className="cursor-pointer select-none px-4 py-2 font-medium text-slate-600 marker:text-slate-400 hover:text-slate-900">
             Cuándo, dónde y avisos de {activity.id}
@@ -210,337 +219,351 @@ export default function ActivityView({
     </div>
   );
 
-  // Pantalla de cierre de la actividad
-  if (pos >= screens.length) {
-    const failed = steps.some((s) => state.steps[stepKey(activity.id, s.id)] === "fail");
-    // Lo ya confirmado en las casillas de cada parte se marca solo como «Sí» (una casilla de confirmación por punto)
-    const cps = steps.filter((s) => s.checkpoint);
-    const auto: Record<string, boolean> = {};
-    if (!failed && cps.length === activity.expected.length)
-      cps.forEach((s, i) => {
-        if (checkpointDone(s)) auto[String(i)] = true;
-      });
-    const checks: ActivityState["checks"] = { ...auto, ...draft.checks };
-    const autoUsed = Object.keys(auto).some((k) => draft.checks[k] === undefined);
-    const allChecked = activity.expected.every((_, i) => checks[String(i)] !== undefined);
-    const anyNo = activity.expected.some((_, i) => checks[String(i)] === false);
-    const allReportChoices = steps.filter((s) => !s.checkpoint).map((s) => s.id);
-    const openFailReport = () =>
-      allReportChoices.length > 1 ? onReport("issue", undefined, false, allReportChoices) : onReport("issue", allReportChoices[0], false);
-    // El resultado se sugiere solo (con falla si algún paso o punto salió mal); el tester lo puede cambiar
-    const suggested: ActivityResult | undefined = failed || anyNo ? "issue" : allChecked ? "ok" : undefined;
-    const result = draft.result ?? suggested;
-    const ordersErrs = Object.fromEntries(
-      (activity.fields ?? []).filter((f) => f.type === "orders").map((f) => [f.id, ordersError(draft.fields[f.id], !!f.required && (!result || result === "ok" || result === "issue"))])
-    );
-    const skipped = result === "skipped";
-    const hasOrders = (activity.fields ?? []).some((f) => f.type === "orders");
-    // Obligatorios solo si le fue bien o con falla; con «No pude» o «No me tocó» basta con que lo escrito tenga buen formato
-    const requireFilled = !result || result === "ok" || result === "issue";
-    const fieldErrors = validateFields((activity.fields ?? []).filter((f) => f.type !== "orders"), draft.fields, requireFilled);
-    const errors: Errors = { ...fieldErrors };
-    for (const [k, v] of Object.entries(ordersErrs)) if (v) errors[k] = v;
-    for (const f of activity.fields ?? [])
-      if (requireFilled && f.requiredWhen && Number(draft.fields[f.requiredWhen]) > 0 && !String(draft.fields[f.id] ?? "").trim())
-        errors[f.id] = `Falta «${f.label}».`;
-    if (!result) errors._result = `Elige cómo te fue en ${activity.id}.`;
-    if (draft.notes.trim().length > LIMITS.notes) errors._notes = `Máximo ${LIMITS.notes} caracteres.`;
-    const shown: Errors = tried ? errors : {};
-    const complete = Object.keys(errors).length === 0 && (allChecked || skipped);
-    const card = "p-4" + dk("lg:p-6");
-    const save = async () => {
-      if (Object.keys(errors).length) {
-        setTried(true);
-        focusFirstError(closingRef.current);
-        return;
-      }
-      // Guardar cierra la actividad (se puede reabrir hasta enviar la encuesta): con «No pude hacerla» se pide confirmación
-      if (
-        result === "blocked" &&
-        !(await confirm({
-          title: `¿Guardar ${activity.id} como «${ACTIVITY_RESULTS.blocked}»?`,
-          message: "Al guardar, la actividad se cierra. La puedes reabrir desde el resumen hasta que envíes la encuesta final. Si fue una falla, revisa que la hayas reportado con «No pude».",
-          confirmLabel: "Sí, guardar",
-          cancelLabel: "Revisar",
-        }))
-      )
-        return;
-      // «Tuvo alguna falla» sin reporte: se ofrece abrir el reporte ya con la actividad
-      if (result === "issue" && issuesFor().filter((i) => i.kind === "issue").length === 0) {
-        const report = await confirm({
-          title: "¿Reportas la falla?",
-          message: `Marcaste «${ACTIVITY_RESULTS.issue}» pero no hay ningún reporte en ${activity.id}. Cuéntanos qué pasó para que el equipo la pueda revisar.`,
-          confirmLabel: "Reportar la falla",
-          cancelLabel: "Guardar sin reporte",
-        });
-        if (report) {
-          setDraft({ ...draft, checks, result });
-          openFailReport();
-          return;
-        }
-      }
-      onSave({ ...draft, checks, result, fields: trimAll(draft.fields), notes: draft.notes.trim(), done: true });
-    };
-    return (
-      <>
-      {header}
-      <StepFrame id="__cierre" dir={dir}>
-      <div ref={closingRef}>
-        <section className={"mt-2 space-y-5" + dk("lg:mt-5")}>
-          {blocked && blockedPanel}
-          {reopened && (
-            <Callout tone="info">
-              Ya guardaste {activity.id}. Puedes corregirla y volver a guardarla hasta que envíes la encuesta final.
-            </Callout>
-          )}
-          <div className={"overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200" + dk(hasOrders ? "" : "lg:max-w-3xl")}>
-            <div className={card}>
-              <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <h2 className={"font-semibold" + dk("lg:text-lg")}>Resultado esperado</h2>
-                  <p className="text-sm text-slate-600">
-                    ¿Pasó lo que dice cada punto?{autoUsed ? " Marcamos «Sí» en lo que ya confirmaste en las casillas; cámbialo si no fue así." : ""}
-                  </p>
-                </div>
-              </div>
-              <ul className="divide-y divide-slate-100">
-                {activity.expected.map((item, i) => {
-                  const v = checks[String(i)];
-                  const e = expectedText(item);
-                  const cond = expectedConditional(item);
-                  return (
-                    <li key={i} className={"py-3 first:pt-0 last:pb-0" + dk("lg:flex lg:items-center lg:gap-4")}>
-                      <p className={"text-sm" + dk("lg:flex-1")} id={`exp-${activity.id}-${i}`}>
-                        {e}
-                      </p>
-                      <div
-                        className={`mt-2 grid gap-2 ${cond ? "grid-cols-3" : "grid-cols-2"}` + dk(cond ? "lg:mt-0 lg:w-60 lg:shrink-0" : "lg:mt-0 lg:w-36 lg:shrink-0")}
-                        role="group"
-                        aria-labelledby={`exp-${activity.id}-${i}`}
-                      >
-                        {(
-                          [
-                            [true, "Sí"],
-                            [false, "No"],
-                            ...(cond ? [[NOT_APPLICABLE, "No aplica"]] : []),
-                          ] as [boolean | "na", string][]
-                        ).map(([val, label]) => (
-                          <motion.button
-                            key={label as string}
-                            type="button"
-                            aria-pressed={v === val}
-                            onClick={() => setDraft({ ...draft, checks: { ...checks, [String(i)]: val } })}
-                            whileTap={reduce ? { opacity: 0.8 } : { scale: 0.92 }}
-                            animate={v === val && !reduce ? { scale: [1, 1.08, 1] } : { scale: 1 }}
-                            transition={{ duration: 0.25 }}
-                            className={`min-h-11 rounded-lg px-1 py-2 text-sm font-medium ring-1 transition-colors ${
-                              v === val
-                                ? val === NOT_APPLICABLE
-                                  ? "bg-slate-600 text-white ring-slate-600"
-                                  : val
-                                    ? "bg-emerald-700 text-white ring-emerald-700"
-                                    : "bg-rose-600 text-white ring-rose-600"
-                                : "bg-white ring-slate-300 hover:bg-slate-50"
-                            }`}
-                          >
-                            {label as string}
-                          </motion.button>
-                        ))}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-
-            <div className="divide-y divide-slate-100 border-t border-slate-100">
-              {activity.fields && activity.fields.length > 0 && (
-                <div className={"space-y-3 " + card}>
-                  <div>
-                    <h2 className={"font-semibold" + dk("lg:text-lg")}>Anota</h2>
-                    <p className="text-sm text-slate-600">
-                      Los datos con * son obligatorios{requireFilled ? "" : " solo si te fue bien o con falla"}.
-                    </p>
-                  </div>
-                  <div className={"space-y-3" + dk("lg:grid lg:grid-cols-2 lg:gap-x-4 lg:gap-y-3 lg:space-y-0")}>
-                    {activity.fields.map((f) =>
-                      f.type === "orders" ? (
-                        <div key={f.id} className={dk("lg:col-span-2")}>
-                          <OrdersField
-                            id={`f-${activity.id}-${f.id}`}
-                            label={`${f.label}${f.required && requireFilled ? " *" : ""}`}
-                            value={draft.fields[f.id] ?? ""}
-                            error={shown[f.id]}
-                            desktop={desktop}
-                            folioPlaceholder={f.placeholder}
-                            onChange={(v) => setDraft({ ...draft, fields: { ...draft.fields, [f.id]: v } })}
-                          />
-                        </div>
-                      ) : (
-                      <FormField
-                        key={f.id}
-                        id={`f-${activity.id}-${f.id}`}
-                        className={f.type === "timeRange" || f.type === "folioTime" ? dk("lg:col-span-2") : ""}
-                        label={`${f.label}${f.required && requireFilled ? " *" : ""}`}
-                        labelClassName="mb-1 block text-sm text-slate-800"
-                        error={shown[f.id]}
-                        hint={f.patternHint && !shown[f.id] ? f.patternHint : undefined}
-                      >
-                        {(p) =>
-                          isPickerType(f.type) ? (
-                            <FieldPicker
-                              f={f}
-                              id={p.id}
-                              invalid={p["aria-invalid"]}
-                              describedBy={p["aria-describedby"]}
-                              value={draft.fields[f.id] ?? ""}
-                              onChange={(v) => setDraft({ ...draft, fields: { ...draft.fields, [f.id]: v } })}
-                            />
-                          ) : (f.maxLength ?? 0) > 200 ? (
-                            <textarea
-                              {...p}
-                              className={p.className + " min-h-24"}
-                              placeholder={f.placeholder}
-                              maxLength={f.maxLength! + 50}
-                              value={draft.fields[f.id] ?? ""}
-                              onChange={(e) => setDraft({ ...draft, fields: { ...draft.fields, [f.id]: e.target.value } })}
-                            />
-                          ) : (
-                            <input
-                              {...p}
-                              {...fieldInputProps(f)}
-                              value={draft.fields[f.id] ?? ""}
-                              onChange={(e) => setDraft({ ...draft, fields: { ...draft.fields, [f.id]: e.target.value } })}
-                            />
-                          )
-                        }
-                      </FormField>
-                      )
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <div className={card} data-error={shown._result ? "true" : undefined}>
-                <h2 className={"font-semibold" + dk("lg:text-lg")} id={`res-${activity.id}`}>
-                  ¿Cómo te fue en {activity.id}? *
-                </h2>
-                {failed ? (
-                  <p className="mt-1 text-sm text-amber-800">Reportaste al menos una falla en los pasos.</p>
-                ) : !draft.result && suggested ? (
-                  <p className="mt-1 text-sm text-slate-600">Lo marcamos según tus respuestas. Cámbialo si no fue así.</p>
-                ) : null}
-                <div
-                  className={"mt-3 grid grid-cols-1 gap-2" + dk("lg:grid-cols-2") + (shown._result ? " animate-shake rounded-xl" : "")}
-                  role="group"
-                  aria-labelledby={`res-${activity.id}`}
-                  aria-describedby={shown._result ? `res-${activity.id}-err` : undefined}
-                >
-                  {(Object.keys(ACTIVITY_RESULTS) as ActivityResult[]).map((r) => (
-                    <motion.button
-                      key={r}
-                      type="button"
-                      aria-pressed={result === r}
-                      onClick={() => {
-                        setDraft({ ...draft, result: r });
-                        // «Tuvo alguna falla» abre el reporte ya con la actividad, si todavía no hay uno
-                        if (r === "issue" && result !== "issue" && !issuesFor().some((i) => i.kind === "issue")) openFailReport();
-                      }}
-                      whileHover={reduce ? undefined : { x: 2 }}
-                      whileTap={reduce ? { opacity: 0.8 } : { scale: 0.96 }}
-                      animate={result === r && !reduce ? { scale: [1, 1.04, 1] } : { scale: 1 }}
-                      transition={{ duration: 0.25 }}
-                      className={`min-h-12 rounded-xl px-4 py-3 text-left font-medium ring-1 transition-colors ${
-                        result === r ? RESULT_STYLE[r] : shown._result ? "bg-white ring-2 ring-rose-400" : "bg-white ring-slate-300 hover:bg-slate-50"
-                      }`}
-                    >
-                      {ACTIVITY_RESULTS[r]}
-                    </motion.button>
-                  ))}
-                </div>
-                {shown._result && <FieldError id={`res-${activity.id}-err`}>{shown._result}</FieldError>}
-                {!showNotes && !draft.notes ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowNotes(true)}
-                    className="mt-3 min-h-11 px-1 text-sm font-medium text-brand-700 hover:underline"
-                  >
-                    + Agregar un comentario (opcional)
-                  </button>
-                ) : (
-                <FormField
-                  id={`notes-${activity.id}`}
-                  className="mt-4"
-                  label="Comentarios (opcional)"
-                  labelClassName="mb-1 block text-sm text-slate-800"
-                  error={shown._notes}
-                >
-                  {(p) => (
-                    <textarea
-                      {...p}
-                      className={p.className + " min-h-20"}
-                      maxLength={LIMITS.notes + 200}
-                      value={draft.notes}
-                      onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
-                    />
-                  )}
-                </FormField>
-                )}
-              </div>
-
-              {issuesFor().length > 0 && (
-                <div className={card}>
-                  <IssueList issues={issuesFor()} steps={steps} />
-                </div>
-              )}
-            </div>
-          </div>
-          <p className={"px-1 text-xs text-slate-600" + dk("lg:hidden")}>✓ Tus respuestas se guardan solas en este navegador mientras llenas.</p>
-
-          <div
-            className={
-              "pb-safe sticky bottom-0 z-10 -mx-4 space-y-2 bg-[#f4f6fa]/95 px-4 pt-2 backdrop-blur" +
-              dk((hasOrders ? "" : "lg:max-w-3xl ") + "lg:mx-0 lg:flex lg:items-center lg:justify-end lg:gap-4 lg:space-y-0 lg:rounded-2xl lg:bg-white/95 lg:px-5 lg:py-3 lg:shadow-md lg:ring-1 lg:ring-slate-200 lg:bottom-4")
-            }
-          >
-            {tried && Object.keys(errors).length > 0 ? (
-              <p className={"text-center text-xs font-medium text-rose-700" + dk("lg:mr-auto lg:text-sm")} role="alert">
-                Revisa {Object.keys(errors).length === 1 ? "el dato marcado" : `los ${Object.keys(errors).length} datos marcados`} en rojo.
-              </p>
-            ) : !allChecked && result && !skipped ? (
-              <p className={"text-center text-xs text-slate-600" + dk("lg:mr-auto lg:text-sm")}>Te faltan puntos del resultado esperado.</p>
-            ) : desktop ? (
-              <p className="hidden text-sm text-slate-600 lg:mr-auto lg:block">Tus respuestas se guardan solas mientras llenas.</p>
-            ) : null}
-            <div className={"grid grid-cols-[auto_1fr] gap-2" + dk("lg:w-[420px]")}>
-              <Button variant="outline" size="lg" onClick={() => go(screens.length - 1)} aria-label="Pantalla anterior">
-                ←
-              </Button>
-              <Button size="lg" disabled={blocked} pulse={complete} onClick={save}>
-                {reopened ? "Guardar cambios" : "Guardar y continuar"}
-              </Button>
-            </div>
-          </div>
-        </section>
-      </div>
-      </StepFrame>
-      </>
-    );
-  }
+  // ---- Cierre de la actividad (al final de la última pantalla) ----
+  const isLast = pos === last;
+  const failed = steps.some((s) => state.steps[stepKey(activity.id, s.id)] === "fail");
+  // Lo ya confirmado en las casillas de cada parte se marca solo como «Sí» (una casilla de confirmación por punto)
+  const cps = steps.filter((s) => s.checkpoint);
+  const auto: Record<string, boolean> = {};
+  if (!failed && cps.length === activity.expected.length)
+    cps.forEach((s, i) => {
+      if (checkpointDone(s)) auto[String(i)] = true;
+    });
+  const checks: ActivityState["checks"] = { ...auto, ...draft.checks };
+  const autoUsed = Object.keys(auto).some((k) => draft.checks[k] === undefined);
+  const allChecked = activity.expected.every((_, i) => checks[String(i)] !== undefined);
+  const anyNo = activity.expected.some((_, i) => checks[String(i)] === false);
+  const allReportChoices = steps.filter((s) => !s.checkpoint).map((s) => s.id);
+  const openFailReport = () =>
+    allReportChoices.length > 1 ? onReport("issue", undefined, false, allReportChoices) : onReport("issue", allReportChoices[0], false);
+  // El resultado se sugiere solo (con falla si algún paso o punto salió mal); el tester lo puede cambiar
+  const suggested: ActivityResult | undefined = failed || anyNo ? "issue" : allChecked ? "ok" : undefined;
+  const result = draft.result ?? suggested;
+  const ordersErrs = Object.fromEntries(
+    (activity.fields ?? []).filter((f) => f.type === "orders").map((f) => [f.id, ordersError(draft.fields[f.id], !!f.required && (!result || result === "ok" || result === "issue"))])
+  );
+  const skipped = result === "skipped";
+  const hasOrders = (activity.fields ?? []).some((f) => f.type === "orders");
+  // Obligatorios solo si le fue bien o con falla; con «No pude» o «No me tocó» basta con que lo escrito tenga buen formato
+  const requireFilled = !result || result === "ok" || result === "issue";
+  const fieldErrors = validateFields((activity.fields ?? []).filter((f) => f.type !== "orders"), draft.fields, requireFilled);
+  const errors: Errors = { ...fieldErrors };
+  for (const [k, v] of Object.entries(ordersErrs)) if (v) errors[k] = v;
+  for (const f of activity.fields ?? [])
+    if (requireFilled && f.requiredWhen && Number(draft.fields[f.requiredWhen]) > 0 && !String(draft.fields[f.id] ?? "").trim())
+      errors[f.id] = `Falta «${f.label}».`;
+  const seqValue = draft.fields[SEQ.field] ?? "";
+  if (seq && requireFilled && !seqValue) errors._seq = "Elige del 1 al 7 qué tan fácil fue.";
+  if (!result) errors._result = `Elige cómo te fue en ${activity.id}.`;
+  if (draft.notes.trim().length > LIMITS.notes) errors._notes = `Máximo ${LIMITS.notes} caracteres.`;
+  const shown: Errors = tried ? errors : {};
+  const complete = Object.keys(errors).length === 0 && (allChecked || skipped);
+  const card = "p-4" + dk("lg:p-6");
 
   const screen = screens[pos];
   const screenSteps = screen.steps;
   const num = (s: Activity["steps"][number]) => screen.start + screenSteps.indexOf(s) + 1;
   const outcomeOf = (s: Activity["steps"][number]) => state.steps[stepKey(activity.id, s.id)];
   const screenIssues = state.issues.filter((i) => i.activityId === activity.id && screenSteps.some((s) => s.id === i.stepId));
+  const markScreenOk = () => {
+    for (const s of screenSteps) if (!outcomeOf(s)) onStep(s.id, "ok");
+  };
 
-  // Todos los pasos de la pantalla en una sola tarjeta, cada uno con su captura (pequeña en celular).
-  // «Listo, siguiente» se puede tocar sin bajar hasta el final.
+  const save = async () => {
+    if (Object.keys(errors).length) {
+      setTried(true);
+      focusFirstError(closingRef.current);
+      return;
+    }
+    // Guardar cierra la actividad (se puede reabrir hasta enviar la encuesta): con «No pude hacerla» se pide confirmación
+    if (
+      result === "blocked" &&
+      !(await confirm({
+        title: `¿Guardar ${activity.id} como «${ACTIVITY_RESULTS.blocked}»?`,
+        message: "Al guardar, la actividad se cierra. La puedes reabrir desde el resumen hasta que envíes la encuesta final. Si fue una falla, revisa que la hayas reportado con «Tuve un problema».",
+        confirmLabel: "Sí, guardar",
+        cancelLabel: "Revisar",
+      }))
+    )
+      return;
+    // «Tuvo alguna falla» sin reporte: se ofrece abrir el reporte ya con la actividad
+    if (result === "issue" && issuesFor().filter((i) => i.kind === "issue").length === 0) {
+      const report = await confirm({
+        title: "¿Reportas la falla?",
+        message: `Marcaste «${ACTIVITY_RESULTS.issue}» pero no hay ningún reporte en ${activity.id}. Cuéntanos qué pasó para que el equipo la pueda revisar.`,
+        confirmLabel: "Reportar la falla",
+        cancelLabel: "Guardar sin reporte",
+      });
+      if (report) {
+        setDraft({ ...draft, checks, result });
+        openFailReport();
+        return;
+      }
+    }
+    // Los pasos de la última pantalla quedan hechos al guardar (como «Listo, siguiente» en las demás)
+    markScreenOk();
+    onSave({ ...draft, checks, result, fields: trimAll(draft.fields), notes: draft.notes.trim(), done: true });
+  };
+
+  const setField = (id: string, v: string) => setDraft({ ...draft, fields: { ...draft.fields, [id]: v } });
+
+  // Resultado esperado + datos + facilidad + resultado, en una sola tarjeta debajo de los pasos
+  const closeCard = (
+    <div ref={closingRef} className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200" data-testid="close-card">
+      {reopened && (
+        <div className={"border-b border-slate-100 " + card}>
+          <Callout tone="info">Ya guardaste {activity.id}. Puedes corregirla y volver a guardarla hasta que envíes la encuesta final.</Callout>
+        </div>
+      )}
+      <div className={card}>
+        <div className="mb-3">
+          <h2 className={"font-semibold" + dk("lg:text-lg")}>✅ Comprueba</h2>
+          <p className="text-sm text-slate-600">
+            ¿Pasó lo que dice cada punto?{autoUsed ? " Marcamos «Sí» en lo que ya confirmaste en las casillas; cámbialo si no fue así." : ""}
+          </p>
+        </div>
+        <ul className="divide-y divide-slate-100">
+          {activity.expected.map((item, i) => {
+            const v = checks[String(i)];
+            const e = expectedText(item);
+            const cond = expectedConditional(item);
+            return (
+              <li key={i} className={"py-3 first:pt-0 last:pb-0" + dk("lg:flex lg:items-center lg:gap-4")} data-testid="expected">
+                <p className={"text-[15px]" + dk("lg:flex-1")} id={`exp-${activity.id}-${i}`}>
+                  {e}
+                </p>
+                <div
+                  className={`mt-2 grid gap-2 ${cond ? "grid-cols-3" : "grid-cols-2"}` + dk(cond ? "lg:mt-0 lg:w-60 lg:shrink-0" : "lg:mt-0 lg:w-36 lg:shrink-0")}
+                  role="group"
+                  aria-labelledby={`exp-${activity.id}-${i}`}
+                >
+                  {(
+                    [
+                      [true, "Sí"],
+                      [false, "No"],
+                      ...(cond ? [[NOT_APPLICABLE, "No aplica"]] : []),
+                    ] as [boolean | "na", string][]
+                  ).map(([val, label]) => (
+                    <motion.button
+                      key={label as string}
+                      type="button"
+                      aria-pressed={v === val}
+                      disabled={blocked}
+                      onClick={() => {
+                        setDraft({ ...draft, checks: { ...checks, [String(i)]: val } });
+                        // Un «No» es una falla: se ofrece el reporte en ese momento, con la actividad ya elegida
+                        if (val === false && v !== false && !issuesFor().some((x) => x.kind === "issue")) openFailReport();
+                      }}
+                      whileTap={reduce ? { opacity: 0.8 } : { scale: 0.92 }}
+                      animate={v === val && !reduce ? { scale: [1, 1.08, 1] } : { scale: 1 }}
+                      transition={{ duration: 0.25 }}
+                      className={`min-h-11 rounded-lg px-1 py-2 text-sm font-medium ring-1 transition-colors ${
+                        v === val
+                          ? val === NOT_APPLICABLE
+                            ? "bg-slate-600 text-white ring-slate-600"
+                            : val
+                              ? "bg-emerald-700 text-white ring-emerald-700"
+                              : "bg-rose-600 text-white ring-rose-600"
+                          : "bg-white ring-slate-300 hover:bg-slate-50"
+                      }`}
+                    >
+                      {label as string}
+                    </motion.button>
+                  ))}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+
+      <div className="divide-y divide-slate-100 border-t border-slate-100">
+        {activity.fields && activity.fields.length > 0 && (
+          <div className={"space-y-3 " + card}>
+            <div>
+              <h2 className={"font-semibold" + dk("lg:text-lg")}>✍️ Anota</h2>
+              <p className="text-sm text-slate-600">Los datos con * son obligatorios{requireFilled ? "" : " solo si te fue bien o con falla"}.</p>
+            </div>
+            <div className={"space-y-3" + dk("lg:grid lg:grid-cols-2 lg:gap-x-4 lg:gap-y-3 lg:space-y-0")}>
+              {activity.fields.map((f) =>
+                f.type === "orders" ? (
+                  <div key={f.id} className={dk("lg:col-span-2")}>
+                    <OrdersField
+                      id={`f-${activity.id}-${f.id}`}
+                      label={`${f.label}${f.required && requireFilled ? " *" : ""}`}
+                      value={draft.fields[f.id] ?? ""}
+                      error={shown[f.id]}
+                      desktop={desktop}
+                      folioPlaceholder={f.placeholder}
+                      onChange={(v) => setField(f.id, v)}
+                    />
+                  </div>
+                ) : (
+                  <FormField
+                    key={f.id}
+                    id={`f-${activity.id}-${f.id}`}
+                    className={f.type === "timeRange" || f.type === "folioTime" || (f.maxLength ?? 0) > 200 ? dk("lg:col-span-2") : ""}
+                    label={`${f.label}${f.required && requireFilled ? " *" : ""}`}
+                    labelClassName="mb-1 block text-sm text-slate-800"
+                    error={shown[f.id]}
+                    hint={f.patternHint && !shown[f.id] ? f.patternHint : undefined}
+                  >
+                    {(p) =>
+                      isPickerType(f.type) ? (
+                        <FieldPicker
+                          f={f}
+                          id={p.id}
+                          invalid={p["aria-invalid"]}
+                          describedBy={p["aria-describedby"]}
+                          value={draft.fields[f.id] ?? ""}
+                          onChange={(v) => setField(f.id, v)}
+                        />
+                      ) : (f.maxLength ?? 0) > 200 ? (
+                        <textarea
+                          {...p}
+                          className={p.className + " min-h-24"}
+                          placeholder={f.placeholder}
+                          maxLength={f.maxLength! + 50}
+                          value={draft.fields[f.id] ?? ""}
+                          onChange={(e) => setField(f.id, e.target.value)}
+                        />
+                      ) : (
+                        <input {...p} {...fieldInputProps(f)} value={draft.fields[f.id] ?? ""} onChange={(e) => setField(f.id, e.target.value)} />
+                      )
+                    }
+                  </FormField>
+                )
+              )}
+            </div>
+          </div>
+        )}
+
+        {seq && (
+          <div className={card} data-error={shown._seq ? "true" : undefined} data-testid="seq">
+            <h2 className={"font-semibold" + dk("lg:text-lg")} id={`seq-${activity.id}`}>
+              {SEQ.label}
+              {requireFilled ? " *" : ""}
+            </h2>
+            <div
+              className={"mt-3 grid grid-cols-7 gap-1.5" + dk("lg:max-w-xl lg:gap-2") + (shown._seq ? " animate-shake rounded-xl" : "")}
+              role="radiogroup"
+              aria-labelledby={`seq-${activity.id}`}
+              aria-describedby={shown._seq ? `seq-${activity.id}-err` : undefined}
+            >
+              {Array.from({ length: SEQ.max - SEQ.min + 1 }, (_, i) => String(SEQ.min + i)).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  role="radio"
+                  aria-checked={seqValue === v}
+                  aria-label={v === String(SEQ.min) ? `${v}, ${SEQ.minLabel}` : v === String(SEQ.max) ? `${v}, ${SEQ.maxLabel}` : v}
+                  disabled={blocked}
+                  onClick={() => setField(SEQ.field, seqValue === v ? "" : v)}
+                  className={`min-h-11 rounded-lg text-base font-semibold ring-1 transition-colors ${
+                    seqValue === v ? "bg-brand-600 text-white ring-brand-600" : shown._seq ? "bg-white ring-2 ring-rose-400" : "bg-white ring-slate-300 hover:bg-slate-50"
+                  }`}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+            <div className={"mt-1 flex justify-between text-xs text-slate-600" + dk("lg:max-w-xl")}>
+              <span>1 = {SEQ.minLabel}</span>
+              <span>7 = {SEQ.maxLabel}</span>
+            </div>
+            {shown._seq && <FieldError id={`seq-${activity.id}-err`}>{shown._seq}</FieldError>}
+          </div>
+        )}
+
+        <div className={card} data-error={shown._result ? "true" : undefined}>
+          {!showResults && !draft.result && suggested && !shown._result ? (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1" data-testid="result-auto">
+              <h2 className={"font-semibold" + dk("lg:text-lg")}>Resultado:</h2>
+              <span className={`rounded-full px-3 py-1 text-sm font-semibold ${RESULT_STYLE[suggested]}`}>{ACTIVITY_RESULTS[suggested]}</span>
+              <button type="button" onClick={() => setShowResults(true)} className="min-h-10 px-1 text-sm font-medium text-brand-700 hover:underline">
+                Cambiar
+              </button>
+              <p className="w-full text-sm text-slate-600">
+                {failed ? "Reportaste al menos una falla en los pasos." : "Lo marcamos según lo que comprobaste."}
+              </p>
+            </div>
+          ) : (
+            <>
+              <h2 className={"font-semibold" + dk("lg:text-lg")} id={`res-${activity.id}`}>
+                ¿Cómo te fue en {activity.id}? *
+              </h2>
+              {failed ? (
+                <p className="mt-1 text-sm text-amber-800">Reportaste al menos una falla en los pasos.</p>
+              ) : !draft.result && suggested ? (
+                <p className="mt-1 text-sm text-slate-600">Lo marcamos según tus respuestas. Cámbialo si no fue así.</p>
+              ) : !allChecked ? (
+                <p className="mt-1 text-sm text-slate-600">Contesta «Comprueba» y se marca solo, o elige aquí.</p>
+              ) : null}
+              <div
+                className={"mt-3 grid grid-cols-1 gap-2" + dk("lg:grid-cols-2") + (shown._result ? " animate-shake rounded-xl" : "")}
+                role="group"
+                aria-labelledby={`res-${activity.id}`}
+                aria-describedby={shown._result ? `res-${activity.id}-err` : undefined}
+              >
+                {(Object.keys(ACTIVITY_RESULTS) as ActivityResult[]).map((r) => (
+                  <motion.button
+                    key={r}
+                    type="button"
+                    aria-pressed={result === r}
+                    disabled={blocked}
+                    onClick={() => {
+                      setDraft({ ...draft, result: r });
+                      // «Tuvo alguna falla» abre el reporte ya con la actividad, si todavía no hay uno
+                      if (r === "issue" && result !== "issue" && !issuesFor().some((i) => i.kind === "issue")) openFailReport();
+                    }}
+                    whileHover={reduce ? undefined : { x: 2 }}
+                    whileTap={reduce ? { opacity: 0.8 } : { scale: 0.96 }}
+                    animate={result === r && !reduce ? { scale: [1, 1.04, 1] } : { scale: 1 }}
+                    transition={{ duration: 0.25 }}
+                    className={`min-h-12 rounded-xl px-4 py-3 text-left font-medium ring-1 transition-colors ${
+                      result === r ? RESULT_STYLE[r] : shown._result ? "bg-white ring-2 ring-rose-400" : "bg-white ring-slate-300 hover:bg-slate-50"
+                    }`}
+                  >
+                    {ACTIVITY_RESULTS[r]}
+                  </motion.button>
+                ))}
+              </div>
+              {shown._result && <FieldError id={`res-${activity.id}-err`}>{shown._result}</FieldError>}
+            </>
+          )}
+          {!showNotes && !draft.notes ? (
+            <button type="button" onClick={() => setShowNotes(true)} className="mt-2 min-h-11 px-1 text-sm font-medium text-brand-700 hover:underline">
+              + Agregar un comentario (opcional)
+            </button>
+          ) : (
+            <FormField id={`notes-${activity.id}`} className="mt-4" label="Comentarios (opcional)" labelClassName="mb-1 block text-sm text-slate-800" error={shown._notes}>
+              {(p) => (
+                <textarea {...p} className={p.className + " min-h-20"} maxLength={LIMITS.notes + 200} value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} />
+              )}
+            </FormField>
+          )}
+        </div>
+
+        {issuesFor().length > 0 && (
+          <div className={card}>
+            <IssueList issues={issuesFor()} steps={steps} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // Todos los pasos de la pantalla en una sola tarjeta. Las capturas que se repiten se muestran una vez.
+  // En pantallas anchas (xl, 1280 px o más), si la pantalla tiene 1 o 2 capturas, van fijas a la izquierda
+  // y los pasos a la derecha; en pantallas más angostas cada captura va debajo de su paso.
+  const imgs = screenImages(screenSteps);
+  const twoCol = desktop && imgs.length >= 1 && imgs.length <= 2;
+  const firstUse = new Set(imgs.map((i) => i.stepId));
   const lastStep = screenSteps[screenSteps.length - 1];
   const reportChoices = screenSteps.filter((s) => !s.checkpoint).map((s) => s.id);
   const cpPending = screenSteps.some((s) => s.checkpoint && !checkpointDone(s));
   const next = () => {
-    for (const s of screenSteps) if (!outcomeOf(s)) onStep(s.id, "ok");
+    markScreenOk();
     go(pos + 1);
   };
   const openData = () => {
@@ -590,7 +613,12 @@ export default function ActivityView({
     <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200" data-testid="instructions">
       {pos === 0 && (
         <div className={"space-y-3 border-b border-slate-100 p-4 text-sm" + dk("lg:p-5")}>
-          <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {activity.goal && (
+            <p className={"text-[15px] font-medium text-slate-900" + dk("lg:text-base")} data-testid="activity-goal">
+              🎯 <Rich text={activity.goal} />
+            </p>
+          )}
+          <dl className={"grid grid-cols-1 gap-2 sm:grid-cols-2" + (twoCol ? " xl:grid-cols-1" : "")}>
             <div>
               <dt className="text-xs font-semibold uppercase text-slate-600">Cuándo</dt>
               <dd>
@@ -616,12 +644,18 @@ export default function ActivityView({
           )}
         </div>
       )}
+      {screen.steps[0].screen && (screens.length > 1 || pos === 0) && (
+        <p className={"border-b border-slate-100 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600" + dk("lg:px-6")} data-testid="screen-title">
+          En el panel: <span className="normal-case tracking-normal text-slate-900">{screen.steps[0].screen}</span>
+        </p>
+      )}
       <ol data-steps={`${activity.id}-${pos}`} className="divide-y divide-slate-100">
         {screenSteps.map((s) => {
           const o = outcomeOf(s);
           const badge = o === "fail" ? "bg-rose-600" : o === "na" ? "bg-slate-500" : o ? "bg-emerald-600" : "bg-brand-gradient";
+          const showImg = !!s.image && firstUse.has(s.id) && imgs.find((x) => x.stepId === s.id)?.src === s.image;
           return (
-            <li key={s.id} data-step-id={s.id} data-testid="instruction" className={"scroll-mt-40 px-4 py-4" + dk("lg:scroll-mt-6 lg:px-6 lg:py-5")}>
+            <li key={s.id} data-step-id={s.id} data-testid="instruction" className={"scroll-mt-40 px-4 py-4" + dk("lg:scroll-mt-6 lg:px-6 lg:py-4")}>
               <div className="flex items-start gap-3">
                 <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${badge}`} aria-hidden="true">
                   {o === "fail" ? "!" : o === "na" ? "–" : o ? "✓" : num(s)}
@@ -629,8 +663,13 @@ export default function ActivityView({
                 <div className="min-w-0 flex-1">
                   <span className="sr-only">Paso {num(s)}. </span>
                   {!s.checkpoint && (
-                    <p className={"text-[16px] leading-relaxed text-slate-900" + dk("lg:text-[17px] lg:leading-7")}>
+                    <p className={"text-[16px] leading-relaxed text-slate-900" + dk("lg:text-[16px] lg:leading-7")}>
                       <Rich text={s.text} links />
+                    </p>
+                  )}
+                  {s.check && (
+                    <p className="mt-1.5 rounded-lg bg-emerald-50 px-3 py-1.5 text-[15px] text-emerald-950" data-testid="step-check">
+                      <span className="font-semibold">Debe pasar:</span> <Rich text={s.check} />
                     </p>
                   )}
                   {s.warning && (
@@ -662,23 +701,23 @@ export default function ActivityView({
                       📷 Adjuntar la captura que pide este paso
                     </button>
                   )}
-                  {s.image && (
-                    <div className={"mt-3" + dk("lg:max-w-2xl")} data-testid="screenshots">
-                      <StepImage key={s.image} src={s.image} caption={s.caption} desktop={desktop} compact />
+                  {showImg && (
+                    <div className={"mt-3" + (twoCol ? " lg:max-w-2xl xl:hidden" : dk("lg:max-w-2xl"))} data-testid="screenshots">
+                      <StepImage key={s.image} src={s.image!} caption={s.caption} desktop={desktop && !twoCol} compact />
                     </div>
                   )}
                   {o === "fail" && <p className="mt-2 text-sm font-medium text-rose-700">Reportaste una falla en este paso.</p>}
                   {s.conditional && !blocked && o !== "fail" && (
                     <div className="mt-1 text-sm">
-                        <button
-                          type="button"
-                          aria-pressed={o === "na"}
-                          onClick={() => onStep(s.id, o === "na" ? null : "na")}
-                          data-testid="step-na"
-                          className={`min-h-10 py-2 font-medium ${o === "na" ? "text-slate-900" : "text-slate-600 hover:underline"}`}
-                        >
-                          {o === "na" ? "✓ No me apareció (toca para quitar)" : "No me apareció"}
-                        </button>
+                      <button
+                        type="button"
+                        aria-pressed={o === "na"}
+                        onClick={() => onStep(s.id, o === "na" ? null : "na")}
+                        data-testid="step-na"
+                        className={`min-h-10 py-2 font-medium ${o === "na" ? "text-slate-900" : "text-slate-600 hover:underline"}`}
+                      >
+                        {o === "na" ? "✓ No me apareció (toca para quitar)" : "No me apareció"}
+                      </button>
                     </div>
                   )}
                 </div>
@@ -710,6 +749,12 @@ export default function ActivityView({
         <p className="mb-1.5 text-center text-xs font-medium text-slate-700" id={`cp-hint-${activity.id}-${pos}`}>
           Marca todas las casillas para poder seguir.
         </p>
+      ) : isLast && tried && Object.keys(errors).length > 0 ? (
+        <p className="mb-1.5 text-center text-xs font-medium text-rose-700" role="alert">
+          Revisa {Object.keys(errors).length === 1 ? "el dato marcado" : `los ${Object.keys(errors).length} datos marcados`} en rojo.
+        </p>
+      ) : isLast && !allChecked && result && !skipped ? (
+        <p className="mb-1.5 text-center text-xs text-slate-600">Te faltan puntos de «Comprueba».</p>
       ) : null}
       <div className={"flex items-center gap-2" + dk("lg:gap-3")}>
         <Button
@@ -722,18 +767,24 @@ export default function ActivityView({
         >
           ←
         </Button>
-        <Button
-          variant="success"
-          size="lg"
-          className="min-w-0 flex-1"
-          disabled={blocked || cpPending}
-          aria-describedby={cpPending ? `cp-hint-${activity.id}-${pos}` : undefined}
-          pulse={!blocked && !cpPending && !screenDone(screen)}
-          onClick={next}
-          data-testid="screen-next"
-        >
-          {screenDone(screen) ? "Siguiente →" : "✓ Listo, siguiente"}
-        </Button>
+        {isLast ? (
+          <Button size="lg" className="min-w-0 flex-1" disabled={blocked || cpPending} pulse={complete && !cpPending} onClick={save} data-testid="activity-save">
+            {reopened ? "Guardar cambios" : "Guardar y continuar"}
+          </Button>
+        ) : (
+          <Button
+            variant="success"
+            size="lg"
+            className="min-w-0 flex-1"
+            disabled={blocked || cpPending}
+            aria-describedby={cpPending ? `cp-hint-${activity.id}-${pos}` : undefined}
+            pulse={!blocked && !cpPending && !screenDone(screen)}
+            onClick={next}
+            data-testid="screen-next"
+          >
+            {screenDone(screen) ? "Siguiente pantalla →" : "✓ Listo, siguiente pantalla"}
+          </Button>
+        )}
         <Button
           variant="outline"
           size="lg"
@@ -741,7 +792,11 @@ export default function ActivityView({
           onClick={() =>
             reportChoices.length > 1 ? onReport("issue", undefined, true, reportChoices) : onReport("issue", reportChoices[0] ?? lastStep.id, reportChoices.length === 1)
           }
-          className={"w-[108px] shrink-0 px-2 text-xs font-semibold leading-tight text-rose-700 ring-rose-200 disabled:opacity-30" + dk("lg:w-auto lg:px-4 lg:text-sm")}
+          className={
+            "w-[108px] shrink-0 px-2 text-xs font-semibold leading-tight text-rose-700 ring-rose-200 disabled:opacity-30" +
+            dk("lg:w-auto lg:px-4 lg:text-sm") +
+            (twoCol ? " xl:w-[108px] xl:px-2 xl:text-xs 2xl:w-auto 2xl:px-4 2xl:text-sm" : "")
+          }
           data-testid="screen-problem"
         >
           ✗ Tuve un problema
@@ -750,16 +805,35 @@ export default function ActivityView({
     </div>
   );
 
+  const content = (
+    <>
+      {blocked && blockedPanel}
+      {stepsCard}
+      {isLast && closeCard}
+      {isLast && <p className={"px-1 text-xs text-slate-600" + dk("lg:hidden")}>✓ Tus respuestas se guardan solas en este navegador mientras llenas.</p>}
+      {actions}
+    </>
+  );
+
   return (
     <>
-    {header}
-    <StepFrame id={`${activity.id}-p${pos}`} dir={dir}>
-      <section className={"mt-1 space-y-4" + dk("lg:mt-4 lg:max-w-3xl")} data-activity-content>
-        {blocked && blockedPanel}
-        {stepsCard}
-        {actions}
-      </section>
-    </StepFrame>
+      {header}
+      <StepFrame id={`${activity.id}-p${pos}`} dir={dir}>
+        {twoCol ? (
+          <div className="mt-1 lg:mt-4 lg:max-w-3xl xl:grid xl:max-w-none xl:grid-cols-2 2xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] xl:items-start xl:gap-6" data-activity-content>
+            <aside className="hidden xl:sticky xl:top-4 xl:block xl:max-h-[calc(100vh-2rem)] xl:space-y-4 xl:overflow-y-auto xl:pr-1" data-testid="screen-images">
+              {imgs.map((im) => (
+                <StepImage key={im.src} src={im.src} caption={im.caption} desktop tall />
+              ))}
+            </aside>
+            <section className="space-y-4">{content}</section>
+          </div>
+        ) : (
+          <section className={"mt-1 space-y-4" + dk("lg:mt-4 " + (hasOrders && isLast ? "" : "lg:max-w-3xl"))} data-activity-content>
+            {content}
+          </section>
+        )}
+      </StepFrame>
     </>
   );
 }
