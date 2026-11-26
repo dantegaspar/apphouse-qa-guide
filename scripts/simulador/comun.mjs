@@ -126,8 +126,10 @@ const POR_ID = {
   orderCard: folio, orderCash: folio, orderBranch1: folio, orderBranch2: folio,
   deliveryCode: () => String(1000 + Math.floor(Math.random() * 9000)), finalStage: "Entregado", stageBefore: "En camino", stageAfter: "En camino",
 };
+// Facilidad de la actividad (SEQ, 1 a 7) cuando la guía la pregunta (guide.seq): baja si hubo falla.
+const seqCampo = (g, falla) => (g.seq ? { seq: String(falla ? 3 + Math.floor(Math.random() * 2) : 5 + Math.floor(Math.random() * 3)) } : {});
 function campos(act, extra = {}) {
-  const out = {};
+  const out = { ...extra };
   for (const f of act.fields ?? []) {
     if (f.id in extra) { out[f.id] = extra[f.id]; continue; }
     let v = POR_ID[f.id];
@@ -219,7 +221,7 @@ export async function correrTester(o, { guideId, tester, escenario, fallas, encu
       const cond = typeof e !== "string" && e.conditional;
       checks[String(k)] = falla && k === 0 ? false : cond && Math.random() < 0.3 ? "na" : true;
     });
-    await enviar([{ type: "activity", payload: { activityId: act.id, result, checks, notes: falla ? "Reporté la falla." : "", fields: campos(act) } }]);
+    await enviar([{ type: "activity", payload: { activityId: act.id, result, checks, notes: falla ? "Reporté la falla." : "", fields: campos(act, seqCampo(g, !!falla)) } }]);
     log(quien, `${act.id} · ${falla ? `Tuvo alguna falla (${falla.severity ?? "medio"}${falla.foto || falla.blocking ? ", con foto" : ""})` : "Todo salió bien"}`);
   }
 
@@ -268,7 +270,8 @@ export function encuestaBase(g, escenario, textos) {
     umux1: alto ? 6 + Math.round(Math.random()) : 4 + Math.round(Math.random() * 2),
     umux2: alto ? 6 + Math.round(Math.random()) : 4 + Math.round(Math.random() * 2),
     logistica: q.logistica.options[escenario === "no-me-toco" && Math.random() < 0.5 ? 1 : 0],
-    hardest: alto ? q.hardest.options[q.hardest.options.length - 1] : azar(q.hardest.options.slice(0, -1)),
+    hardest: q.hardest && (alto ? q.hardest.options[q.hardest.options.length - 1] : azar(q.hardest.options.slice(0, -1))),
+    guia: alto ? 6 + Math.round(Math.random()) : 4 + Math.round(Math.random() * 2),
     improve: azar(textos),
   };
   for (const k of Object.keys(ans)) if (!q[k]) delete ans[k];

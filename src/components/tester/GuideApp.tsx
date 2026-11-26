@@ -362,6 +362,7 @@ export default function GuideApp({
       <ActivityView
         key={act.id}
         desktop={desktop}
+        seq={!!guide.seq}
         activity={act}
         index={idx}
         total={guide.activities.length}

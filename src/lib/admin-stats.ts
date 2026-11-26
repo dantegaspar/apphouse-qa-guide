@@ -2,6 +2,7 @@ import { getDb } from "./db";
 import { getGuide, GUIDES } from "./guides";
 import { loadRuns, parseRec, type RunRow } from "./admin-data";
 import type { Guide } from "./types";
+import { SEQ } from "./guide-utils";
 import { umuxLite } from "./verdict";
 
 /** Agregados para la página de gráficas del panel (/admin/graficas). */
@@ -9,7 +10,8 @@ import { umuxLite } from "./verdict";
 export const RESULT_ORDER = ["ok", "issue", "blocked", "skipped"] as const;
 export type ResultKey = (typeof RESULT_ORDER)[number];
 
-export type ActivityResultCounts = { id: string; title: string; counts: Record<ResultKey, number>; pending: number };
+/** `seq`: facilidad promedio (Single Ease Question, 1 a 7) de quienes la contestaron al cerrar la actividad. */
+export type ActivityResultCounts = { id: string; title: string; counts: Record<ResultKey, number>; pending: number; seq: { n: number; avg: number | null } };
 export type StepBlocked = { label: string; activity: string; text: string; count: number };
 export type FailureCounts = { id: string; title: string; blocking: number; nonBlocking: number };
 export type ScaleDist = { id: string; label: string; min: number; max: number; minLabel?: string; maxLabel?: string; counts: number[]; n: number; avg: number | null };
@@ -113,7 +115,7 @@ export function loadStats(guideId?: string | null) {
   const ids = new Set(runs.map((r) => r.id));
   const keep = <T extends { run_id: string }>(rows: T[]) => rows.filter((r) => ids.has(r.run_id));
   const steps = keep(safeAll<{ run_id: string; activity_id: string; step_id: string; outcome: string }>("SELECT run_id, activity_id, step_id, outcome FROM step_results"));
-  const acts = keep(safeAll<{ run_id: string; activity_id: string; result: string | null }>("SELECT run_id, activity_id, result FROM activity_results"));
+  const acts = keep(safeAll<{ run_id: string; activity_id: string; result: string | null; fields: string }>("SELECT run_id, activity_id, result, fields FROM activity_results"));
   const issues = keep(safeAll<{ run_id: string; activity_id: string; step_id: string | null; kind: string; blocking: number }>("SELECT run_id, activity_id, step_id, kind, blocking FROM issues"));
   const surveys = keep(safeAll<{ run_id: string; answers: string; updated_at: string }>("SELECT run_id, answers, updated_at FROM survey_responses WHERE is_draft = 0"));
   const runById = new Map<string, RunRow>(runs.map((r) => [r.id, r]));
@@ -186,7 +188,11 @@ export function loadStats(guideId?: string | null) {
       const res = acts.filter((x) => x.activity_id === a.id && rids.has(x.run_id));
       const counts = Object.fromEntries(RESULT_ORDER.map((k) => [k, res.filter((x) => x.result === k).length])) as Record<ResultKey, number>;
       const answered = RESULT_ORDER.reduce((n, k) => n + counts[k], 0);
-      return { id: a.id, title: a.title, counts, pending: Math.max(0, rids.size - answered) };
+      const seqVals = res
+        .filter((x) => x.result)
+        .map((x) => num(parseRec(x.fields)[SEQ.field]))
+        .filter((v): v is number => v !== null && v >= SEQ.min && v <= SEQ.max);
+      return { id: a.id, title: a.title, counts, pending: Math.max(0, rids.size - answered), seq: { n: seqVals.length, avg: mean(seqVals) } };
     });
     const answers = surveys.filter((s) => rids.has(s.run_id)).map((s) => parseRec(s.answers));
     const scales: ScaleDist[] = [];

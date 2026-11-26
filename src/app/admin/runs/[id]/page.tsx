@@ -1,4 +1,4 @@
-import { expectedText } from "@/lib/guide-utils";
+import { activityFieldDefs, expectedText } from "@/lib/guide-utils";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { isAdmin } from "@/lib/auth";
@@ -150,7 +150,7 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
         const ar = acts.find((x) => x.activity_id === a.id);
         const checks = parseRec(ar?.checks);
         const fieldVals = parseRec(ar?.fields);
-        const fieldLabels = new Map((a.fields ?? []).map((f) => [f.id, f.label]));
+        const fieldLabels = new Map(activityFieldDefs(guide, a).map((f) => [f.id, f.label]));
         const aIssues = issues.filter((i) => i.activity_id === a.id);
         return (
           <Card key={a.id} title={`${a.id} · ${a.title}`}>

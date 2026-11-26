@@ -44,6 +44,11 @@ export type Step = {
   /** Aviso en amarillo dentro de este paso (p. ej. «No toques Cerrar ahora»). */
   warning?: string;
   /**
+   * Lo que debe pasar al hacer el paso (resultado esperado del paso, ISO/IEC/IEEE 29119-3). Se muestra
+   * debajo de la acción como «Debe pasar: …» para que el tester compare en el momento.
+   */
+  check?: string;
+  /**
    * Pantalla a la que pertenece el paso (los pasos seguidos con el mismo valor se muestran juntos).
    * Opcional: sin este campo los pasos se agrupan solos (ver screensOf en guide-utils).
    */
@@ -68,6 +73,8 @@ export type OrderRow = {
 export type Activity = {
   id: string;
   title: string;
+  /** Para qué sirve la actividad, en una línea y en palabras del tester (escenario de la tarea). */
+  goal?: string;
   when: string;
   where: string;
   warnings?: string[];
@@ -197,6 +204,11 @@ export type Guide = {
    * Sin este campo, todas van en orden estricto.
    */
   sequentialUntil?: string;
+  /**
+   * Al cerrar cada actividad se pregunta «¿Qué tan fácil o difícil fue…?» (Single Ease Question, 1 a 7).
+   * Se guarda en el campo `seq` de la actividad.
+   */
+  seq?: boolean;
   tester: { fields: FieldDef[] };
   prep: {
     title: string;
