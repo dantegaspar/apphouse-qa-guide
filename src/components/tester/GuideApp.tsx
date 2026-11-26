@@ -254,7 +254,7 @@ export default function GuideApp({
   if (cur.name === "activity" && !isOpen(cur.id)) cur = { name: "home" };
   if ((cur.name === "summary" || cur.name === "survey") && !canFinish) cur = { name: "home" };
 
-  // Encuesta final: solo se abre con todas las actividades guardadas (o si el guía terminó la prueba)
+  // Encuesta final: solo se abre con todas las actividades guardadas (o si la prueba terminó por un bloqueo)
   const pendingIds = guide.activities.filter((a) => !state.activities[a.id]?.done).map((a) => a.id);
   const finalReachable = !state.finished && state.prepDone && canFinish;
   const finalLabel = state.finished ? "Encuesta final enviada" : "Encuesta final";
@@ -542,7 +542,7 @@ export default function GuideApp({
         {ended && (
           <div className="space-y-3 rounded-2xl bg-rose-50 p-4 ring-1 ring-rose-200">
             <div>
-              <div className="font-semibold text-rose-900">El guía terminó la prueba por un bloqueo</div>
+              <div className="font-semibold text-rose-900">La prueba terminó por un bloqueo</div>
               <p className="mt-1 whitespace-pre-wrap text-sm text-rose-800">{state.ended!.reason}</p>
             </div>
             <Button size="lg" className="w-full" onClick={() => nav({ name: "summary" })}>
@@ -571,7 +571,7 @@ export default function GuideApp({
           <Callout>
             <strong>{nextAct.id} está en pausa</strong> por una falla que te impide seguir.{" "}
             {state.blocked.helpId ? "Ya pediste ayuda: espera al guía." : "Ábrela y pide ayuda al guía."}{" "}
-            Si no se puede resolver, el guía puede terminar la prueba y entonces se abre la encuesta final.
+            Si ya no puedes seguir, ábrela y toca «Ya no puedo seguir con la prueba»: después contestas la encuesta final.
           </Callout>
         )}
 
@@ -840,7 +840,7 @@ function flushWithin(flush: () => Promise<boolean>, ms: number): Promise<boolean
  * - Sin `sequentialUntil`: orden estricto; solo la primera sin guardar, y las guardadas quedan cerradas.
  * - Con `sequentialUntil`: hasta esa actividad van en orden; al guardarla se abren todas las demás, y
  *   cualquier actividad guardada se puede reabrir y corregir hasta que el tester envíe la encuesta final («Enviar encuesta y terminar»).
- * Al terminar (encuesta enviada) o si el guía terminó la prueba, todo queda cerrado.
+ * Al terminar (encuesta enviada) o si la prueba terminó por un bloqueo, todo queda cerrado.
  */
 function access(guide: Guide, state: RunState) {
   const done = (id: string) => !!state.activities[id]?.done;
@@ -859,7 +859,7 @@ function access(guide: Guide, state: RunState) {
     return seqDone;
   };
   const currentAct = finalized ? undefined : acts.find((a) => !done(a.id) && (state.prepDone ? isOpen(a.id) : true));
-  // La encuesta final solo se abre con el 100 % de las actividades guardadas (o si el guía terminó la prueba)
+  // La encuesta final solo se abre con el 100 % de las actividades guardadas (o si la prueba terminó por un bloqueo)
   const canFinish = !!state.ended || acts.every((a) => done(a.id));
   return { flexible, seqDone, isOpen, currentAct, canFinish, finalized, firstFlexId: flexible ? acts[seqIdx + 1]?.id : undefined };
 }
@@ -1057,7 +1057,7 @@ function FinalSurveyCard({
   className = "",
 }: {
   finished: boolean;
-  /** Todas las actividades guardadas (o el guía terminó la prueba). */
+  /** Todas las actividades guardadas (o la prueba terminó por un bloqueo). */
   ready: boolean;
   /** Ya se puede abrir (todas las actividades guardadas). */
   reachable: boolean;
@@ -1510,7 +1510,7 @@ function Summary({
       </motion.div>
       {state.ended && (
         <div className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-900 ring-1 ring-rose-200">
-          <strong>El guía terminó la prueba por un bloqueo.</strong>
+          <strong>La prueba terminó por un bloqueo.</strong>
           <p className="mt-1 whitespace-pre-wrap">{state.ended.reason}</p>
           {pending.length > 0 && <p className="mt-1 text-xs">No se realizaron: {pending.map((a) => a.id).join(", ")}.</p>}
         </div>

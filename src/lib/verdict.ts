@@ -1,4 +1,5 @@
 import { roundCond, runInRound, viewRoundId } from "./rounds";
+import { endCause, isLogisticsCause } from "./end-causes";
 import { getDb } from "./db";
 import { GUIDES } from "./guides";
 import { answerOf, loadCourier } from "./courier-data";
@@ -221,7 +222,7 @@ export type Verdict = {
 };
 
 // ---------------------------------------------------------------- Cálculo
-type RunRow = { id: string; guide_id: string; name: string; status: string; verdict_scope?: string; verdict_scope_note?: string };
+type RunRow = { id: string; guide_id: string; name: string; status: string; verdict_scope?: string; verdict_scope_note?: string; ended_cause?: string };
 
 /** Por qué una prueba no entra en el cálculo del veredicto. */
 export type ExclusionReason = "sin_terminar" | "logistica" | "mesa";
@@ -266,7 +267,7 @@ const sevOf = (i: IssueRow): Severity =>
 export function computeVerdict(round = viewRoundId()): Verdict {
   const T = THRESHOLDS;
   // Solo la ronda de encuestas a la vista en el panel.
-  const runs = safeAll<RunRow>(`SELECT id, guide_id, name, status, verdict_scope, verdict_scope_note FROM runs WHERE ${roundCond("round_id", round)}`);
+  const runs = safeAll<RunRow>(`SELECT id, guide_id, name, status, verdict_scope, verdict_scope_note, ended_cause FROM runs WHERE ${roundCond("round_id", round)}`);
   const acts = safeAll<ActRow>(`SELECT run_id, activity_id, result, fields, updated_at FROM activity_results WHERE ${runInRound("run_id", round)}`);
   const steps = safeAll<StepRow>(`SELECT run_id, activity_id, updated_at FROM step_results WHERE ${runInRound("run_id", round)}`);
   const issues = safeAll<IssueRow>(
@@ -288,7 +289,11 @@ export function computeVerdict(round = viewRoundId()): Verdict {
     let reason: ExclusionReason | null = null;
     let detail = "";
     if (scope === "excluir") [reason, detail] = ["mesa", note];
-    else if (r.status !== "finished") [reason, detail] = ["sin_terminar", r.status === "ended_blocked" ? "Terminada por bloqueo" : "Sin terminar"];
+    // Quien terminó por un bloqueo de logística (eligió ese motivo al terminar) cuenta como «Problema de logística»
+    else if (r.status === "ended_blocked" && isLogisticsCause(r.ended_cause))
+      [reason, detail] = ["logistica", `Terminada por bloqueo: ${endCause(r.ended_cause)!.label}`];
+    else if (r.status !== "finished")
+      [reason, detail] = ["sin_terminar", r.status === "ended_blocked" ? `Terminada por bloqueo${endCause(r.ended_cause) ? `: ${endCause(r.ended_cause)!.label}` : ""}` : "Sin terminar"];
     else if (scope !== "incluir" && logistics) [reason, detail] = ["logistica", ans];
     if (reason) excluded.push({ runId: r.id, guideId: r.guide_id, name: r.name, reason, detail });
   }

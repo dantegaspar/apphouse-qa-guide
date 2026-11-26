@@ -225,6 +225,10 @@ const MIGRATIONS: string[] = [
   CREATE INDEX courier_feedback_round ON courier_feedback(round_id, created_at);
   CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
   `,
+  // 14: motivo elegido por el tester al terminar la prueba por un bloqueo (ver src/lib/end-causes.ts).
+  `
+  ALTER TABLE runs ADD COLUMN ended_cause TEXT NOT NULL DEFAULT '';
+  `,
 ];
 
 function migrate(db: Database.Database) {

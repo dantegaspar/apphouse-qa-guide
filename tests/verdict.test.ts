@@ -56,6 +56,17 @@ describe("base del cálculo (quién cuenta)", () => {
     expect(v.population.counts).toEqual({ sin_terminar: 2, logistica: 1, mesa: 1 });
   });
 
+  it("quien terminó por bloqueo de logística cuenta como «Problema de logística»; los demás bloqueos, como «sin terminar»", () => {
+    const { round } = readyScenario();
+    addRun({ guideId: "cliente", status: "ended_blocked", endedCause: "sin_repartidor", name: "Sin repartidor" });
+    addRun({ guideId: "cliente", status: "ended_blocked", endedCause: "repartidor_sin_contacto", name: "Sin contacto" });
+    addRun({ guideId: "cliente", status: "ended_blocked", endedCause: "falla_app", name: "Falla" });
+    const v = computeVerdict(round);
+    expect(v.population.valid).toBe(2);
+    expect(v.population.counts).toEqual({ sin_terminar: 1, logistica: 2, mesa: 0 });
+    expect(v.population.excluded.find((e) => e.name === "Falla")?.detail).toBe("Terminada por bloqueo: Una falla de la app no me deja seguir");
+  });
+
   it("«Incluir» desde Mesa anula la exclusión por logística", () => {
     const { round } = readyScenario();
     addRun({ guideId: "cliente", logistica: "No me asignaron repartidor", scope: "incluir" });

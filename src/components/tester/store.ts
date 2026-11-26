@@ -69,7 +69,7 @@ export type RunState = {
   finished: boolean;
   outbox: QAEvent[];
   blocked?: Blocked;
-  /** La prueba se terminó por un bloqueo (con la contraseña del guía). */
+  /** La prueba se terminó por un bloqueo (el tester eligió el motivo; la encuesta final sigue). */
   ended?: { reason: string; at: string };
   /**
    * Casillas marcadas en los pasos de confirmación (`step.checkpoint`), por `stepKey` y número de
