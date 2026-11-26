@@ -254,38 +254,16 @@ export default function GuideApp({
   if (cur.name === "activity" && !isOpen(cur.id)) cur = { name: "home" };
   if ((cur.name === "summary" || cur.name === "survey") && !canFinish) cur = { name: "home" };
 
-  // Encuesta final: ¿ya se puede ir a ella? (todas guardadas, o ya pasó la parte en orden y se marcan las pendientes)
+  // Encuesta final: solo se abre con todas las actividades guardadas (o si el guía terminó la prueba)
   const pendingIds = guide.activities.filter((a) => !state.activities[a.id]?.done).map((a) => a.id);
-  const finalReachable = !state.finished && state.prepDone && (canFinish || (flexible && seqDone));
+  const finalReachable = !state.finished && state.prepDone && canFinish;
   const finalLabel = state.finished ? "Encuesta final enviada" : "Encuesta final";
-  /** Lleva a la encuesta final; si quedan actividades sin guardar, pide marcarlas como «No me tocó». */
-  const openFinal = async () => {
-    if (canFinish) return nav({ name: "summary" });
-    if (!finalReachable) return;
-    const ids = [...pendingIds];
-    const ok = await confirm({
-      title: `¿Ya terminaste? ${ids.length === 1 ? "Falta 1 actividad" : `Faltan ${ids.length} actividades`}`,
-      message: `Para abrir la encuesta final, ${ids.join(", ")} ${ids.length === 1 ? "queda" : "quedan"} como «No me tocó» (no cuenta en tu contra). Hazlo cuando Mesa de control dé por terminada la prueba. Puedes corregir cualquier actividad hasta que envíes la encuesta.`,
-      confirmLabel: "Sí, ir a la encuesta",
-      cancelLabel: "Todavía no",
-    });
-    if (!ok) return;
-    update(
-      (s) => {
-        const activities = { ...s.activities };
-        for (const id of ids) activities[id] = { result: "skipped", checks: {}, fields: {}, notes: activities[id]?.notes ?? "", done: true };
-        return { ...s, activities };
-      },
-      ids.map((id) => ({
-        type: "activity",
-        payload: { activityId: id, result: "skipped", checks: {}, fields: {}, notes: state.activities[id]?.notes ?? "" },
-      }))
-    );
-    toast.success("Contesta la encuesta para terminar tu prueba.", { title: `${ids.length === 1 ? "1 actividad marcada" : `${ids.length} actividades marcadas`} como «No me tocó»` });
-    nav({ name: "summary" });
+  const openFinal = () => {
+    if (canFinish) nav({ name: "summary" });
   };
   // Aviso fijo bajo la barra superior: sigue visible en todas las pantallas hasta enviar la encuesta
-  const showFinalBar = (finalReachable || (ended && !state.finished)) && cur.name !== "summary" && cur.name !== "survey";
+  const finalWaiting = !state.finished && !ended && state.prepDone && !canFinish && flexible && seqDone;
+  const showFinalBar = (finalReachable || finalWaiting || (ended && !state.finished)) && cur.name !== "summary" && cur.name !== "survey";
   const finalReady = canFinish;
   const finalBar = showFinalBar && (
     <div
@@ -299,14 +277,17 @@ export default function GuideApp({
           {finalReady ? (
             <span>Es el último paso y es obligatoria.</span>
           ) : (
-            <span className={desktop ? "" : "hidden sm:inline"}>Contéstala cuando termines tus actividades.</span>
+            <span>
+              Se abre al guardar todas tus actividades (te {pendingIds.length === 1 ? "falta 1" : `faltan ${pendingIds.length}`}).
+            </span>
           )}
         </span>
+        {finalReady && (
         <Button
           size="md"
           variant={finalReady ? "primary" : "outline"}
           pulse={finalReady}
-          onClick={() => void openFinal()}
+          onClick={openFinal}
           className={`shrink-0 !min-h-9 !rounded-lg !px-3 !py-1 !text-sm ${finalReady ? "attn-amber !bg-amber-600 hover:!bg-amber-700" : ""}`}
           data-testid="final-survey-bar-go"
         >
@@ -314,6 +295,7 @@ export default function GuideApp({
             Contestar<span className={desktop ? "hidden lg:inline" : "hidden"}> la encuesta final</span> →
           </span>
         </Button>
+        )}
       </div>
     </div>
   );
@@ -579,13 +561,9 @@ export default function GuideApp({
           <div className="rounded-2xl bg-brand-50 px-4 py-3 text-sm text-brand-700 ring-1 ring-brand-100" data-testid="survey-locked-hint">
             <p className="font-semibold">📝 Al final falta la encuesta final</p>
             <p className="mt-1">
-              Es el último paso y es obligatoria. Te {pendingIds.length === 1 ? "falta" : "faltan"}: <strong>{pendingIds.join(", ")}</strong>. Cuando
-              Mesa de control dé por terminada la prueba, toca este botón: las que no te tocaron quedan como <strong>«No me tocó»</strong> y se abre la
-              encuesta.
+              Es el último paso y es obligatoria. Se abre cuando todas las actividades tengan su resultado guardado. Te{" "}
+              {pendingIds.length === 1 ? "falta" : "faltan"}: <strong>{pendingIds.join(", ")}</strong>.
             </p>
-            <Button className="mt-3 w-full sm:w-auto" data-testid="skip-pending" onClick={() => void openFinal()}>
-              Ya terminé: ir a la encuesta final →
-            </Button>
           </div>
         )}
 
@@ -705,7 +683,7 @@ export default function GuideApp({
             finished={state.finished}
             ready={canFinish}
             reachable={finalReachable}
-            onOpen={() => void openFinal()}
+            onOpen={openFinal}
             onView={() => nav({ name: "summary" })}
           />
         </section>
@@ -780,7 +758,7 @@ export default function GuideApp({
             fresh={fresh}
             onFreshSeen={(id) => setFreshState((f) => f.filter((x) => x !== id))}
             finalReachable={finalReachable}
-            onFinal={() => void openFinal()}
+            onFinal={openFinal}
           />
           <main className="min-w-0 flex-1 lg:pb-10">{body}</main>
         </div>
@@ -1056,7 +1034,7 @@ function Sidebar({
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block leading-snug">Encuesta final</span>
-                <span className="block text-[11px] leading-tight">🔒 Último paso: se abre al terminar</span>
+                <span className="block text-[11px] leading-tight">🔒 Se abre al terminar todas</span>
               </span>
             </div>
           )}
@@ -1081,14 +1059,14 @@ function FinalSurveyCard({
   finished: boolean;
   /** Todas las actividades guardadas (o el guía terminó la prueba). */
   ready: boolean;
-  /** Ya se puede ir (aunque falten actividades por marcar como «No me tocó»). */
+  /** Ya se puede abrir (todas las actividades guardadas). */
   reachable: boolean;
   onOpen: () => void;
   onView: () => void;
   className?: string;
 }) {
   const reduce = useReducedMotion();
-  const status = finished ? "✓ Enviada" : ready ? "Falta: contéstala ahora" : reachable ? "Al terminar tus actividades" : "🔒 Todavía no toca";
+  const status = finished ? "✓ Enviada" : ready ? "Falta: contéstala ahora" : "🔒 Al terminar todas";
   const inner = (
     <>
       <span className="mt-0.5 w-14 shrink-0 text-xl" aria-hidden="true">
