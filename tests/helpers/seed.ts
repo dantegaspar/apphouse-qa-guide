@@ -21,6 +21,8 @@ type RunOpts = {
   guideId?: string;
   name?: string;
   status?: "finished" | "in_progress" | "ended_blocked";
+  /** Motivo elegido al terminar por bloqueo (END_CAUSES). */
+  endedCause?: string;
   scope?: "" | "incluir" | "excluir";
   /** Respuesta a «logistica» (por omisión, la primera opción: sin problema). */
   logistica?: string;
@@ -38,6 +40,7 @@ export function addRun(o: RunOpts = {}) {
     `INSERT INTO runs (id, token_hash, guide_id, guide_version, name, email, role, status, created_at, updated_at, finished_at, verdict_scope, round_id)
      VALUES (?, 'x', ?, ?, ?, 't@example.com', 'tester', ?, ?, ?, ?, ?, ?)`,
   ).run(id, guideId, guide.version, o.name ?? `Tester ${id.slice(0, 4)}`, o.status ?? "finished", iso(60), iso(1), o.status === "in_progress" ? null : iso(1), o.scope ?? "", activeRoundId());
+  if (o.endedCause) db.prepare("UPDATE runs SET ended_cause = ? WHERE id = ?").run(o.endedCause, id);
   for (const a of o.okActivities ?? guide.activities.map((x) => x.id)) setActivity(id, a, "ok");
   const logQ = guide.survey.questions.find((q) => q.id === "logistica");
   const [u1, u2] = o.umux ?? [7, 7];

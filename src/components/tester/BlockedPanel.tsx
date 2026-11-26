@@ -1,16 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { confirm } from "@/components/feedback";
-import { Button, FormField } from "./ui";
+import { END_CAUSES, type EndCause } from "@/lib/end-causes";
+import { Button, FormField, Sheet } from "./ui";
 import { focusFirstError, LIMITS } from "./validation";
 import { callRun, type Blocked } from "./store";
 
-type Mode = null | "resolve" | "end";
-
 /**
  * Panel de actividad bloqueada: el tester explica por qué no puede seguir y pide ayuda al guía.
- * Para desbloquear o terminar la prueba hace falta la contraseña del guía (se verifica en el servidor).
+ * Ya no se pide la contraseña del guía: si se resolvió, el tester continúa; si ya no puede seguir,
+ * elige el motivo en una ventana y la prueba se cierra, pero todavía contesta la encuesta final.
  */
 export default function BlockedPanel({
   blocked,
@@ -31,8 +30,9 @@ export default function BlockedPanel({
   onEnded: (reason: string, at: string) => void;
 }) {
   const [reason, setReason] = useState(blocked.reason);
-  const [mode, setMode] = useState<Mode>(null);
-  const [password, setPassword] = useState("");
+  const [endOpen, setEndOpen] = useState(false);
+  const [cause, setCause] = useState<EndCause | "">("");
+  const [detail, setDetail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tried, setTried] = useState(false);
@@ -44,7 +44,14 @@ export default function BlockedPanel({
       : r.length > LIMITS.reason
         ? `Máximo ${LIMITS.reason} caracteres (llevas ${r.length}).`
         : null;
-  const pwErr = password.trim() ? null : "Escribe la contraseña del guía.";
+  const causeErr = cause ? null : "Elige por qué ya no puedes seguir.";
+  const d = detail.trim();
+  const detailErr =
+    cause === "otro" && d.length < 5
+      ? "Cuéntanos el motivo (al menos 5 letras)."
+      : d.length > LIMITS.reason
+        ? `Máximo ${LIMITS.reason} caracteres (llevas ${d.length}).`
+        : null;
 
   const request = async () => {
     if (reasonErr) {
@@ -66,34 +73,28 @@ export default function BlockedPanel({
     onRequested(r.data.id, reason.trim(), r.data.createdAt);
   };
 
-  const submitPassword = async () => {
-    if (pwErr) {
-      setTried(true);
-      focusFirstError(document.querySelector<HTMLElement>('[data-testid="blocked-panel"]'));
-      return;
-    }
-    if (
-      mode === "end" &&
-      !(await confirm({
-        title: "¿Terminar la prueba?",
-        message: "Se cerrarán todas las actividades que faltan y ya no podrás seguir. Después verás tu resumen y la encuesta.",
-        confirmLabel: "Sí, terminar la prueba",
-        cancelLabel: "Seguir en pausa",
-        tone: "danger",
-      }))
-    )
-      return;
+  const resolve = async () => {
     setBusy(true);
     setError(null);
-    const r =
-      mode === "resolve"
-        ? await callRun(run, "help/resolve", { helpId: blocked.helpId, password })
-        : await callRun<{ endedAt: string }>(run, "end", { password, reason: blocked.reason });
+    const r = await callRun(run, "help/resolve", { helpId: blocked.helpId });
     setBusy(false);
     if (!r.ok) return setError(r.error);
-    setPassword("");
-    if (mode === "resolve") onResolved();
-    else onEnded(blocked.reason, (r.data as { endedAt?: string }).endedAt || new Date().toISOString());
+    onResolved();
+  };
+
+  const end = async () => {
+    if (causeErr || detailErr) {
+      setTried(true);
+      focusFirstError(document.querySelector<HTMLElement>('[data-testid="end-sheet"]'));
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    const r = await callRun<{ endedAt: string; reason: string }>(run, "end", { cause, reason: d || blocked.reason });
+    setBusy(false);
+    if (!r.ok) return setError(r.error);
+    setEndOpen(false);
+    onEnded(r.data.reason || blocked.reason, r.data.endedAt || new Date().toISOString());
   };
 
   const errorBox = error && (
@@ -156,57 +157,76 @@ export default function BlockedPanel({
         <p className="mt-0.5 whitespace-pre-wrap">{blocked.reason}</p>
       </div>
 
-      {mode === null ? (
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-amber-900">Cuando llegue el guía:</p>
-          <Button size="lg" variant="success" className="w-full" onClick={() => { setTried(false); setMode("resolve"); }}>
-            ✓ Ya se resolvió, continuar
-          </Button>
-          <Button size="lg" variant="danger" className="w-full" onClick={() => { setTried(false); setMode("end"); }}>
-            Terminar la prueba (contraseña del guía)
-          </Button>
-        </div>
-      ) : (
-        <form
-          className="space-y-3 rounded-xl bg-white p-3 ring-1 ring-slate-200"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void submitPassword();
+      {!endOpen && errorBox}
+      <div className="space-y-2">
+        <Button size="lg" variant="success" className="w-full" disabled={busy} onClick={() => void resolve()} data-testid="blocked-resolve">
+          {busy && !endOpen ? "Enviando…" : "✓ Ya se resolvió, continuar"}
+        </Button>
+        <Button
+          size="lg"
+          variant="danger"
+          className="w-full"
+          data-testid="blocked-end"
+          onClick={() => {
+            setTried(false);
+            setError(null);
+            setEndOpen(true);
           }}
         >
-          <p className="text-sm font-semibold">
-            {mode === "resolve" ? "El guía confirma que ya se resolvió" : "El guía termina la prueba"}
-          </p>
-          {mode === "end" && (
-            <p className="text-xs text-slate-600">
-              Se cerrarán todas las actividades. Después podrás ver tu resumen y contestar la encuesta.
-            </p>
-          )}
-          <FormField id="guide-password" label="Contraseña del guía" error={tried ? pwErr : null}>
-            {(p) => (
-              <input {...p} type="password" autoComplete="off" value={password} onChange={(e) => setPassword(e.target.value)} autoFocus />
-            )}
-          </FormField>
-          {errorBox}
+          Ya no puedo seguir con la prueba
+        </Button>
+      </div>
+
+      <Sheet
+        open={endOpen}
+        onClose={() => !busy && setEndOpen(false)}
+        title="¿Por qué ya no puedes seguir?"
+        footer={
           <div className="grid grid-cols-[auto_1fr] gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setMode(null);
-                setPassword("");
-                setError(null);
-                setTried(false);
-              }}
-            >
+            <Button variant="outline" disabled={busy} onClick={() => setEndOpen(false)}>
               Cancelar
             </Button>
-            <Button type="submit" variant={mode === "resolve" ? "success" : "primary"} className={mode === "end" ? "!bg-rose-600" : ""} disabled={busy}>
-              {busy ? "Verificando…" : mode === "resolve" ? "Confirmar y continuar" : "Terminar la prueba"}
+            <Button className="!bg-rose-600 hover:!bg-rose-700" disabled={busy} onClick={() => void end()} data-testid="end-confirm">
+              {busy ? "Enviando…" : "Terminar y contestar la encuesta →"}
             </Button>
           </div>
-        </form>
-      )}
+        }
+      >
+        <div className="space-y-4" data-testid="end-sheet">
+          <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-950 ring-1 ring-amber-200">
+            Las actividades que faltan se cierran, pero <strong>la encuesta final sigue</strong>: contéstala para que tu prueba cuente.
+          </p>
+          <fieldset aria-invalid={tried && !!causeErr} aria-describedby={tried && causeErr ? "end-cause-error" : undefined}>
+            <legend className="mb-2 text-sm font-semibold text-slate-800">Elige el motivo *</legend>
+            <div className="space-y-2">
+              {END_CAUSES.map((c) => (
+                <label
+                  key={c.id}
+                  className={`flex cursor-pointer items-start gap-3 rounded-xl p-3 text-sm ring-1 transition ${
+                    cause === c.id ? "bg-brand-50 ring-2 ring-brand-500" : "bg-white ring-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  <input type="radio" name="end-cause" className="mt-0.5 h-5 w-5 shrink-0 accent-[#2f5da8]" checked={cause === c.id} onChange={() => setCause(c.id)} />
+                  <span>{c.label}</span>
+                </label>
+              ))}
+            </div>
+            {tried && causeErr && (
+              <p id="end-cause-error" role="alert" className="mt-2 text-sm font-medium text-rose-700">
+                {causeErr}
+              </p>
+            )}
+          </fieldset>
+          <FormField
+            id="end-detail"
+            label={cause === "otro" ? "Cuéntanos el motivo *" : "¿Algo más que debamos saber? (opcional)"}
+            error={tried ? detailErr : null}
+          >
+            {(p) => <textarea {...p} className={p.className + " min-h-20"} value={detail} onChange={(e) => setDetail(e.target.value)} />}
+          </FormField>
+          {endOpen && errorBox}
+        </div>
+      </Sheet>
     </section>
   );
 }

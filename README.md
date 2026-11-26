@@ -6,7 +6,7 @@ Guía interactiva de pruebas QA de AppHouse. El tester:
 - Sigue cada actividad por pantallas: todos los pasos con el mismo `screen` son una pantalla del sistema que se prueba y se muestran juntos en una página (sin `screen`, se agrupan solos de 3 o 4 con `screensOf` en `src/lib/guide-utils.ts`). Cada actividad abre con su meta (`goal`), cada paso puede decir qué «Debe pasar» (`check`) y la captura que se repite se muestra una sola vez; en pantallas de 1280 px o más, con 1 o 2 capturas, quedan fijas a la izquierda. En la última pantalla, en la misma página, marca «Comprueba», anota los datos, dice qué tan fácil fue (1 a 7, si la guía tiene `"seq": true`) y el resultado se marca solo. «✓ Listo, siguiente pantalla» lleva a la siguiente pantalla del panel. Cada pantalla tiene «Tuve un problema» (y «No me apareció» en los pasos «Si…»). «Datos» muestra solo lo de la actividad en curso (`activities` / `rowActivities` en las tablas de `reference`). Cómo escribir una guía y por qué: [docs/metodologia-guias.md](docs/metodologia-guias.md).
 - Reporta fallas con descripción y captura de pantalla (o video corto).
 - Hace las actividades **en orden**: solo puede abrir la actividad actual y las ya guardadas quedan cerradas.
-- Si una falla le impide seguir, la actividad queda en pausa y pide ayuda al guía de la prueba. El guía la desbloquea o termina la prueba con su contraseña (`GUIDE_PASSWORD`). Las solicitudes abiertas aparecen arriba en **/admin**.
+- Si una falla le impide seguir, la actividad queda en pausa y pide ayuda al guía de la prueba. Cuando se resuelve, el tester continúa; si ya no puede seguir, elige el motivo en una ventana (sin contraseña), la prueba se cierra y todavía contesta la encuesta final. Los motivos de logística sacan la prueba del veredicto como «Problema de logística». Las solicitudes abiertas aparecen arriba en **/admin**.
 - Ve un resumen de sus resultados y contesta una encuesta al final (al terminar la última actividad o si el guía terminó la prueba).
 
 Todo se guarda en SQLite. El panel **/admin**, protegido con contraseña, muestra los resultados y permite exportarlos a CSV.
@@ -164,7 +164,7 @@ Reglas prácticas:
 | Variable | Obligatoria | Por defecto | Descripción |
 | --- | --- | --- | --- |
 | `ADMIN_PASSWORD` | Sí (para `/admin`) | — | Contraseña del panel de administración. |
-| `GUIDE_PASSWORD` | Recomendada | `ADMIN_PASSWORD` | Contraseña del guía de la prueba: desbloquea una actividad detenida por una falla o termina la prueba por bloqueo. Se verifica solo en el servidor. |
+| `GUIDE_PASSWORD` | Ya no se usa | `ADMIN_PASSWORD` | Antes desbloqueaba o terminaba la prueba; desde el 26-nov-2026 el tester lo hace sin contraseña. |
 | `SESSION_SECRET` | No | Se deriva de `ADMIN_PASSWORD` | Secreto para firmar la sesión de `/admin`. |
 | `MAX_UPLOAD_MB` | No | `15` | Tamaño máximo por archivo subido, en MB. |
 | `DATA_DIR` | No | `./data` | Carpeta de `qa.sqlite`. En Docker es `/app/data`. |
