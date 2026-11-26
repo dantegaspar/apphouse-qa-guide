@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emailError, fieldDefError, parseOrders, surveyAnswerError, textError } from "@/lib/validate";
+import { courierAnswerError, courierRatingError, emailError, fieldDefError, parseOrders, surveyAnswerError, textError } from "@/lib/validate";
 import type { FieldDef, SurveyQuestion } from "@/lib/types";
 
 describe("datos del tester", () => {
@@ -51,5 +51,22 @@ describe("encuesta final", () => {
   it("opción: solo de la lista", () => {
     expect(surveyAnswerError(choice, "Sí")).toBeNull();
     expect(surveyAnswerError(choice, "Tal vez")).toBe("Elige una de las opciones.");
+  });
+});
+
+describe("encuesta de repartidores", () => {
+  it("caritas 1–5 y «No me tocó» solo donde se permite", () => {
+    expect(courierAnswerError(3)).toBeNull();
+    expect(courierAnswerError(0)).toBe("Toca una carita.");
+    expect(courierAnswerError("na")).toBe("Toca una carita.");
+    expect(courierAnswerError("na", true)).toBeNull();
+  });
+
+  it("calificación: entero del 0 al 10, obligatoria", () => {
+    expect(courierRatingError(0)).toBeNull();
+    expect(courierRatingError(10)).toBeNull();
+    expect(courierRatingError(11)).toMatch(/0 al 10/);
+    expect(courierRatingError(7.5)).toMatch(/0 al 10/);
+    expect(courierRatingError(undefined)).toMatch(/0 al 10/);
   });
 });

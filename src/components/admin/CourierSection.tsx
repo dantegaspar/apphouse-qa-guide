@@ -1,7 +1,9 @@
 import { deviceSummary, fmtDate, isImage, parseRec } from "@/lib/admin-data";
 import PhotoGallery from "@/components/admin/PhotoGallery";
-import { COURIER_QUESTIONS, FACES, faceOf } from "@/lib/courier";
-import { answerOf, courierStats, isCourierNa, loadCourier } from "@/lib/courier-data";
+import { TriangleAlert } from "lucide-react";
+import { COURIER_QUESTIONS, COURIER_RATING, FACES } from "@/lib/courier";
+import { answerOf, courierStats, isCourierNa, loadCourier, ratingOf } from "@/lib/courier-data";
+import { FaceIcon } from "@/components/courier/FaceIcon";
 import { ExportButton } from "@/components/admin/ExportButton";
 import VerdictScope from "@/components/admin/VerdictScope";
 import { Bars, ChartCard, COLORS, Columns, Empty, fmt, Kpi } from "@/components/admin/charts/Charts";
@@ -18,10 +20,9 @@ const avgText = (v: number | null) => (v === null ? "—" : fmt(v, 1));
 const RECENT = 30;
 
 function FaceAvg({ value }: { value: number | null }) {
-  const f = faceOf(value);
   return (
-    <span className="whitespace-nowrap">
-      {f && <span aria-hidden>{f.emoji} </span>}
+    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+      <FaceIcon value={value} className="h-[1em] w-[1em]" />
       <span className="font-semibold">{avgText(value)}</span>
       <span className="text-slate-500"> / 5</span>
     </span>
@@ -50,7 +51,7 @@ export function CourierAdminSection() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
           <div className="text-3xl font-bold text-[#2F5DA8]" data-testid="courier-count">{stats.responses}</div>
           <div className="text-sm text-slate-600">Encuestas</div>
@@ -58,6 +59,15 @@ export function CourierAdminSection() {
         <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
           <div className="text-3xl text-slate-900"><FaceAvg value={stats.avg} /></div>
           <div className="text-sm text-slate-600">Promedio general</div>
+        </div>
+        <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200" data-testid="courier-rating">
+          <div className="text-3xl text-slate-900">
+            <span className="font-semibold">{stats.rating.avg === null ? "—" : fmt(stats.rating.avg, 1)}</span>
+            <span className="text-slate-500"> / 10</span>
+          </div>
+          <div className="text-sm text-slate-600" title={COURIER_RATING.label}>
+            Lo recomendaría{stats.rating.n ? ` · ${stats.rating.n} resp.` : ""}
+          </div>
         </div>
         <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
           <div className="text-3xl font-bold text-amber-600">{issues.length}</div>
@@ -76,7 +86,10 @@ export function CourierAdminSection() {
               <th className="px-3 py-2">Pregunta</th>
               <th className="px-3 py-2">Promedio</th>
               {FACES.map((f) => (
-                <th key={f.value} className="px-2 py-2 text-center" title={`Carita ${f.value} de 5`}>{f.emoji}</th>
+                <th key={f.value} className="px-2 py-2 text-center" title={`Carita ${f.value} de 5`}>
+                  <FaceIcon value={f.value} className="h-5 w-5" />
+                  <span className="sr-only">{f.label}</span>
+                </th>
               ))}
               <th className="px-2 py-2 text-center normal-case" title="No me tocó / No llegué a esta parte (no cuenta en el promedio)">No aplica</th>
             </tr>
@@ -119,7 +132,6 @@ export function CourierAdminSection() {
                 <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-700">
                   {COURIER_QUESTIONS.map((q) => {
                     const v = answerOf(ans, q.id);
-                    const face = faceOf(v);
                     if (isCourierNa(ans, q.id))
                       return (
                         <span key={q.id} title={q.label}>
@@ -128,10 +140,15 @@ export function CourierAdminSection() {
                       );
                     return (
                       <span key={q.id} title={q.label}>
-                        {q.short}: <span aria-hidden>{face?.emoji ?? "—"}</span> <span className="text-slate-500">{v ? q.faces[v - 1] : ""}</span>
+                        {q.short}: {v ? <FaceIcon value={v} className="-mt-0.5 h-4 w-4 align-middle" /> : "—"} <span className="text-slate-500">{v ? q.faces[v - 1] : ""}</span>
                       </span>
                     );
                   })}
+                  {ratingOf(ans) !== null && (
+                    <span title={COURIER_RATING.label}>
+                      {COURIER_RATING.short}: <b>{ratingOf(ans)}</b>
+                    </span>
+                  )}
                 </div>
                 {f.comment && <p className="mt-2 whitespace-pre-wrap text-sm text-slate-800">“{f.comment}”</p>}
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
@@ -142,7 +159,10 @@ export function CourierAdminSection() {
                   <ul className="mt-3 space-y-2">
                     {its.map((i) => (
                       <li key={i.id} className="rounded-lg bg-amber-50 p-3 ring-1 ring-amber-200" data-testid="courier-issue">
-                        <p className="whitespace-pre-wrap text-sm text-slate-800">⚠️ {i.description}</p>
+                        <p className="flex items-start gap-1.5 whitespace-pre-wrap text-sm text-slate-800">
+                          <TriangleAlert aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                          <span>{i.description}</span>
+                        </p>
                         {(attsBy.get(i.id) ?? []).length > 0 && (
                           <div className="mt-2 flex flex-wrap gap-2">
                             <PhotoGallery
@@ -178,13 +198,18 @@ export function CourierChartsSection() {
   return (
     <section data-testid="courier-charts">
       <h2 className="mb-3 text-lg font-semibold text-slate-900">Repartidores</h2>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Kpi label="Encuestas" value={fmt(s.responses)} />
-        <Kpi label="Satisfacción promedio" value={s.avg === null ? "—" : `${faceOf(s.avg)?.emoji ?? ""} ${fmt(s.avg, 1)}`} hint={s.avg === null ? "Sin respuestas" : "de 5 (todas las preguntas)"} />
+        <Kpi label="Satisfacción promedio" value={s.avg === null ? "—" : fmt(s.avg, 1)} hint={s.avg === null ? "Sin respuestas" : "de 5 (todas las preguntas)"} />
+        <Kpi
+          label="Lo recomendaría"
+          value={s.rating.avg === null ? "—" : fmt(s.rating.avg, 1)}
+          hint={s.rating.n ? `de 10 · ${s.rating.n} respuesta${s.rating.n === 1 ? "" : "s"} · informativo` : "Sin respuestas"}
+        />
         <Kpi label="Problemas reportados" value={fmt(issues.length)} accent={COLORS.warning} />
       </div>
       {s.responses === 0 ? (
-        <ChartCard className="mt-4" title="Encuesta de repartidores" subtitle="Caritas de 1 (😡 la peor) a 5 (😍 la mejor)">
+        <ChartCard className="mt-4" title="Encuesta de repartidores" subtitle="Caritas de 1 (la peor) a 5 (la mejor)">
           <Empty />
         </ChartCard>
       ) : (
@@ -192,7 +217,7 @@ export function CourierChartsSection() {
           <ChartCard
             className="mt-4"
             title="Promedio por pregunta"
-            subtitle="De 1 (😡 la peor carita) a 5 (😍 la mejor). «No me tocó» no cuenta."
+            subtitle="De 1 (la peor carita) a 5 (la mejor). «No me tocó» no cuenta."
             table={{ head: ["Pregunta", "Promedio", "Respuestas", "No aplica"], rows: s.questions.map((q) => [q.label, avgText(q.avg), q.n, q.naCount]) }}
           >
             <Bars
@@ -213,7 +238,7 @@ export function CourierChartsSection() {
                 }
                 table={{
                   head: ["Carita", "Respuestas"],
-                  rows: [...q.counts.map((c, i) => [`${FACES[i].emoji} ${q.faces[i]}`, c]), ...(q.naCount ? [["No me tocó", q.naCount]] : [])],
+                  rows: [...q.counts.map((c, i) => [`${i + 1} · ${q.faces[i]}`, c]), ...(q.naCount ? [["No me tocó", q.naCount]] : [])],
                 }}
               >
                 {q.n === 0 ? (
@@ -225,7 +250,7 @@ export function CourierChartsSection() {
                       height={110}
                       cols={q.counts.map((c, i) => ({
                         key: String(i),
-                        label: FACES[i].emoji,
+                        label: String(i + 1),
                         value: c,
                         color: FACE_COLORS[i],
                         title: `${q.faces[i]}: ${c} respuesta(s)`,
@@ -240,6 +265,29 @@ export function CourierChartsSection() {
               </ChartCard>
             ))}
           </div>
+          <ChartCard
+            className="mt-4"
+            title={COURIER_RATING.label}
+            subtitle={
+              s.rating.n
+                ? `Promedio ${fmt(s.rating.avg ?? 0, 1)} de 10 · ${s.rating.n} respuesta${s.rating.n === 1 ? "" : "s"} · informativo, no decide el veredicto`
+                : "Sin respuestas (las encuestas anteriores no tenían esta pregunta)"
+            }
+            table={{ head: ["Calificación", "Respuestas"], rows: s.rating.counts.map((c, i) => [String(i + COURIER_RATING.min), c]) }}
+          >
+            {s.rating.n === 0 ? (
+              <Empty />
+            ) : (
+              <Columns
+                aria={`Distribución de ${COURIER_RATING.label}`}
+                height={110}
+                cols={s.rating.counts.map((c, i) => {
+                  const n = i + COURIER_RATING.min;
+                  return { key: String(n), label: String(n), value: c, color: n <= 6 ? COLORS.critical : n <= 8 ? COLORS.neutral : COLORS.good, title: `${n}: ${c} respuesta(s)` };
+                })}
+              />
+            )}
+          </ChartCard>
         </>
       )}
     </section>

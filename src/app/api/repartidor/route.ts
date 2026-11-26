@@ -4,7 +4,7 @@ import { getDb, now, UPLOAD_DIR } from "@/lib/db";
 import { sha256 } from "@/lib/auth";
 import { activeRoundId } from "@/lib/rounds";
 import { checkCourierToken, courierRoundClosed, ROUND_CLOSED, ROUND_CLOSED_MESSAGE } from "@/lib/courier-data";
-import { COURIER_QUESTIONS, type CourierAnswer } from "@/lib/courier";
+import { COURIER_QUESTIONS, COURIER_RATING, type CourierAnswer } from "@/lib/courier";
 import { cleanRecord, err, hasErrors, invalid, json, readJsonObject } from "@/lib/http";
 import {
   collect,
@@ -13,6 +13,7 @@ import {
   courierCommentError,
   courierIssueError,
   courierNameError,
+  courierRatingError,
   idError,
   isPlainObject,
   objectError,
@@ -31,7 +32,7 @@ const TOKEN_RE = /^[A-Za-z0-9_-]{20,200}$/;
  *
  * Reglas: id (8–64, letras/números/-/_) y token (20–200) del navegador; nombre 2–80; teléfono
  * opcional (números, espacios, + o -, 8–20); answers: cada pregunta conocida con un entero 1–5
- * (o "na" = «No me tocó» en las preguntas que dependen de un pedido) y sin llaves desconocidas; comment ≤2000; issues ≤30, cada uno con id válido (sin repetir) y
+ * (o "na" = «No me tocó» en las preguntas que dependen de un pedido), la calificación 0–10 (COURIER_RATING) y sin llaves desconocidas; comment ≤2000; issues ≤30, cada uno con id válido (sin repetir) y
  * descripción 3–1000; device objeto plano ≤30 datos, ≤8 KB.
  */
 export async function POST(req: Request) {
@@ -49,13 +50,16 @@ export async function POST(req: Request) {
   const answers: Record<string, CourierAnswer> = {};
   if (!isPlainObject(body.answers)) errors.answers = "Faltan las respuestas.";
   else {
-    const known = new Set(COURIER_QUESTIONS.map((q) => q.id));
+    const known = new Set([...COURIER_QUESTIONS.map((q) => q.id), COURIER_RATING.id]);
     for (const k of Object.keys(body.answers)) if (!known.has(k)) errors[`answers.${k.slice(0, 64)}`] = "Esta pregunta no existe.";
     for (const q of COURIER_QUESTIONS) {
       const v = body.answers[q.id];
       if (courierAnswerError(v, q.na)) errors[`answers.${q.id}`] = `Toca una carita en «${q.label}».`;
       else answers[q.id] = v as CourierAnswer;
     }
+    const r = body.answers[COURIER_RATING.id];
+    if (courierRatingError(r)) errors[`answers.${COURIER_RATING.id}`] = `Toca un número del 0 al 10 en «${COURIER_RATING.label}».`;
+    else answers[COURIER_RATING.id] = r as number;
   }
 
   const issues: { id: string; description: string }[] = [];

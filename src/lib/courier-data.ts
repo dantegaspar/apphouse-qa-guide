@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import { getDb } from "./db";
 import { sha256 } from "./auth";
 import { parseRec } from "./admin-data";
-import { COURIER_NA, COURIER_QUESTIONS, type CourierQuestion } from "./courier";
+import { COURIER_NA, COURIER_QUESTIONS, COURIER_RATING, type CourierQuestion } from "./courier";
 export { ROUND_CLOSED, ROUND_CLOSED_MESSAGE } from "./courier";
 
 export type CourierFeedbackRow = {
@@ -46,6 +46,13 @@ export function answerOf(answers: Record<string, unknown>, id: string): number |
   return Number.isInteger(v) && v >= 1 && v <= 5 ? v : null;
 }
 
+/** Calificación 0–10 (COURIER_RATING), o null en encuestas que no la tenían. */
+export function ratingOf(answers: Record<string, unknown>): number | null {
+  const raw = answers[COURIER_RATING.id];
+  const v = Number(raw);
+  return raw !== undefined && raw !== null && raw !== "" && Number.isInteger(v) && v >= COURIER_RATING.min && v <= COURIER_RATING.max ? v : null;
+}
+
 /** El repartidor eligió «No me tocó / No llegué a esta parte». */
 export const isCourierNa = (answers: Record<string, unknown>, id: string) => answers[id] === COURIER_NA;
 
@@ -76,5 +83,12 @@ export function courierStats(feedback: CourierFeedbackRow[]) {
     return { ...q, counts, n: vals.length, naCount, avg: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null };
   });
   const all = questions.flatMap((q) => q.counts.flatMap((c, i) => Array<number>(c).fill(i + 1)));
-  return { responses: feedback.length, questions, avg: all.length ? all.reduce((a, b) => a + b, 0) / all.length : null };
+  // Calificación 0–10: aparte, no se mezcla con el promedio de caritas
+  const ratings = answers.map(ratingOf).filter((v): v is number => v !== null);
+  const rating = {
+    n: ratings.length,
+    avg: ratings.length ? ratings.reduce((a, b) => a + b, 0) / ratings.length : null,
+    counts: Array.from({ length: COURIER_RATING.max - COURIER_RATING.min + 1 }, (_, i) => ratings.filter((x) => x === i + COURIER_RATING.min).length),
+  };
+  return { responses: feedback.length, questions, avg: all.length ? all.reduce((a, b) => a + b, 0) / all.length : null, rating };
 }

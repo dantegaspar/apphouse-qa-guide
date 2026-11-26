@@ -8,6 +8,7 @@ import {
   COURIER_NA,
   COURIER_NA_LABEL,
   COURIER_QUESTIONS,
+  COURIER_RATING,
   FACES,
   guessPhotoMime,
   ROUND_CLOSED,
@@ -19,6 +20,7 @@ import {
   courierCommentError,
   courierIssueError,
   courierNameError,
+  courierRatingError,
   phoneError,
   type FieldErrors,
 } from "@/lib/validate";
@@ -26,6 +28,8 @@ import { compressImage, detectDevice, uid } from "@/components/tester/store";
 import { toast, useConfirm } from "@/components/feedback";
 import { Confetti, motion, Sparkles, staggerItem, staggerList, useReducedMotion } from "@/components/motion";
 import { clearPhotos, deletePhoto, getPhoto, putPhoto } from "./photos";
+import { FaceIcon } from "./FaceIcon";
+import { Camera, Check, ChevronDown, CircleCheck, ImageOff, Mic, PartyPopper, Plus, Trash2, TriangleAlert, WifiOff } from "lucide-react";
 
 /**
  * Encuesta para repartidores: una sola pantalla, botones grandes y palabras sencillas.
@@ -133,6 +137,8 @@ function validateDraft(d: Draft): FieldErrors {
     const a = courierAnswerError(d.answers[q.id], q.na);
     if (a) e[`answers.${q.id}`] = a;
   }
+  const r = courierRatingError(d.answers[COURIER_RATING.id]);
+  if (r) e[`answers.${COURIER_RATING.id}`] = r;
   return e;
 }
 
@@ -324,13 +330,14 @@ export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) 
   const errs: FieldErrors = { ...validateDraft(draft), ...serverErrors };
   /** Error visible de un campo: tras intentar enviar, al salir del campo, o si lo marcó el servidor. */
   const shown = (k: string) => (showErrors || touched[k] || k in serverErrors ? errs[k] : undefined);
-  const missing = COURIER_QUESTIONS.filter((q) => errs[`answers.${q.id}`]);
+  const ratingKey = `answers.${COURIER_RATING.id}`;
+  const missing = [...COURIER_QUESTIONS.filter((q) => errs[`answers.${q.id}`]), ...(errs[ratingKey] ? [COURIER_RATING] : [])];
   const problems: string[] = [];
   if (errs.name) problems.push(errs.name);
   if (errs.phone) problems.push(errs.phone);
   if (missing.length)
     problems.push(
-      missing.length === 1 ? "Te falta 1 pregunta. Toca una carita." : `Te faltan ${missing.length} preguntas. Toca una carita en cada una.`
+      missing.length === 1 ? "Te falta 1 pregunta." : `Te faltan ${missing.length} preguntas. Contesta cada una.`
     );
   if (errs.comment) problems.push(errs.comment);
   if (editing && editorDirty) problems.push("Tienes un problema sin guardar. Toca «Guardar problema» o «Cancelar».");
@@ -341,6 +348,7 @@ export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) 
     if (e.phone) return "c-phone-input";
     const q = COURIER_QUESTIONS.find((x) => e[`answers.${x.id}`]);
     if (q) return `q-${q.id}`;
+    if (e[`answers.${COURIER_RATING.id}`]) return `q-${COURIER_RATING.id}`;
     if (e.comment) return "c-comment-input";
     const issue = Object.keys(e).find((k) => k.startsWith("issues"));
     if (issue || (editing && editorDirty)) return "c-issues";
@@ -560,12 +568,12 @@ export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) 
                         }`}
                       >
                         <motion.span
-                          className="relative inline-block text-[2.6rem] leading-none"
+                          className="relative inline-flex leading-none"
                           aria-hidden
                           animate={on ? (reduce ? { opacity: [0.4, 1] } : { y: [0, -14, 0, -5, 0], rotate: [0, -14, 12, -6, 0], scale: [1, 1.3, 1, 1.08, 1] }) : undefined}
                           transition={{ duration: 0.65, ease: "easeOut" }}
                         >
-                          {f.emoji}
+                          <FaceIcon value={f.value} colored={on || value === undefined || value === COURIER_NA} className={`h-10 w-10 ${on || value === undefined || value === COURIER_NA ? "" : "text-slate-400"}`} strokeWidth={on ? 2.4 : 1.9} />
                           {on && <Sparkles count={8} radius={34} size={11} />}
                         </motion.span>
                         <span className={`mt-1.5 text-xs leading-tight ${on ? "font-bold text-brand-700" : "font-medium text-slate-700"}`}>
@@ -587,7 +595,7 @@ export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) 
                       value === COURIER_NA ? "bg-slate-700 text-white ring-2 ring-slate-700" : "bg-white text-slate-700 ring-1 ring-slate-300"
                     }`}
                   >
-                    {value === COURIER_NA ? "✓ " : ""}
+                    {value === COURIER_NA && <Check aria-hidden className="mr-1.5 h-4 w-4" strokeWidth={3} />}
                     {COURIER_NA_LABEL}
                   </button>
                 )}
@@ -602,7 +610,15 @@ export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) 
         })}
       </motion.div>
 
-      {/* 3. Comentario */}
+      {/* 3. Calificación 0–10 (aparte de las caritas; no entra al veredicto) */}
+      <RatingQuestion
+        value={typeof draft.answers[COURIER_RATING.id] === "number" ? (draft.answers[COURIER_RATING.id] as number) : undefined}
+        number={COURIER_QUESTIONS.length + 1}
+        bad={!!shown(ratingKey)}
+        onChoose={(n) => choose(COURIER_RATING.id, n)}
+      />
+
+      {/* 4. Comentario */}
       <section className="mt-5 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
         <label className="block">
           <span className="text-lg font-semibold">
@@ -628,10 +644,12 @@ export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) 
             </span>
           )}
         </label>
-        <p className="mt-1 text-sm text-slate-500">🎤 Si no quieres escribir, puedes usar el micrófono del teclado para dictar.</p>
+        <p className="mt-1 flex items-start gap-1.5 text-sm text-slate-500">
+          <Mic aria-hidden className="mt-0.5 h-4 w-4 shrink-0" /> Si no quieres escribir, puedes usar el micrófono del teclado para dictar.
+        </p>
       </section>
 
-      {/* 4. Problemas */}
+      {/* 5. Problemas */}
       <section id="c-issues" className="mt-5 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200" data-testid="issues">
         <h2 className="text-xl font-bold">¿Algo falló?</h2>
         <p className="mt-1 text-base text-slate-600">Si algo no funcionó, cuéntanos. Si no, sáltate esta parte.</p>
@@ -645,8 +663,9 @@ export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) 
                   <div className="text-sm font-semibold text-amber-900">Problema {i + 1}</div>
                   <p className="whitespace-pre-wrap break-words text-base text-slate-800">{it.description}</p>
                   {it.photo && missingPhotos.has(it.photo.id) && (
-                    <p className="mt-1 text-sm font-medium text-rose-800" data-testid="photo-missing">
-                      ⚠️ La foto ya no está en este celular. El problema se enviará sin foto; si quieres mandarla, borra este problema y agrégalo
+                    <p className="mt-1 flex items-start gap-1.5 text-sm font-medium text-rose-800" data-testid="photo-missing">
+                      <TriangleAlert aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
+                      La foto ya no está en este celular. El problema se enviará sin foto; si quieres mandarla, borra este problema y agrégalo
                       otra vez con la foto.
                     </p>
                   )}
@@ -665,9 +684,9 @@ export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) 
                       update((d) => ({ ...d, issues: d.issues.filter((x) => x.id !== it.id) }));
                       toast.success("Problema borrado");
                     }}
-                    className={`mt-2 min-h-11 rounded-xl px-3 py-2 text-base font-semibold text-rose-700 ring-1 ring-rose-200 active:bg-rose-50 ${FOCUS}`}
+                    className={`mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 py-2 text-base font-semibold text-rose-700 ring-1 ring-rose-200 active:bg-rose-50 ${FOCUS}`}
                   >
-                    🗑️ Borrar
+                    <Trash2 aria-hidden className="h-5 w-5" /> Borrar
                   </button>
                 </div>
               </li>
@@ -703,7 +722,7 @@ export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) 
             onClick={() => setEditing(true)}
             className={`mt-4 flex min-h-16 w-full items-center justify-center gap-2 rounded-2xl bg-amber-100 px-4 text-lg font-bold text-amber-900 ring-1 ring-amber-300 active:scale-[0.98] ${FOCUS}`}
           >
-            ➕ {draft.issues.length ? "Agregar otro problema" : "Agregar problema"}
+            <Plus aria-hidden className="h-6 w-6" strokeWidth={2.6} /> {draft.issues.length ? "Agregar otro problema" : "Agregar problema"}
           </button>
         )}
       </section>
@@ -721,7 +740,9 @@ export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) 
           <div role="alert" className="mb-3 rounded-2xl bg-rose-50 p-4 text-base text-rose-800 ring-1 ring-rose-200" data-testid="send-error">
             {sendError === OFFLINE ? (
               <>
-                <p className="font-bold">📵 No hay internet.</p>
+                <p className="flex items-center gap-2 font-bold">
+                  <WifiOff aria-hidden className="h-5 w-5" /> No hay internet.
+                </p>
                 <p className="mt-1">
                   Tus respuestas siguen guardadas en este celular. Se mandan solas cuando vuelva la señal: deja esta página abierta. También
                   puedes tocar «Intentar de nuevo».
@@ -740,13 +761,71 @@ export default function CourierSurvey({ maxUploadMb }: { maxUploadMb: number }) 
           whileHover={reduce || sending ? undefined : { y: -2 }}
           whileTap={reduce || sending ? { opacity: 0.85 } : { scale: 0.96 }}
           className={`flex min-h-[68px] w-full items-center justify-center rounded-2xl bg-emerald-600 px-4 text-xl font-bold text-white shadow-md disabled:opacity-60 ${FOCUS} ${
-            !sending && COURIER_QUESTIONS.every((q) => draft.answers[q.id]) ? "attn attn-success" : ""
+            !sending && COURIER_QUESTIONS.every((q) => draft.answers[q.id]) && typeof draft.answers[COURIER_RATING.id] === "number" ? "attn attn-success" : ""
           }`}
         >
           {sending ? "Enviando…" : sendError ? "Intentar de nuevo" : "Enviar"}
         </motion.button>
       </div>
     </main>
+  );
+}
+
+/**
+ * Calificación de 0 a 10 (COURIER_RATING): dos filas de números grandes para que se toquen fácil en celular.
+ * Es aparte de las caritas: no entra al promedio de satisfacción ni al veredicto.
+ */
+function RatingQuestion({ value, number, bad, onChoose }: { value: number | undefined; number: number; bad: boolean; onChoose: (n: number) => void }) {
+  const nums = Array.from({ length: COURIER_RATING.max - COURIER_RATING.min + 1 }, (_, i) => i + COURIER_RATING.min);
+  const id = COURIER_RATING.id;
+  return (
+    <section
+      id={`q-${id}`}
+      data-testid={`q-${id}`}
+      className={`mt-4 rounded-3xl bg-white p-4 shadow-sm ring-1 ${bad ? "ring-2 ring-rose-500" : "ring-slate-200"}`}
+    >
+      <h3 id={`q-${id}-label`} className="text-lg font-semibold leading-snug">
+        <span className="text-slate-500">{number}.</span> {COURIER_RATING.label}
+      </h3>
+      <div
+        role="radiogroup"
+        aria-labelledby={`q-${id}-label`}
+        aria-invalid={bad}
+        aria-describedby={bad ? `q-${id}-error` : `q-${id}-scale`}
+        onKeyDown={(e) => radioKeys(e, (i) => onChoose(nums[i]))}
+        className="mt-3 grid grid-cols-6 gap-1.5"
+      >
+        {nums.map((n, i) => {
+          const on = value === n;
+          return (
+            <button
+              key={n}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              aria-label={`${n} de 10`}
+              tabIndex={on || (value === undefined && i === 0) ? 0 : -1}
+              onClick={() => onChoose(n)}
+              data-testid={`rating-${n}`}
+              className={`min-h-14 rounded-2xl text-xl font-bold transition-colors ${FOCUS} ${
+                on ? "bg-brand-600 text-white ring-[3px] ring-brand-600" : "bg-white text-slate-800 ring-1 ring-slate-300 active:bg-brand-50"
+              }`}
+            >
+              {n}
+            </button>
+          );
+        })}
+      </div>
+      <p id={`q-${id}-scale`} className="mt-2 flex justify-between text-sm text-slate-600">
+        <span>0 = {COURIER_RATING.low}</span>
+        <span>10 = {COURIER_RATING.high}</span>
+      </p>
+      {bad && (
+        <p id={`q-${id}-error`} className="mt-2 text-base font-medium text-rose-700">
+          Toca un número del 0 al 10.
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -777,9 +856,7 @@ function TodayGuide({ defaultOpen }: { defaultOpen: boolean }) {
           <span className="block text-2xl font-bold">Qué haces hoy</span>
           <span className="block text-sm text-slate-600 group-open:hidden">Toca para ver los {TODAY_STEPS.length} pasos de la prueba</span>
         </span>
-        <span aria-hidden className="text-2xl text-slate-500 transition-transform group-open:rotate-180">
-          ⌄
-        </span>
+        <ChevronDown aria-hidden className="h-7 w-7 shrink-0 text-slate-500 transition-transform group-open:rotate-180" />
       </summary>
       <ol className="space-y-4 px-5 pb-5 pt-1">
         {TODAY_STEPS.map((t, i) => (
@@ -822,15 +899,15 @@ function PhotoThumb({ id, missing }: { id: string; missing?: boolean }) {
   return (
     <div className="h-20 w-16 shrink-0 overflow-hidden rounded-xl bg-white ring-1 ring-amber-200">
       {missing ? (
-        <span className="flex h-full items-center justify-center text-2xl" role="img" aria-label="Foto no disponible">
-          ⚠️
+        <span className="flex h-full items-center justify-center text-rose-700" role="img" aria-label="Foto no disponible">
+          <ImageOff aria-hidden className="h-7 w-7" />
         </span>
       ) : url && !broken ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={url} alt="Foto de la pantalla" className="h-full w-full object-cover" onError={() => setBroken(true)} />
       ) : (
-        <span className="flex h-full items-center justify-center text-2xl" role="img" aria-label="Con foto">
-          📷
+        <span className="flex h-full items-center justify-center text-slate-500" role="img" aria-label="Con foto">
+          <Camera aria-hidden className="h-7 w-7" />
         </span>
       )}
     </div>
@@ -907,7 +984,7 @@ function IssueEditor({
     const e = await onSave({ id, description: description.trim(), photo });
     setBusy(false);
     if (e) {
-      setError(e === OFFLINE ? "📵 No hay internet. Conéctate y toca «" + saveLabel + "» otra vez." : e);
+      setError(e === OFFLINE ? "No hay internet. Conéctate y toca «" + saveLabel + "» otra vez." : e);
       toast.error(e === OFFLINE ? "No hay internet. Conéctate e inténtalo otra vez." : e, { id: "courier-issue", title: "No se pudo guardar" });
       if (lastFields.description) {
         setDescError(true);
@@ -944,7 +1021,9 @@ function IssueEditor({
         />
         <Counter value={description} max={COURIER_RULES.issue.max} />
       </label>
-      <p className="text-sm text-slate-500">🎤 Puedes usar el micrófono del teclado para dictar.</p>
+      <p className="flex items-start gap-1.5 text-sm text-slate-500">
+        <Mic aria-hidden className="mt-0.5 h-4 w-4 shrink-0" /> Puedes usar el micrófono del teclado para dictar.
+      </p>
 
       <div className="mt-4">
         {photo && preview ? (
@@ -955,9 +1034,7 @@ function IssueEditor({
                 aria-label="Foto adjunta (este celular no puede mostrarla, pero sí se envía)"
                 className="flex h-28 w-20 flex-col items-center justify-center rounded-xl bg-slate-100 text-center text-xs text-slate-600 ring-1 ring-slate-300"
               >
-                <span aria-hidden className="text-3xl">
-                  📷
-                </span>
+                <Camera aria-hidden className="mb-1 h-8 w-8" />
                 Foto adjunta
               </span>
             ) : (
@@ -970,7 +1047,9 @@ function IssueEditor({
               />
             )}
             <div className="flex flex-col gap-2">
-              <span className="text-base font-medium text-emerald-700">✅ Foto lista</span>
+              <span className="inline-flex items-center gap-1.5 text-base font-medium text-emerald-700">
+                <CircleCheck aria-hidden className="h-5 w-5" /> Foto lista
+              </span>
               <button
                 type="button"
                 onClick={() => {
@@ -985,7 +1064,7 @@ function IssueEditor({
           </div>
         ) : (
           <label className="flex min-h-16 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-white px-4 text-lg font-bold text-brand-700 ring-2 ring-brand-500 active:scale-[0.98] has-[:focus-visible]:outline-[3px] has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-brand-600">
-            📷 Foto de la pantalla
+            <Camera aria-hidden className="h-6 w-6" /> Foto de la pantalla
             <input
               ref={inputRef}
               type="file"
@@ -1052,7 +1131,7 @@ function ThankYou({
       <Confetti count={44} />
       <div className="animate-pop rounded-3xl bg-white p-6 text-center shadow-sm ring-1 ring-slate-200" data-testid="thanks">
         <motion.div
-          className="relative inline-block text-7xl"
+          className="relative inline-block text-brand-600"
           aria-hidden
           initial={reduce ? { opacity: 0 } : { scale: 0.2, rotate: -30, opacity: 0 }}
           animate={reduce ? { opacity: 1 } : { scale: [0.2, 1.3, 1], rotate: [-30, 12, 0], opacity: 1 }}
@@ -1063,7 +1142,7 @@ function ThankYou({
             animate={reduce ? { opacity: [1, 0.7, 1] } : { y: [0, -10, 0], rotate: [0, -6, 6, 0] }}
             transition={{ duration: 1.6, repeat: Infinity, repeatDelay: 1, delay: 0.7 }}
           >
-            🎉
+            <PartyPopper className="h-20 w-20" strokeWidth={1.6} />
           </motion.span>
           <Sparkles count={12} radius={76} size={15} delay={0.2} />
         </motion.div>
@@ -1074,7 +1153,11 @@ function ThankYou({
             Problemas enviados: <b>{sent.issues}</b>
           </p>
         )}
-        {lastOk && <p className="mt-3 rounded-xl bg-emerald-50 px-3 py-2 text-base font-medium text-emerald-800">✅ Problema enviado. ¡Gracias!</p>}
+        {lastOk && (
+          <p className="mt-3 flex items-center justify-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-2 text-base font-medium text-emerald-800">
+            <CircleCheck aria-hidden className="h-5 w-5" /> Problema enviado. ¡Gracias!
+          </p>
+        )}
       </div>
 
       {editing ? (
@@ -1131,7 +1214,7 @@ function ThankYou({
           }}
           className={`mt-5 flex min-h-16 w-full items-center justify-center gap-2 rounded-2xl bg-amber-100 px-4 text-lg font-bold text-amber-900 ring-1 ring-amber-300 active:scale-[0.98] ${FOCUS}`}
         >
-          ⚠️ Reportar otro problema
+          <TriangleAlert aria-hidden className="h-6 w-6" /> Reportar otro problema
         </button>
       )}
 

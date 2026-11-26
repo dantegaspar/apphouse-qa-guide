@@ -1,4 +1,4 @@
-/** Encuesta para repartidores: preguntas y caritas (compartido entre cliente y servidor). */
+/** Encuesta para repartidores: preguntas, caritas y calificación 0–10 (compartido entre cliente y servidor). */
 
 /**
  * `faces`: etiqueta de cada carita (1 = peor … 5 = mejor) que responde a lo que se pregunta.
@@ -15,41 +15,74 @@ export type CourierAnswer = number | typeof COURIER_NA;
 
 const EASY: CourierQuestion["faces"] = ["Muy difícil", "Difícil", "Regular", "Fácil", "Muy fácil"];
 
+/**
+ * Preguntas en el orden en que el repartidor vive la prueba (avisos → camino → entrega → app → en general).
+ * Los ids no cambian entre rondas: las respuestas viejas siguen contando igual en el panel y en el veredicto.
+ */
 export const COURIER_QUESTIONS: CourierQuestion[] = [
-  { id: "facil", label: "¿Qué tan fácil fue usar la app?", short: "Fácil de usar", faces: EASY },
   {
     id: "avisos",
-    label: "¿Te llegaron bien los avisos de pedidos nuevos?",
-    short: "Avisos de pedidos",
+    label: "Cuando te asignaron un pedido, ¿te llegó el aviso al celular?",
+    short: "Aviso de pedido",
     na: true,
     faces: ["Nunca", "Pocas veces", "A veces", "Casi siempre", "Siempre"],
   },
-  { id: "direccion", label: "¿Fue fácil encontrar la dirección y llegar?", short: "Encontrar la dirección", faces: EASY, na: true },
-  { id: "entregado", label: "¿Fue fácil marcar el pedido como entregado?", short: "Marcar entregado", faces: EASY, na: true },
+  {
+    id: "direccion",
+    label: "¿Qué tan fácil fue ver la dirección del cliente y llegar con el mapa?",
+    short: "Dirección y mapa",
+    faces: EASY,
+    na: true,
+  },
+  {
+    id: "entregado",
+    label: "Al entregar, ¿qué tan fácil fue poner el código del cliente y marcar «Entregado»?",
+    short: "Código y entregado",
+    faces: EASY,
+    na: true,
+  },
+  {
+    id: "facil",
+    label: "¿Qué tan fácil fue saber qué botón tocar en cada paso (aceptar, recoger, entregar)?",
+    short: "Botones claros",
+    faces: EASY,
+  },
   {
     id: "rapida",
-    label: "¿La app funcionó rápido y sin trabarse?",
+    label: "¿La app respondió rápido, sin trabarse ni cerrarse sola?",
     short: "Rápida, sin trabarse",
     faces: ["Muy lenta", "Lenta", "Regular", "Rápida", "Muy rápida"],
   },
   {
     id: "general",
-    label: "¿Qué tan contento estás con la app en general?",
+    label: "En general, ¿qué tan contento quedaste con la app?",
     short: "Contento en general",
     faces: ["Nada contento", "Poco", "Regular", "Contento", "Muy contento"],
   },
 ];
 
-/** Valor 1 (peor) a 5 (mejor). */
-export const FACES = [
-  { value: 1, emoji: "😡", label: "Muy mal" },
-  { value: 2, emoji: "😕", label: "Mal" },
-  { value: 3, emoji: "😐", label: "Regular" },
-  { value: 4, emoji: "🙂", label: "Bien" },
-  { value: 5, emoji: "😍", label: "Muy bien" },
-] as const;
+/**
+ * Calificación de 0 a 10 al final de la encuesta («¿la recomendarías?»). Se guarda en `answers` con
+ * este id, pero NO es parte de COURIER_QUESTIONS: no entra al promedio de caritas ni al veredicto.
+ */
+export const COURIER_RATING = {
+  id: "recomienda",
+  label: "Del 0 al 10, ¿qué tanto le recomendarías esta app a otro repartidor?",
+  short: "Recomendaría (0–10)",
+  low: "Nada",
+  high: "Muchísimo",
+  min: 0,
+  max: 10,
+} as const;
 
-export const faceOf = (v: number | null | undefined) => (v ? FACES.find((f) => f.value === Math.round(v)) : undefined);
+/** Valor 1 (peor) a 5 (mejor). El dibujo de cada carita está en src/components/courier/FaceIcon.tsx. */
+export const FACES = [
+  { value: 1, label: "Muy mal" },
+  { value: 2, label: "Mal" },
+  { value: 3, label: "Regular" },
+  { value: 4, label: "Bien" },
+  { value: 5, label: "Muy bien" },
+] as const;
 
 /**
  * Código de error (409, `{ error, code }`) cuando la encuesta es de una ronda que ya no está activa:
