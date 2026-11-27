@@ -27,6 +27,8 @@ type RunOpts = {
   /** Respuesta a «logistica» (por omisión, la primera opción: sin problema). */
   logistica?: string;
   umux?: [number, number];
+  /** Otras respuestas de la encuesta final (rapidez, satisfaccion, adopcion…). */
+  answers?: Record<string, unknown>;
   /** Actividades a marcar «Todo salió bien» (por omisión, todas las de la guía). */
   okActivities?: string[];
 };
@@ -46,7 +48,7 @@ export function addRun(o: RunOpts = {}) {
   const [u1, u2] = o.umux ?? [7, 7];
   db.prepare("INSERT INTO survey_responses (run_id, answers, created_at, updated_at, is_draft) VALUES (?, ?, ?, ?, 0)").run(
     id,
-    JSON.stringify({ umux1: u1, umux2: u2, logistica: o.logistica ?? logQ?.options?.[0] ?? "" }),
+    JSON.stringify({ umux1: u1, umux2: u2, logistica: o.logistica ?? logQ?.options?.[0] ?? "", ...o.answers }),
     iso(),
     iso(),
   );

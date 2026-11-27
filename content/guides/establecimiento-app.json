@@ -1,6 +1,6 @@
 {
   "id": "establecimiento-app",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "role": "Establecimiento",
   "hidden": true,
   "title": "Manual del Establecimiento · App móvil",
@@ -1203,7 +1203,7 @@
   },
   "survey": {
     "title": "Encuesta del Establecimiento",
-    "intro": "Son 5 preguntas cortas; toma 1 minuto.",
+    "intro": "Son 10 preguntas de tocar una opción y un comentario opcional; toma 2 minutos.",
     "questions": [
       {
         "id": "umux1",
@@ -1223,6 +1223,67 @@
         "minLabel": "Totalmente en desacuerdo",
         "maxLabel": "Totalmente de acuerdo",
         "label": "La app es fácil de usar.",
+        "required": true
+      },
+      {
+        "id": "satisfaccion",
+        "type": "scale",
+        "min": 1,
+        "max": 5,
+        "minLabel": "Nada satisfecho",
+        "maxLabel": "Muy satisfecho",
+        "label": "En general, ¿qué tan satisfecho quedaste con la app?",
+        "required": true
+      },
+      {
+        "id": "seguirPedidos",
+        "type": "scale",
+        "min": 1,
+        "max": 5,
+        "minLabel": "Muy difícil",
+        "maxLabel": "Muy fácil",
+        "label": "¿Qué tan fácil fue seguir los pedidos, desde que llegan hasta que se entregan?",
+        "required": true
+      },
+      {
+        "id": "configurar",
+        "type": "scale",
+        "min": 1,
+        "max": 5,
+        "minLabel": "Muy difícil",
+        "maxLabel": "Muy fácil",
+        "label": "¿Qué tan fácil fue configurar tu sucursal (horario, menú y repartidores)?",
+        "required": true
+      },
+      {
+        "id": "rapidez",
+        "type": "scale",
+        "min": 1,
+        "max": 5,
+        "minLabel": "Muy lento",
+        "maxLabel": "Muy rápido",
+        "label": "A tu parecer, ¿qué tan rápido cargaron las pantallas de la app?",
+        "required": true
+      },
+      {
+        "id": "fluidez",
+        "type": "scale",
+        "min": 1,
+        "max": 5,
+        "minLabel": "Se trababa mucho",
+        "maxLabel": "Muy fluida",
+        "label": "¿Qué tan fluida se sintió la app al usarla, sin trabarse, congelarse ni cerrarse sola?",
+        "required": true
+      },
+      {
+        "id": "adopcion",
+        "type": "choice",
+        "label": "¿Usarías esta app para manejar tu negocio tal como está hoy?",
+        "options": [
+          "Sí",
+          "Tal vez",
+          "No"
+        ],
         "required": true
       },
       {
