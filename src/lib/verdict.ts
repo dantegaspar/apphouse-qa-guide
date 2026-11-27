@@ -190,12 +190,46 @@ export type BugTypeRow = {
   examples: { id: string; activityId: string; description: string; severity: Severity; open: boolean; runId: string }[];
 };
 
+/**
+ * Opinión de las personas en la encuesta final (rapidez, fluidez, satisfacción general, recomendación,
+ * facilidad por tema y si la usarían hoy). Solo informativo: ninguna de estas preguntas es criterio ni
+ * cambia el veredicto; son percepciones (la rapidez depende también del servidor y la red).
+ */
+export type AvgStat = { n: number; avg: number | null };
+export type OpinionStat = {
+  /** Promedio por id de pregunta: escalas 1–5 (rapidez, fluidez, satisfaccion, facilidad, seguirPedidos, configurar) y recomienda 0–10. */
+  scales: Record<string, AvgStat>;
+  /** «¿La usarías tal como está hoy?»: cuántos dijeron Sí, Tal vez y No. */
+  adopcion: { si: number; talvez: number; no: number };
+};
+export const OPINION_SCALES: Record<string, [number, number]> = {
+  rapidez: [1, 5],
+  fluidez: [1, 5],
+  satisfaccion: [1, 5],
+  facilidad: [1, 5],
+  seguirPedidos: [1, 5],
+  configurar: [1, 5],
+  recomienda: [0, 10],
+};
+export function opinionOf(answers: Record<string, unknown>[]): OpinionStat {
+  const scales: Record<string, AvgStat> = {};
+  for (const [id, [min, max]] of Object.entries(OPINION_SCALES)) {
+    const vals = answers
+      .filter((a) => a[id] !== undefined && a[id] !== null && a[id] !== "")
+      .map((a) => Number(a[id]))
+      .filter((x) => Number.isFinite(x) && x >= min && x <= max);
+    scales[id] = { n: vals.length, avg: vals.length ? vals.reduce((s, x) => s + x, 0) / vals.length : null };
+  }
+  const ad = answers.map((a) => a.adopcion);
+  return { scales, adopcion: { si: ad.filter((x) => x === "Sí").length, talvez: ad.filter((x) => x === "Tal vez").length, no: ad.filter((x) => x === "No").length } };
+}
+
 export type GuideVerdict = {
   guide: Guide;
   testers: number;
   finished: number;
   cases: CaseStat[];
-  survey: { n: number; umux: number | null; sus: number | null; ci: [number, number] | null };
+  survey: { n: number; umux: number | null; sus: number | null; ci: [number, number] | null; opinion: OpinionStat };
   criteria: Criterion[];
 };
 
@@ -429,9 +463,9 @@ export function computeVerdict(round = viewRoundId()): Verdict {
     });
 
     // Satisfacción (UMUX-Lite → SUS)
-    const scores = surveys
-      .filter((s) => roleIds.has(s.run_id))
-      .map((s) => parseRec(s.answers))
+    const roleAnswers = surveys.filter((s) => roleIds.has(s.run_id)).map((s) => parseRec(s.answers));
+    const opinion = opinionOf(roleAnswers);
+    const scores = roleAnswers
       .map((a) => [Number(a.umux1), Number(a.umux2)])
       .filter(([x, y]) => x >= 1 && x <= 7 && y >= 1 && y <= 7)
       .map(([x, y]) => umuxLite(x, y));
@@ -498,7 +532,7 @@ export function computeVerdict(round = viewRoundId()): Verdict {
       testers: gRuns.length,
       finished,
       cases,
-      survey: { n: nS, umux: meanRaw, sus: meanSus, ci: susCi },
+      survey: { n: nS, umux: meanRaw, sus: meanSus, ci: susCi, opinion },
       criteria,
     };
   });

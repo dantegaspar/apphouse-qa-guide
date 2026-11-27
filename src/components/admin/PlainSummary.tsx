@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { COLORS } from "@/components/admin/charts/Charts";
-import { AUDIENCE_LABEL, PLAIN_SEVERITY, type Audience, type PlainSummary, type Problem, type Tone } from "@/lib/plain-summary";
+import { AUDIENCE_LABEL, PLAIN_SEVERITY, type Audience, type OpinionItem, type PlainSummary, type Problem, type Tone } from "@/lib/plain-summary";
 import type { Severity } from "@/lib/types";
 import { THRESHOLDS } from "@/lib/verdict";
 
 /**
  * Resumen ejecutivo para todo el personal (componente de servidor): veredicto Sí/No con el porqué en una
- * frase, cuatro indicadores y qué no funcionó para quién, sin códigos ni siglas.
+ * frase, cuatro indicadores, qué no funcionó para quién y qué opinaron, con rapidez y fluidez (informativo), sin códigos ni siglas.
  */
 
 const TONE_DOT: Record<Tone, string> = { good: COLORS.good, bad: COLORS.critical, neutral: COLORS.neutral };
@@ -26,6 +26,30 @@ function Meter({ value, of, color, label }: { value: number; of: number; color: 
     <div className="h-2 w-full overflow-hidden rounded-full" style={{ background: COLORS.track }} role="img" aria-label={label} title={label}>
       <div className="h-full rounded-full" style={{ width: `${w}%`, background: color }} />
     </div>
+  );
+}
+
+function OpinionList({ items }: { items: OpinionItem[] }) {
+  return (
+    <ul className="mt-2 space-y-3">
+      {items.map((it) => {
+        const nums = `${it.avg.toFixed(1)} de ${it.max}`;
+        return (
+          <li key={it.id}>
+            <div className="flex items-baseline justify-between gap-2 text-sm">
+              <span className="text-slate-700">{it.label}</span>
+              <strong className="shrink-0 text-right text-slate-900">{it.word}</strong>
+            </div>
+            <div className="mt-1.5">
+              <Meter value={it.avg} of={it.max} color={TONE_DOT[it.tone]} label={`${it.label}: ${it.word}, ${nums}`} />
+            </div>
+            <p className="mt-1 text-xs tabular-nums text-slate-500">
+              {nums} · {it.n} {it.n === 1 ? "respuesta" : "respuestas"}
+            </p>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -195,6 +219,39 @@ export function PlainSummaryView({ s, sistemasHref }: { s: PlainSummary; sistema
                 </div>
               );
             })}
+          </div>
+        </section>
+      )}
+
+      {/* 5. Qué opinaron (informativo) */}
+      {s.opinion.length > 0 && (
+        <section aria-labelledby="opinion">
+          <h3 id="opinion" className="text-lg font-semibold text-slate-900">Qué opinaron de la app</h3>
+          <p className="mb-3 text-sm text-slate-600">
+            Promedio de lo que contestaron en la encuesta final. Solo es de referencia: no decide el resultado. En la rapidez influyen también el internet y el servidor.
+          </p>
+          <div className="grid gap-3 lg:grid-cols-3">
+            {s.opinion.map((row) => (
+              <div key={row.audience} className="rounded-xl bg-white p-4 ring-1 ring-slate-200">
+                <span className="text-sm font-semibold uppercase tracking-wide text-slate-500">{AUDIENCE_LABEL[row.audience]}</span>
+                {row.general.length > 0 && <OpinionList items={row.general} />}
+                {row.adopcion && (
+                  <div className="mt-3 text-sm">
+                    <p className="text-slate-700">¿La usarían hoy, tal como está?</p>
+                    <p className="mt-0.5 text-slate-900">
+                      <strong>Sí: {row.adopcion.si}</strong> · Tal vez: {row.adopcion.talvez} · No: {row.adopcion.no}
+                      <span className="text-slate-500"> (de {row.adopcion.n})</span>
+                    </p>
+                  </div>
+                )}
+                {row.speed.length > 0 && (
+                  <>
+                    <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500">Rapidez y fluidez</p>
+                    <OpinionList items={row.speed} />
+                  </>
+                )}
+              </div>
+            ))}
           </div>
         </section>
       )}

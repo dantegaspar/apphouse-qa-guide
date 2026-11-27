@@ -1,6 +1,6 @@
 {
   "id": "cliente",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "role": "Cliente final",
   "title": "Manual del Cliente final",
   "subtitle": "Guía de prueba de la app AppHouse",
@@ -868,7 +868,7 @@
   },
   "survey": {
     "title": "Encuesta del Cliente final",
-    "intro": "Son 5 preguntas cortas; toma 1 minuto.",
+    "intro": "Son 10 preguntas de tocar una opción y 2 comentarios opcionales; toma 2 minutos.",
     "questions": [
       {
         "id": "umux1",
@@ -888,6 +888,63 @@
         "minLabel": "Totalmente en desacuerdo",
         "maxLabel": "Totalmente de acuerdo",
         "label": "La app es fácil de usar.",
+        "required": true
+      },
+      {
+        "id": "satisfaccion",
+        "type": "scale",
+        "min": 1,
+        "max": 5,
+        "minLabel": "Nada satisfecho",
+        "maxLabel": "Muy satisfecho",
+        "label": "En general, ¿qué tan satisfecho quedaste con la app?",
+        "required": true
+      },
+      {
+        "id": "facilidad",
+        "type": "scale",
+        "min": 1,
+        "max": 5,
+        "minLabel": "Muy difícil",
+        "maxLabel": "Muy fácil",
+        "label": "¿Qué tan fácil fue usar la app sin que nadie te ayudara?",
+        "required": true
+      },
+      {
+        "id": "rapidez",
+        "type": "scale",
+        "min": 1,
+        "max": 5,
+        "minLabel": "Muy lento",
+        "maxLabel": "Muy rápido",
+        "label": "A tu parecer, ¿qué tan rápido cargaron las pantallas de la app?",
+        "required": true
+      },
+      {
+        "id": "fluidez",
+        "type": "scale",
+        "min": 1,
+        "max": 5,
+        "minLabel": "Se trababa mucho",
+        "maxLabel": "Muy fluida",
+        "label": "¿Qué tan fluida se sintió la app al usarla, sin trabarse, congelarse ni cerrarse sola?",
+        "required": true
+      },
+      {
+        "id": "recomienda",
+        "type": "nps",
+        "label": "Del 0 al 10, ¿qué tanto le recomendarías esta app a un amigo o familiar?",
+        "required": true
+      },
+      {
+        "id": "adopcion",
+        "type": "choice",
+        "label": "¿Usarías esta app en tu día a día tal como está hoy?",
+        "options": [
+          "Sí",
+          "Tal vez",
+          "No"
+        ],
         "required": true
       },
       {
@@ -919,6 +976,12 @@
           "Ninguna, todo fue fácil"
         ],
         "required": true
+      },
+      {
+        "id": "gusto",
+        "type": "text",
+        "label": "¿Qué te gustó más de la app? (opcional)",
+        "placeholder": "Lo que más me gustó fue…"
       },
       {
         "id": "improve",

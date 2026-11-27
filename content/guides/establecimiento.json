@@ -1,6 +1,6 @@
 {
   "id": "establecimiento",
-  "version": "5.1.0",
+  "version": "5.2.0",
   "role": "Establecimiento",
   "title": "Manual del Establecimiento",
   "subtitle": "Guía de prueba del panel web de tu sucursal",
@@ -1131,7 +1131,7 @@
   },
   "survey": {
     "title": "Encuesta del Establecimiento",
-    "intro": "Son 4 preguntas y un comentario opcional; toma 1 minuto.",
+    "intro": "Son 10 preguntas de tocar una opción y un comentario opcional; toma 2 minutos.",
     "questions": [
       {
         "id": "umux1",
@@ -1151,6 +1151,67 @@
         "minLabel": "Totalmente en desacuerdo",
         "maxLabel": "Totalmente de acuerdo",
         "label": "El panel es fácil de usar.",
+        "required": true
+      },
+      {
+        "id": "satisfaccion",
+        "type": "scale",
+        "min": 1,
+        "max": 5,
+        "minLabel": "Nada satisfecho",
+        "maxLabel": "Muy satisfecho",
+        "label": "En general, ¿qué tan satisfecho quedaste con el panel?",
+        "required": true
+      },
+      {
+        "id": "seguirPedidos",
+        "type": "scale",
+        "min": 1,
+        "max": 5,
+        "minLabel": "Muy difícil",
+        "maxLabel": "Muy fácil",
+        "label": "¿Qué tan fácil fue seguir los pedidos, desde que llegan hasta que se entregan?",
+        "required": true
+      },
+      {
+        "id": "configurar",
+        "type": "scale",
+        "min": 1,
+        "max": 5,
+        "minLabel": "Muy difícil",
+        "maxLabel": "Muy fácil",
+        "label": "¿Qué tan fácil fue configurar tu sucursal (horario, menú y repartidores)?",
+        "required": true
+      },
+      {
+        "id": "rapidez",
+        "type": "scale",
+        "min": 1,
+        "max": 5,
+        "minLabel": "Muy lento",
+        "maxLabel": "Muy rápido",
+        "label": "A tu parecer, ¿qué tan rápido cargaron las pantallas del panel?",
+        "required": true
+      },
+      {
+        "id": "fluidez",
+        "type": "scale",
+        "min": 1,
+        "max": 5,
+        "minLabel": "Se trababa mucho",
+        "maxLabel": "Muy fluido",
+        "label": "¿Qué tan fluido se sintió el panel al usarlo, sin trabarse, congelarse ni cerrarse solo?",
+        "required": true
+      },
+      {
+        "id": "adopcion",
+        "type": "choice",
+        "label": "¿Usarías este panel para manejar tu negocio tal como está hoy?",
+        "options": [
+          "Sí",
+          "Tal vez",
+          "No"
+        ],
         "required": true
       },
       {
