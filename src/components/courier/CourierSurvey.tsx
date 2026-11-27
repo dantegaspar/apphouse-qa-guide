@@ -29,7 +29,8 @@ import { toast, useConfirm } from "@/components/feedback";
 import { Confetti, motion, Sparkles, staggerItem, staggerList, useReducedMotion } from "@/components/motion";
 import { clearPhotos, deletePhoto, getPhoto, putPhoto } from "./photos";
 import { FaceIcon } from "./FaceIcon";
-import { Camera, Check, ChevronDown, CircleCheck, ImageOff, Mic, PartyPopper, Plus, Trash2, TriangleAlert, WifiOff } from "lucide-react";
+import { HappyCat } from "@/components/HappyCat";
+import { Camera, Check, ChevronDown, CircleCheck, ImageOff, Mic, Plus, Trash2, TriangleAlert, WifiOff } from "lucide-react";
 
 /**
  * Encuesta para repartidores: una sola pantalla, botones grandes y palabras sencillas.
@@ -1131,20 +1132,13 @@ function ThankYou({
       <Confetti count={44} />
       <div className="animate-pop rounded-3xl bg-white p-6 text-center shadow-sm ring-1 ring-slate-200" data-testid="thanks">
         <motion.div
-          className="relative inline-block text-brand-600"
-          aria-hidden
-          initial={reduce ? { opacity: 0 } : { scale: 0.2, rotate: -30, opacity: 0 }}
-          animate={reduce ? { opacity: 1 } : { scale: [0.2, 1.3, 1], rotate: [-30, 12, 0], opacity: 1 }}
+          className="relative inline-block"
+          initial={reduce ? { opacity: 0 } : { scale: 0.2, rotate: -20, opacity: 0 }}
+          animate={reduce ? { opacity: 1 } : { scale: [0.2, 1.15, 1], rotate: [-20, 8, 0], opacity: 1 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
         >
-          <motion.span
-            className="inline-block"
-            animate={reduce ? { opacity: [1, 0.7, 1] } : { y: [0, -10, 0], rotate: [0, -6, 6, 0] }}
-            transition={{ duration: 1.6, repeat: Infinity, repeatDelay: 1, delay: 0.7 }}
-          >
-            <PartyPopper className="h-20 w-20" strokeWidth={1.6} />
-          </motion.span>
-          <Sparkles count={12} radius={76} size={15} delay={0.2} />
+          <HappyCat size={150} />
+          <Sparkles count={12} radius={84} size={15} delay={0.2} />
         </motion.div>
         <h1 className="mt-3 text-3xl font-bold">¡Gracias, {sent.name.split(/\s+/)[0]}!</h1>
         <p className="mt-2 text-lg text-slate-700">Tus respuestas se enviaron. Nos ayudan a mejorar la app.</p>
