@@ -1,6 +1,6 @@
 {
   "id": "establecimiento-app",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "role": "Establecimiento",
   "hidden": true,
   "title": "Manual del Establecimiento · App móvil",
@@ -175,8 +175,8 @@
             "Martes 24 de noviembre de 2026, de 2:00 p.m. a 5:00 p.m. (E02)."
           ],
           [
-            "Repartidores",
-            "Mesa de control te entrega el nombre, correo y teléfono de cada uno (E03)."
+            "Repartidor de ejemplo",
+            "Juan Pérez López · juan.perez@example.com · 5512345678. Es ficticio: solo se da de alta, no participa después (E03)."
           ],
           [
             "Promoción",
@@ -411,14 +411,14 @@
     },
     {
       "id": "E03",
-      "title": "Da de alta a tus repartidores",
+      "title": "Da de alta un repartidor",
       "priority": "alta",
       "quality": "Adecuación funcional",
-      "estMin": 6,
+      "estMin": 3,
       "when": "Después de E02.",
       "where": "Barra de abajo de la app › **Más** › **Reparto** › **Repartidores**.",
       "warnings": [
-        "Mesa de control te entrega los datos de cada repartidor: nombre, correo y teléfono. Da de alta a todos los que te indique."
+        "Esta actividad solo mide **dar de alta** a un repartidor. Usa los datos de ejemplo (Juan Pérez). Ese repartidor es ficticio: **no recibe pedidos ni participa** en el resto de la prueba."
       ],
       "steps": [
         {
@@ -435,56 +435,34 @@
         },
         {
           "id": "3",
-          "text": "Sin escribir nada, toca **Dar de alta (8)**. Los campos deben ponerse en rojo con avisos como «Escribe su nombre» **(4 a 7)**. Toma una captura.",
+          "text": "Sin escribir nada, toca **Dar de alta (8)**. Los campos deben ponerse en rojo con avisos como «Escribe su nombre» **(4 a 7)**.",
           "image": "/guides/establecimiento-app/m-e03-03-alta.jpg",
-          "caption": "4 a 7 = datos del repartidor · 8 = Dar de alta",
-          "evidence": true
+          "caption": "4 a 7 = datos del repartidor · 8 = Dar de alta"
         },
         {
           "id": "4",
-          "text": "Escribe **Nombre (4)**, **Apellido paterno (5)**, el apellido materno si lo tiene, **Correo (6)** y **Teléfono (7)**, tal como te los dio Mesa de control. Deja la lada en +52.",
+          "text": "Escribe los datos de ejemplo en **(4 a 7)** y deja la lada en +52: **Nombre:** Juan · **Apellido paterno:** Pérez · **Apellido materno:** López · **Correo:** juan.perez@example.com · **Teléfono:** 5512345678.",
           "image": "/guides/establecimiento-app/m-e03-03-alta.jpg",
           "caption": "4 a 7 = datos del repartidor · 8 = Dar de alta"
         },
         {
           "id": "5",
-          "text": "Toca **Dar de alta (8)**. El repartidor recibe por correo su usuario y una contraseña temporal.",
+          "text": "Toca **Dar de alta (8)**. Regresas a la lista y aparece **Juan Pérez López**.",
           "image": "/guides/establecimiento-app/m-e03-03-alta.jpg",
-          "caption": "4 a 7 = datos del repartidor · 8 = Dar de alta"
+          "caption": "4 a 7 = datos del repartidor · 8 = Dar de alta",
+          "warning": "Si dice que el correo ya está registrado (otra sucursal ya usó a Juan Pérez), usa **juan.perez2@example.com** (o 3, 4…)."
         },
         {
           "id": "6",
-          "text": "Repite con cada repartidor. En **Tu equipo hoy (2)**, **Activos** debe mostrar cuántos diste de alta.",
+          "text": "En **Tu equipo hoy (2)**, **Activos** debe haber subido en 1.",
           "image": "/guides/establecimiento-app/m-e03-02-repartidores.jpg",
           "caption": "2 = Activos y Disponibles ahora · 3 = Dar de alta"
-        },
-        {
-          "id": "7",
-          "text": "Cuando cada repartidor entre a su app y toque **Disponible**, debe subir **Disponibles ahora (2)**. Si todavía no entran, sigue con E04-A y revísalo después.",
-          "image": "/guides/establecimiento-app/m-e03-02-repartidores.jpg",
-          "caption": "2 = Activos y Disponibles ahora · 3 = Dar de alta",
-          "conditional": true
         }
       ],
       "expected": [
         "Con los datos vacíos, la app bloqueó el guardado y marcó los campos que faltan.",
-        "Cada repartidor aparece en la lista con su nombre, correo y teléfono correctos.",
-        "Activos muestra cuántos repartidores di de alta.",
-        {
-          "text": "Cuando un repartidor tocó Disponible en su app, subió Disponibles ahora.",
-          "conditional": true
-        }
-      ],
-      "fields": [
-        {
-          "id": "couriersCount",
-          "label": "Repartidores que di de alta (cuántos)",
-          "type": "number",
-          "required": true,
-          "pattern": "^\\d{1,2}$",
-          "patternHint": "Escribe solo el número, por ejemplo 3.",
-          "maxLength": 2
-        }
+        "Juan Pérez López aparece en la lista con su correo y teléfono correctos.",
+        "Activos subió en 1."
       ]
     },
     {
