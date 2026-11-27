@@ -229,6 +229,25 @@ const MIGRATIONS: string[] = [
   `
   ALTER TABLE runs ADD COLUMN ended_cause TEXT NOT NULL DEFAULT '';
   `,
+  // 15: comparativas entre dos encuestas redactadas con Claude (ver src/lib/comparativa.ts). Los números se
+  // calculan al vuelo; aquí se guarda solo el emparejamiento de bugs y el texto, con la huella de los datos.
+  `
+  CREATE TABLE claude_comparativa (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at TEXT NOT NULL,
+    model TEXT NOT NULL DEFAULT '',
+    base_round INTEGER NOT NULL,
+    current_round INTEGER NOT NULL,
+    facts_hash TEXT NOT NULL DEFAULT '',
+    matches TEXT NOT NULL DEFAULT '',
+    narrative TEXT NOT NULL DEFAULT '',
+    unverified TEXT NOT NULL DEFAULT '[]',
+    error TEXT NOT NULL DEFAULT '',
+    input_tokens INTEGER NOT NULL DEFAULT 0,
+    output_tokens INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE INDEX claude_comparativa_pair ON claude_comparativa(base_round, current_round, id);
+  `,
 ];
 
 function migrate(db: Database.Database) {

@@ -10,6 +10,7 @@ import { LogoutButton } from "@/components/admin/LogoutButton";
 import { AutoRefresh } from "@/components/admin/AutoRefresh";
 import ClaudeDictamenButton from "@/components/admin/ClaudeDictamenButton";
 import { PlainSummaryView } from "@/components/admin/PlainSummary";
+import { ComparativaView } from "@/components/admin/ComparativaView";
 import { loadPlainSummary } from "@/lib/plain-summary";
 import type { ActivityRow, Verdict } from "@/lib/verdict";
 import { dictamenGate, latestDictamen, NORMAS, umbralesAprobacion } from "@/lib/claude-dictamen";
@@ -133,10 +134,12 @@ const SYS_NAV = [
   ["sys-metodologia", "Metodología"],
 ] as const;
 
-export default async function VerdictPage({ searchParams }: { searchParams: Promise<{ vista?: string }> }) {
+export default async function VerdictPage({ searchParams }: { searchParams: Promise<{ vista?: string; antes?: string; ahora?: string }> }) {
   if (!(await isAdmin())) redirect("/admin/login");
-  const { vista } = await searchParams;
+  const { vista, antes, ahora } = await searchParams;
   const sistemas = vista === "sistemas";
+  const comparativa = vista === "comparativa";
+  const tab = sistemas ? "sistemas" : comparativa ? "comparativa" : "";
   const v = computeVerdict();
   const cd = latestDictamen();
   const gate = dictamenGate();
@@ -167,9 +170,10 @@ export default async function VerdictPage({ searchParams }: { searchParams: Prom
           [
             ["", "Resumen", "Para todo el personal"],
             ["sistemas", "Para Sistemas", "Detalle técnico"],
+            ["comparativa", "Comparativa", "Entre dos encuestas"],
           ] as const
         ).map(([id, label, hint]) => {
-          const on = (id === "sistemas") === sistemas;
+          const on = id === tab;
           return (
             <Link
               key={id}
@@ -185,7 +189,9 @@ export default async function VerdictPage({ searchParams }: { searchParams: Prom
         })}
       </nav>
 
-      {!sistemas ? (
+      {comparativa ? (
+        <ComparativaView antes={antes} ahora={ahora} />
+      ) : !sistemas ? (
         gate.needed ? (
           <section data-testid="summary-pending" className="rounded-2xl bg-slate-50 p-6 text-slate-700 ring-1 ring-slate-200">
             <h2 className="text-xl font-semibold text-slate-900">El resultado todavía se está revisando</h2>

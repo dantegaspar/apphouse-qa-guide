@@ -23,8 +23,8 @@ import { BUG_TYPE_HINT, BUG_TYPES, type BugType } from "./types";
 
 export const CLAUDE_MODEL = "claude-opus-5-5";
 /** Precio de lista de Claude Opus 5.5 (USD por millón de tokens) para estimar el costo de cada dictamen. */
-const PRICE_IN = 4;
-const PRICE_OUT = 20;
+export const PRICE_IN = 4;
+export const PRICE_OUT = 20;
 const usage = { input: 0, output: 0 };
 
 const ORIGINS = ["desarrollo", "servidor", "logistica", "tester"] as const;
@@ -93,7 +93,7 @@ export type DictamenRow = {
 };
 
 /** Quita correos y teléfonos del texto libre antes de mandarlo. */
-const scrub = (s: unknown) =>
+export const scrub = (s: unknown) =>
   String(s ?? "")
     .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, "[correo]")
     .replace(/\+?\d[\d\s-]{8,}\d/g, "[teléfono]")
@@ -108,24 +108,36 @@ function client() {
   return new Anthropic();
 }
 
-async function ask<T>(schema: z.ZodType<T>, prompt: string, effort: "medium" | "high"): Promise<T> {
+/**
+ * Llamada a Claude con salida estructurada (zod). Suma los tokens en `acc` (por omisión, los del dictamen).
+ * `system` permite reutilizarla en otras secciones (p. ej. la comparativa entre encuestas).
+ */
+export async function askClaude<T>(
+  schema: z.ZodType<T>,
+  prompt: string,
+  effort: "medium" | "high",
+  opts: { system?: string; acc?: { input: number; output: number } } = {}
+): Promise<T> {
+  const acc = opts.acc ?? usage;
   const res = await client().beta.messages.parse({
     model: CLAUDE_MODEL,
     max_tokens: 16000,
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
-    system: SYSTEM,
+    system: opts.system ?? SYSTEM,
     output_config: { effort, format: betaZodOutputFormat(schema) },
     messages: [{ role: "user", content: prompt }],
   });
   const u = res.usage;
-  usage.input += (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0);
-  usage.output += u.output_tokens ?? 0;
+  acc.input += (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0);
+  acc.output += u.output_tokens ?? 0;
   if (res.stop_reason === "refusal") throw new Error("Claude no quiso procesar estos datos.");
   if (res.stop_reason === "max_tokens") throw new Error("La respuesta de Claude quedó incompleta; vuelve a intentarlo.");
   if (!res.parsed_output) throw new Error("Claude no devolvió el formato esperado.");
   return res.parsed_output as T;
 }
+
+const ask = <T>(schema: z.ZodType<T>, prompt: string, effort: "medium" | "high") => askClaude(schema, prompt, effort);
 
 type RunRow = { id: string; guide_id: string; status: string };
 type IssueRow = { id: string; run_id: string; activity_id: string; severity: string; triage: string; description: string; expected: string; triage_note?: string };

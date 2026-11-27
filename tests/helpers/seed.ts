@@ -10,7 +10,7 @@ import { activeRoundId } from "@/lib/rounds";
 
 export function resetDb() {
   const db = getDb();
-  for (const t of ["courier_issues", "courier_attachments", "courier_feedback", "claude_dictamen", "help_requests", "attachments", "issues", "survey_responses", "activity_results", "step_results", "runs"])
+  for (const t of ["claude_comparativa", "courier_issues", "courier_attachments", "courier_feedback", "claude_dictamen", "help_requests", "attachments", "issues", "survey_responses", "activity_results", "step_results", "runs"])
     db.prepare(`DELETE FROM ${t}`).run();
   return activeRoundId();
 }

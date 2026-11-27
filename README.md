@@ -11,6 +11,8 @@ Guía interactiva de pruebas QA de AppHouse. El tester:
 
 Todo se guarda en SQLite. El panel **/admin**, protegido con contraseña, muestra los resultados y permite exportarlos a CSV.
 
+En **/admin/veredicto**, la pestaña **Comparativa** compara dos encuestas (rondas): qué mejoró, qué retrocedió y qué bugs de la encuesta pasada se solucionaron (no se repitieron al volver a probar la tarea), siguen pasando o quedaron sin verificar. Los números los calcula `src/lib/comparativa.ts` con las mismas reglas del veredicto; Claude (`ANTHROPIC_API_KEY`) solo decide qué reportes nuevos son el mismo problema que uno anterior y redacta el resumen en lenguaje llano, y las cifras de su texto se revisan contra el cálculo.
+
 ## Requisitos
 
 - Node.js 22 o superior
