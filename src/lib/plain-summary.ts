@@ -35,7 +35,7 @@ export const PLAIN_TASK: Record<string, string> = {
   C13: "Cerrar y volver a abrir la app",
   E01: "Entrar al panel o a la app del negocio",
   E02: "Poner el horario de la sucursal",
-  E03: "Dar de alta a sus repartidores",
+  E03: "Dar de alta un repartidor",
   "E04-A": "Crear el menú",
   "E04-B": "Crear una promoción",
   "E04-C": "Poner el costo de envío",

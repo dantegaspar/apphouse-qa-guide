@@ -1,6 +1,6 @@
 {
   "id": "establecimiento",
-  "version": "5.0.0",
+  "version": "5.1.0",
   "role": "Establecimiento",
   "title": "Manual del Establecimiento",
   "subtitle": "Guía de prueba del panel web de tu sucursal",
@@ -173,8 +173,8 @@
             "Hoy (el día de la prueba), de 2:00 p.m. a 5:00 p.m. (E02)."
           ],
           [
-            "Repartidores",
-            "Mesa de control te entrega el nombre, correo y teléfono de cada uno (E03)."
+            "Repartidor de ejemplo",
+            "Juan Pérez López · juan.perez@example.com · 5512345678. Es ficticio: solo se da de alta, no participa después (E03)."
           ],
           [
             "Promoción",
@@ -401,14 +401,14 @@
     },
     {
       "id": "E03",
-      "title": "Da de alta a tus repartidores",
+      "title": "Da de alta un repartidor",
       "priority": "alta",
       "quality": "Adecuación funcional",
-      "estMin": 6,
+      "estMin": 3,
       "when": "Después de E02.",
       "where": "Menú izquierdo › **REPARTO › Repartidores**",
       "warnings": [
-        "Mesa de control te da el nombre, correo y teléfono de cada repartidor. Da de alta a todos los que te indique."
+        "Esta actividad solo mide **dar de alta** a un repartidor. Usa los datos de ejemplo (Juan Pérez). Ese repartidor es ficticio: **no recibe pedidos ni participa** en el resto de la prueba."
       ],
       "steps": [
         {
@@ -428,7 +428,7 @@
         },
         {
           "id": "3",
-          "text": "Escribe **Nombre**, **Apellido paterno**, el materno si lo tiene, **Correo** y **Teléfono (5)**, tal como te los dio Mesa de control. Deja el código del país en 52.",
+          "text": "Escribe los datos de ejemplo en **(5)** y deja el código del país en 52: **Nombre:** Juan · **Apellido paterno:** Pérez · **Apellido materno:** López · **Correo:** juan.perez@example.com · **Teléfono:** 5512345678.",
           "screen": "Repartidores y «Dar de alta a un repartidor»",
           "dataButton": true
         },
@@ -436,43 +436,22 @@
           "id": "4",
           "text": "Toca **Dar de alta (3)**.",
           "screen": "Repartidores y «Dar de alta a un repartidor»",
-          "check": "Regresas a la lista y aparece el repartidor con su nombre, correo y teléfono."
+          "check": "Regresas a la lista y aparece **Juan Pérez López** con su correo y teléfono.",
+          "warning": "Si dice que el correo ya está registrado (otra sucursal ya usó a Juan Pérez), usa **juan.perez2@example.com** (o 3, 4…)."
         },
         {
           "id": "5",
-          "text": "Repite los pasos 1 a 4 con cada repartidor.",
+          "text": "Mira el número de **Activos (6)**.",
           "screen": "Repartidores y «Dar de alta a un repartidor»",
-          "check": "**Activos (6)** muestra cuántos diste de alta."
-        },
-        {
-          "id": "6",
-          "text": "Cuando un repartidor entre a su app y toque **Disponible**, mira **Disponibles ahora (7)**. Si todavía no entran, guarda esta actividad y sigue: lo revisas después.",
-          "screen": "Repartidores y «Dar de alta a un repartidor»",
-          "check": "Sube el número de Disponibles ahora.",
-          "conditional": true
+          "check": "**Activos (6)** subió en 1."
         }
       ],
       "expected": [
         "Con los datos vacíos, el panel bloqueó el guardado y marcó los campos que faltan.",
-        "Cada repartidor aparece en la lista con su nombre, correo y teléfono correctos.",
-        "Activos muestra cuántos repartidores di de alta.",
-        {
-          "text": "Cuando un repartidor tocó Disponible en su app, subió Disponibles ahora.",
-          "conditional": true
-        }
+        "Juan Pérez López aparece en la lista con su correo y teléfono correctos.",
+        "Activos subió en 1."
       ],
-      "fields": [
-        {
-          "id": "ridersCount",
-          "label": "Repartidores que di de alta (cuántos)",
-          "type": "number",
-          "required": true,
-          "pattern": "^\\d{1,2}$",
-          "patternHint": "Escribe solo el número, por ejemplo 3.",
-          "maxLength": 2
-        }
-      ],
-      "goal": "Que cada repartidor que te indique Mesa de control quede registrado y reciba su acceso por correo."
+      "goal": "Que puedas dar de alta un repartidor y quede registrado en la lista. Es solo para medir el alta: ese repartidor no participa después."
     },
     {
       "id": "E04-A",
