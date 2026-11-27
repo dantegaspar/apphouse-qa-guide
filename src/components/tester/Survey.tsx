@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { Guide, SurveyQuestion } from "@/lib/types";
 import { Confetti, motion, Sparkles, useReducedMotion } from "@/components/motion";
+import { HappyCat } from "@/components/HappyCat";
 import { Button, FieldError, inputCls, inputErrCls } from "./ui";
 import { focusFirstError, LIMITS } from "./validation";
 
@@ -162,19 +163,13 @@ export default function Survey({
       <div className="animate-pop flex flex-col items-center py-12 text-center" data-testid="survey-done">
         {justSent && <Confetti count={44} />}
         <motion.div
-          className="relative text-6xl"
-          initial={reduce ? { opacity: 0 } : { scale: 0.2, rotate: -30, opacity: 0 }}
-          animate={reduce ? { opacity: 1 } : { scale: [0.2, 1.3, 1], rotate: [-30, 12, 0], opacity: 1 }}
+          className="relative"
+          initial={reduce ? { opacity: 0 } : { scale: 0.2, rotate: -20, opacity: 0 }}
+          animate={reduce ? { opacity: 1 } : { scale: [0.2, 1.15, 1], rotate: [-20, 8, 0], opacity: 1 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
         >
-          <motion.span
-            className="inline-block"
-            animate={reduce ? { opacity: [1, 0.7, 1] } : { y: [0, -8, 0], rotate: [0, -6, 6, 0] }}
-            transition={{ duration: 1.6, repeat: Infinity, repeatDelay: 1, delay: 0.7 }}
-          >
-            🎉
-          </motion.span>
-          <Sparkles count={12} radius={70} size={14} delay={0.2} loop={justSent} />
+          <HappyCat size={150} />
+          <Sparkles count={12} radius={84} size={14} delay={0.2} loop={justSent} />
         </motion.div>
         <h1 className="mt-4 text-2xl font-bold">¡Prueba terminada!</h1>
         <p className="mt-2 max-w-sm text-slate-600" role="status">
